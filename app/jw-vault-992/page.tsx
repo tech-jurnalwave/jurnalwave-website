@@ -83,10 +83,10 @@ export default function SuperadminSecretAuthPage() {
           theme: 'outline',
           size: 'large',
           type: 'standard',
-          shape: 'pill',
+          shape: 'rectangular',
           text: 'signin_with',
           logo_alignment: 'left',
-          width: 280,
+          width: 320,
         })
       } catch (e) {
         console.warn('Google GSI render notice:', e)
@@ -102,30 +102,26 @@ export default function SuperadminSecretAuthPage() {
         onLoad={() => setScriptLoaded(true)}
       />
 
-      <div className="min-h-screen bg-[#fafafa] flex items-center justify-center p-4 selection:bg-[#c00015] selection:text-white">
-        <div className="w-full max-w-sm bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-xs">
-          {/* Header Minimalis dengan Logo JurnalWave */}
-          <div className="text-center mb-6">
-            <div className="flex justify-center mb-4">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/logo-jurnal-wave.webp"
-                alt="JurnalWave"
-                className="h-9 sm:h-10 w-auto object-contain"
-              />
-            </div>
-
-            <h1 className="font-heading font-extrabold text-lg text-slate-900 tracking-tight">
-              Login Superadmin JurnalWave
-            </h1>
-            <p className="text-xs text-slate-500 mt-1">
-              Masuk dengan akun Google terdaftar
-            </p>
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4 selection:bg-[#c00015] selection:text-white">
+        <div className="w-full max-w-sm flex flex-col items-center justify-center text-center">
+          {/* Logo JurnalWave */}
+          <div className="flex justify-center mb-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo-jurnal-wave.webp"
+              alt="JurnalWave"
+              className="h-10 sm:h-12 w-auto object-contain"
+            />
           </div>
+
+          {/* Teks Minimalis Sesuai Referensi */}
+          <p className="text-xs sm:text-sm text-slate-500 font-medium mb-8">
+            Portal Akses Khusus Superadmin JurnalWave.
+          </p>
 
           {/* Notifikasi Error */}
           {errorMsg && (
-            <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-medium flex items-start gap-2 animate-in fade-in">
+            <div className="w-full mb-5 p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-medium flex items-start gap-2 text-left animate-in fade-in">
               <ShieldAlert className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
               <div className="flex-1 leading-relaxed">{errorMsg}</div>
             </div>
@@ -133,14 +129,14 @@ export default function SuperadminSecretAuthPage() {
 
           {/* Notifikasi Sukses */}
           {successMsg && (
-            <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-start gap-2 animate-in fade-in">
+            <div className="w-full mb-5 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-start gap-2 text-left animate-in fade-in">
               <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <div className="flex-1 leading-relaxed">{successMsg}</div>
             </div>
           )}
 
-          {/* Tombol Sign In with Google */}
-          <div className="flex flex-col items-center justify-center py-2">
+          {/* Tombol Google Sign In */}
+          <div className="w-full flex flex-col items-center justify-center">
             {loading ? (
               <div className="flex items-center gap-2 text-xs text-slate-600 py-3">
                 <Loader2 className="w-4 h-4 animate-spin text-[#c00015]" />

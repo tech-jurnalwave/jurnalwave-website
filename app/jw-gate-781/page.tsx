@@ -21,7 +21,6 @@ export default function AdminStaffSecretLoginPage() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [lockCountdown, setLockCountdown] = useState<number>(0)
 
-  // Countdown timer jika terkena rate limit
   useEffect(() => {
     if (lockCountdown <= 0) return
     const timer = setInterval(() => {
@@ -43,7 +42,6 @@ export default function AdminStaffSecretLoginPage() {
       return
     }
 
-    // Jika Superadmin mencoba login via form staf
     if (email.trim().toLowerCase() === 'tech.jurnalwave@gmail.com') {
       setErrorMsg('Email atau kata sandi tidak cocok.')
       return
@@ -93,79 +91,73 @@ export default function AdminStaffSecretLoginPage() {
         setErrorMsg(json.message || 'Email atau kata sandi tidak cocok.')
       }
     } catch (err: any) {
-      setErrorMsg('Gagal terhubung ke server autentikasi: ' + (err?.message || 'Koneksi bermasalah'))
+      setErrorMsg('Gagal terhubung ke server: ' + (err?.message || 'Koneksi bermasalah'))
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-[#fafafa] flex items-center justify-center p-4 selection:bg-[#c00015] selection:text-white">
-      <div className="w-full max-w-sm bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-xs">
-        {/* Header Minimalis dengan Logo JurnalWave */}
-        <div className="text-center mb-6">
-          <div className="flex justify-center mb-4">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo-jurnal-wave.webp"
-              alt="JurnalWave"
-              className="h-9 sm:h-10 w-auto object-contain"
-            />
-          </div>
-          <h1 className="font-heading font-extrabold text-lg text-slate-900 tracking-tight">
-            Login Admin JurnalWave
-          </h1>
+    <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4 selection:bg-[#c00015] selection:text-white">
+      <div className="w-full max-w-sm flex flex-col items-center justify-center">
+        {/* Logo JurnalWave */}
+        <div className="flex justify-center mb-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo-jurnal-wave.webp"
+            alt="JurnalWave"
+            className="h-10 sm:h-12 w-auto object-contain"
+          />
         </div>
 
+        {/* Teks Minimalis Sesuai Referensi */}
+        <p className="text-xs sm:text-sm text-slate-500 font-medium mb-7 text-center">
+          Portal Akses Khusus Admin JurnalWave.
+        </p>
+
         {errorMsg && (
-          <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-medium flex items-start gap-2 animate-in fade-in">
+          <div className="w-full mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-medium flex items-start gap-2 animate-in fade-in">
             <ShieldAlert className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
             <div className="flex-1 leading-relaxed">{errorMsg}</div>
           </div>
         )}
 
         {successMsg && (
-          <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-start gap-2 animate-in fade-in">
+          <div className="w-full mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-start gap-2 animate-in fade-in">
             <div className="flex-1 leading-relaxed">{successMsg}</div>
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleLogin} className="w-full space-y-3.5">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Masukkan Email
-            </label>
             <div className="relative">
-              <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Masukkan email"
-                className="w-full pl-9 pr-3.5 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#c00015] focus:ring-1 focus:ring-[#c00015] transition"
+                className="w-full pl-10 pr-4 py-2.5 text-xs sm:text-sm bg-slate-50/80 border border-slate-200/90 rounded-xl text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#c00015] focus:ring-1 focus:ring-[#c00015] transition shadow-2xs"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Kata Sandi
-            </label>
             <div className="relative">
-              <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Masukkan kata sandi"
-                className="w-full pl-9 pr-10 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#c00015] focus:ring-1 focus:ring-[#c00015] transition"
+                className="w-full pl-10 pr-10 py-2.5 text-xs sm:text-sm bg-slate-50/80 border border-slate-200/90 rounded-xl text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#c00015] focus:ring-1 focus:ring-[#c00015] transition shadow-2xs"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -175,7 +167,7 @@ export default function AdminStaffSecretLoginPage() {
           <button
             type="submit"
             disabled={loading || lockCountdown > 0}
-            className="w-full py-2.5 px-4 rounded-lg bg-[#c00015] hover:bg-[#a00012] text-white text-xs sm:text-sm font-semibold transition shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
+            className="w-full py-3 px-4 rounded-xl bg-[#c00015] hover:bg-[#a00012] text-white text-xs sm:text-sm font-semibold transition shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-1"
           >
             {loading ? (
               <span className="flex items-center gap-2">
