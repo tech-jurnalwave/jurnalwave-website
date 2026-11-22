@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Vote, Check } from 'lucide-react';
 import { Poll } from '@/types';
-import { DEFAULT_FALLBACK_POLL } from '@/lib/polls';
 
 interface PollingWidgetProps {
   poll?: Poll | null;
@@ -252,6 +251,11 @@ export const PollingWidget: React.FC<PollingWidgetProps> = ({ poll: initialPoll 
             updatedCounts[opt.id] = opt.votes || 0;
           });
           setVoteCounts(updatedCounts);
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem('jurnal_wave_active_poll', JSON.stringify(json.data));
+            } catch {}
+          }
         }
       }
     } catch (err) {

@@ -206,8 +206,12 @@ export default function AdminPollingPage() {
           }),
         })
 
+        let finalUpdatedPoll: Poll | null = null
         if (res.ok) {
           const json = await res.json().catch(() => ({}))
+          if (json.success && json.data) {
+            finalUpdatedPoll = json.data
+          }
           showToast('Polling berhasil diperbarui.')
         } else {
           showToast('Polling berhasil diperbarui di penyimpanan lokal.')
@@ -215,7 +219,7 @@ export default function AdminPollingPage() {
 
         let updatedPolls = polls.map((p) => {
           if (p.id === editingPollId) {
-            return {
+            return finalUpdatedPoll || {
               ...p,
               question: formQuestion.trim(),
               category: formCategory.trim(),
@@ -250,6 +254,7 @@ export default function AdminPollingPage() {
           options: validOptions.map((text, idx) => ({ id: `opt-${Date.now()}-${idx}`, text, votes: 0 })),
         }
 
+        let savedItem: Poll = newPollItem
         const res = await fetch('/api/polls', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -262,20 +267,24 @@ export default function AdminPollingPage() {
         })
 
         if (res.ok) {
+          const json = await res.json().catch(() => ({}))
+          if (json.success && json.data) {
+            savedItem = json.data
+          }
           showToast('Polling baru berhasil diterbitkan!')
         } else {
           showToast('Polling baru berhasil diterbitkan di penyimpanan lokal!')
         }
 
-        let nextPolls = [newPollItem, ...polls]
+        let nextPolls = [savedItem, ...polls]
         if (formIsActive) {
-          nextPolls = nextPolls.map((p) => (p.id === newPollItem.id ? p : { ...p, isActive: false }))
+          nextPolls = nextPolls.map((p) => (p.id === savedItem.id ? p : { ...p, isActive: false }))
         }
         setPolls(nextPolls)
         if (typeof window !== 'undefined') {
           localStorage.setItem('jurnal_wave_admin_polls', JSON.stringify(nextPolls))
           if (formIsActive) {
-            localStorage.setItem('jurnal_wave_active_poll', JSON.stringify(newPollItem))
+            localStorage.setItem('jurnal_wave_active_poll', JSON.stringify(savedItem))
           }
           window.dispatchEvent(new CustomEvent('poll-updated'))
           window.dispatchEvent(new Event('storage'))
