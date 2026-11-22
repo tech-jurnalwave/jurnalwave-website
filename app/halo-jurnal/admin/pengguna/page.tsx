@@ -600,41 +600,6 @@ export default function AdminTimRedaksiPage() {
             onClose={() => setToastMessage(null)}
           />
 
-          {/* Banner Pintu Masuk Login Staf Resmi */}
-          <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-3.5 sm:p-4 rounded-xl border border-slate-700 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <KeyRound className="w-4 h-4 text-amber-400" />
-                <span className="font-heading font-bold text-xs sm:text-sm text-white">
-                  Tautan Login Staf Redaksi (Portal Rahasia)
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-300">
-                Kirimkan tautan login resmi ini beserta email dan kata sandi yang telah Anda buat kepada staf.
-              </p>
-              <div className="flex items-center gap-1.5 pt-0.5">
-                <code className="text-[11px] font-mono font-semibold bg-black/50 text-amber-300 px-2.5 py-0.5 rounded border border-white/10">
-                  {typeof window !== 'undefined' ? `${window.location.origin}/jw-gate-781` : '/jw-gate-781'}
-                </code>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                const url = typeof window !== 'undefined' ? `${window.location.origin}/jw-gate-781` : '/jw-gate-781'
-                if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                  navigator.clipboard.writeText(url)
-                  setToastMessage('✓ Tautan login staf (/jw-gate-781) berhasil disalin ke clipboard!')
-                  setTimeout(() => setToastMessage(null), 3500)
-                }
-              }}
-              className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold border border-white/20 transition cursor-pointer shrink-0 self-start sm:self-center"
-            >
-              <Copy className="w-3.5 h-3.5 text-amber-400" />
-              <span>Salin Tautan Login Staf</span>
-            </button>
-          </div>
-
           {/* Toolbar: Search & Tombol Tambah Anggota */}
           <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="relative w-full sm:max-w-md">
