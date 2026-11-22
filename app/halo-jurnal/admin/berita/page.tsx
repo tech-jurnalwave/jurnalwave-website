@@ -266,6 +266,27 @@ const generateSmartLead = (title: string, content: string): string => {
   return bestLead || validCandidates[0] || ''
 }
 
+function formatPublishDateTime(createdAt?: string, publishedDate?: string) {
+  if (createdAt) {
+    try {
+      const d = new Date(createdAt);
+      if (!isNaN(d.getTime())) {
+        const day = d.getDate();
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+        const month = monthNames[d.getMonth()];
+        const year = d.getFullYear();
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        return `${day} ${month} ${year} | ${hours}:${minutes} WIB`;
+      }
+    } catch {}
+  }
+  if (publishedDate) {
+    return publishedDate.includes('|') ? publishedDate : `${publishedDate} | 00:00 WIB`;
+  }
+  return '26 Okt 2024 | 00:00 WIB';
+}
+
 export default function AdminBeritaPage() {
   const confirmDialog = useConfirm()
   const [articles, setArticles] = useState<Article[]>([])
@@ -1291,7 +1312,7 @@ export default function AdminBeritaPage() {
                             Tayang
                           </span>
                           <span className="text-[10px] text-slate-400">
-                            {article.publishedDate || '26 Okt 2024'}
+                            {formatPublishDateTime(article.createdAt, article.publishedDate)}
                           </span>
                         </div>
                       )}
