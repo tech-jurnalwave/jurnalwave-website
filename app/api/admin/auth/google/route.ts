@@ -51,12 +51,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 2. Proteksi Mutlak: Hanya email tech.jurnalwave@gmail.com yang diizinkan!
+    // 2. Proteksi Mutlak: Hanya email resmi yang diizinkan!
     if (email !== SUPERADMIN_OFFICIAL_EMAIL) {
       return NextResponse.json(
         {
           success: false,
-          message: `Akses Ditolak! Akun Google (${email}) tidak memiliki otoritas Superadmin JurnalWave. Hanya ${SUPERADMIN_OFFICIAL_EMAIL} yang berhak masuk.`,
+          message: 'Akses ditolak. Akun Google ini tidak memiliki otoritas Superadmin.',
         },
         { status: 403 }
       )

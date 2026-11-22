@@ -75,14 +75,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 1. Proteksi Khusus Superadmin: Wajib via Google SSO di /superadmin-auth
+    // 1. Proteksi Khusus Superadmin: Tidak dapat login via form staf biasa
     if (email === 'tech.jurnalwave@gmail.com') {
       return NextResponse.json(
         {
           success: false,
-          message: 'Akun Superadmin wajib masuk melalui Portal Superadmin khusus (/superadmin-auth) menggunakan Akun Google.',
+          message: 'Kombinasi email atau kata sandi admin salah.',
         },
-        { status: 403 }
+        { status: 401 }
       )
     }
 

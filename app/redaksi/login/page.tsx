@@ -45,7 +45,7 @@ export default function RedaksiStaffLoginPage() {
 
     // Jika Superadmin mencoba login via form staf
     if (email.trim().toLowerCase() === 'tech.jurnalwave@gmail.com') {
-      setErrorMsg('Akun Superadmin wajib masuk melalui Portal Superadmin khusus menggunakan Akun Google.')
+      setErrorMsg('Email atau kata sandi tidak cocok.')
       return
     }
 
