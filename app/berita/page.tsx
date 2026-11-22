@@ -1,4 +1,4 @@
-﻿import type { Metadata } from 'next';
+import type { Metadata } from 'next';
 import { CategoryTemplate } from '@/components/layout/CategoryTemplate';
 import { fetchArticles } from '@/lib/wordpress';
 

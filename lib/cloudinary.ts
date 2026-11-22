@@ -135,3 +135,125 @@ export async function ensureCloudinaryUrl(
 
   return trimmed;
 }
+
+/**
+ * Ekstrak publicId dan resourceType dari URL Cloudinary
+ */
+export function extractCloudinaryPublicId(
+  url?: string | null
+): { publicId: string; resourceType: 'image' | 'video' } | null {
+  if (!url || typeof url !== 'string' || !url.includes('res.cloudinary.com')) {
+    return null;
+  }
+
+  try {
+    const isVideo = url.includes('/video/upload/');
+    const resourceType: 'image' | 'video' = isVideo ? 'video' : 'image';
+
+    const uploadIdx = url.indexOf('/upload/');
+    if (uploadIdx === -1) return null;
+
+    let pathAfterUpload = url.substring(uploadIdx + '/upload/'.length);
+    const queryIdx = pathAfterUpload.indexOf('?');
+    if (queryIdx !== -1) {
+      pathAfterUpload = pathAfterUpload.substring(0, queryIdx);
+    }
+
+    const segments = pathAfterUpload.split('/');
+    const cleanSegments: string[] = [];
+
+    for (const seg of segments) {
+      if (!seg) continue;
+      // Lewati segmen transformasi (f_auto,q_auto, w_500, c_fill, dll)
+      if (
+        seg.includes(',') ||
+        seg.startsWith('c_') ||
+        seg.startsWith('w_') ||
+        seg.startsWith('h_') ||
+        seg.startsWith('q_') ||
+        seg.startsWith('f_')
+      ) {
+        continue;
+      }
+      // Lewati versi (v1712345678)
+      if (/^v\d+$/.test(seg)) {
+        continue;
+      }
+      cleanSegments.push(seg);
+    }
+
+    if (cleanSegments.length === 0) return null;
+
+    // Hilangkan ekstensi file pada segmen terakhir
+    const lastSeg = cleanSegments[cleanSegments.length - 1];
+    const dotIdx = lastSeg.lastIndexOf('.');
+    if (dotIdx !== -1) {
+      cleanSegments[cleanSegments.length - 1] = lastSeg.substring(0, dotIdx);
+    }
+
+    const publicId = cleanSegments.join('/');
+    return { publicId, resourceType };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Hapus aset (gambar/video) dari Cloudinary CDN
+ */
+export async function deleteFromCloudinary(
+  urlOrPublicId: string,
+  resourceType: 'image' | 'video' = 'image'
+): Promise<{ success: boolean; result?: string; error?: string }> {
+  const cloudName =
+    process.env.CLOUDINARY_CLOUD_NAME ||
+    process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ||
+    '';
+  const apiKey = process.env.CLOUDINARY_API_KEY || '';
+  const apiSecret = process.env.CLOUDINARY_API_SECRET || '';
+
+  if (!cloudName || !apiKey || !apiSecret) {
+    return { success: false, error: 'Konfigurasi kredensial Cloudinary belum lengkap' };
+  }
+
+  let publicId = urlOrPublicId;
+  let targetType = resourceType;
+
+  if (urlOrPublicId.includes('res.cloudinary.com')) {
+    const extracted = extractCloudinaryPublicId(urlOrPublicId);
+    if (!extracted) {
+      return { success: false, error: 'Bukan format URL Cloudinary yang valid' };
+    }
+    publicId = extracted.publicId;
+    targetType = extracted.resourceType;
+  }
+
+  if (!publicId || publicId.trim() === '' || publicId === 'hero-banner') {
+    return { success: false, error: 'Invalid publicId' };
+  }
+
+  try {
+    const timestamp = Math.round(Date.now() / 1000).toString();
+    const paramsToSign = `public_id=${publicId}&timestamp=${timestamp}${apiSecret}`;
+    const signature = crypto.createHash('sha1').update(paramsToSign).digest('hex');
+
+    const form = new FormData();
+    form.append('public_id', publicId);
+    form.append('api_key', apiKey);
+    form.append('timestamp', timestamp);
+    form.append('signature', signature);
+
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${targetType}/destroy`, {
+      method: 'POST',
+      body: form,
+    });
+
+    const json = await res.json().catch(() => null);
+    if (res.ok && json && (json.result === 'ok' || json.result === 'not found')) {
+      return { success: true, result: json.result };
+    }
+    return { success: false, error: json?.error?.message || json?.result || `HTTP ${res.status}` };
+  } catch (err: any) {
+    return { success: false, error: err?.message || String(err) };
+  }
+}

@@ -5,7 +5,7 @@ import { getAdminSession } from '@/lib/auth'
 import { clearServerArticlesCache } from '@/lib/wordpress'
 import { INITIAL_ARTICLES } from '@/lib/initialArticles'
 
-import { ensureCloudinaryUrl } from '@/lib/cloudinary'
+import { ensureCloudinaryUrl, deleteFromCloudinary } from '@/lib/cloudinary'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -636,12 +636,37 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'ID artikel tidak ditemukan' }, { status: 400 })
     }
 
+    // Ambil data artikel sebelum dihapus untuk mendeteksi URL media Cloudinary
+    const articleToDelete = await prisma.article.findUnique({
+      where: { id },
+      select: { imageUrl: true, content: true },
+    })
+
     const deleted = await prisma.article.delete({
       where: { id },
     })
 
     clearServerArticlesCache()
     invalidateArticlesCache()
+
+    // Bersihkan file cover & media di Cloudinary secara asynchronous di background
+    if (articleToDelete?.imageUrl) {
+      deleteFromCloudinary(articleToDelete.imageUrl).catch((err) =>
+        console.warn('Gagal menghapus cover Cloudinary notice:', err)
+      )
+    }
+
+    if (articleToDelete?.content && articleToDelete.content.includes('res.cloudinary.com')) {
+      const imgRegex = /https:\/\/res\.cloudinary\.com\/[^\s"'>)]+/g
+      const matches = articleToDelete.content.match(imgRegex)
+      if (matches && matches.length > 0) {
+        matches.forEach((imgUrl) => {
+          if (imgUrl !== articleToDelete.imageUrl) {
+            deleteFromCloudinary(imgUrl).catch(() => {})
+          }
+        })
+      }
+    }
 
     try {
       revalidatePath('/')
