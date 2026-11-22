@@ -186,15 +186,10 @@ export const CategoryTemplate: React.FC<CategoryTemplateProps> = ({
 
   return (
     <div className="flex-grow w-full max-w-6xl mx-auto px-4 sm:px-6 md:px-8 pt-6 pb-12 flex flex-col min-w-0">
-      <header className="flex flex-col gap-1.5 mb-6 pb-3 border-b border-outline-variant/40">
+      <header className="mb-6 pb-3 border-b border-outline-variant/40">
         <h1 className="text-lg sm:text-xl md:text-2xl font-bold font-headline-xl text-on-surface tracking-tight">
           {title}
         </h1>
-        {description && (
-          <p className="text-xs sm:text-sm text-on-surface-variant font-normal">
-            {description}
-          </p>
-        )}
       </header>
 
       {articles.length > 0 ? (

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -126,11 +126,6 @@ export function BeritaClient({ initialArticles = [] }: BeritaClientProps) {
           <h1 className="text-lg sm:text-xl md:text-2xl font-bold font-headline-xl text-on-surface tracking-tight">
             {pageTitle}
           </h1>
-          {pageSubtitle && (
-            <p className="mt-1 text-xs sm:text-sm text-on-surface-variant font-normal">
-              {pageSubtitle}
-            </p>
-          )}
         </div>
       </header>
 

@@ -79,13 +79,10 @@ export function LokerClient({
     <div className="flex-grow w-full max-w-6xl mx-auto px-4 sm:px-6 md:px-8 pt-6 pb-12 flex flex-col min-w-0">
       <main className="w-full flex flex-col min-w-0">
         {/* Header */}
-        <header className="flex flex-col gap-1.5 mb-5">
+        <header className="mb-5">
           <h1 className="text-lg sm:text-xl md:text-2xl font-bold font-headline-xl text-on-surface tracking-tight">
             Lowongan Kerja Sukabumi
           </h1>
-          <p className="text-xs sm:text-sm text-on-surface-variant font-normal">
-            Temukan peluang karir dan pekerjaan terkini di Kota &amp; Kabupaten Sukabumi.
-          </p>
         </header>
 
         {/* Search Bar & Type Filters */}

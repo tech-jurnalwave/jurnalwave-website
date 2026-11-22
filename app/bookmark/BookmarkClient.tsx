@@ -98,13 +98,10 @@ export function BookmarkClient({ initialArticles = [], initialJobs = [] }: Bookm
   return (
     <div className="flex-grow w-full max-w-6xl mx-auto px-4 sm:px-6 md:px-8 pt-6 pb-16 flex flex-col min-w-0">
       <main className="w-full flex flex-col min-w-0">
-        <header className="flex flex-col gap-1 mb-5">
+        <header className="mb-5">
           <h1 className="text-base sm:text-lg md:text-xl font-bold font-headline-xl text-slate-900 dark:text-zinc-100 tracking-tight">
             Konten Tersimpan
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400">
-            Daftar artikel dan lowongan kerja yang Anda simpan untuk dibaca atau dilamar nanti.
-          </p>
         </header>
 
         {/* Tab Switcher: 2 Tab Saja (Artikel & Loker - Minimalis & Ramping) */}
