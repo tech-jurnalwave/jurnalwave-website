@@ -9,9 +9,7 @@ import {
   Eye,
   EyeOff,
   Loader2,
-  ArrowRight,
   ShieldAlert,
-  ArrowLeft,
   Users,
 } from 'lucide-react'
 
@@ -58,7 +56,6 @@ export default function RedaksiStaffLoginPage() {
     setSuccessMsg(null)
 
     try {
-      // Ambil daftar anggota tim lokal dari localStorage jika ada
       let teamMembers: any[] = []
       if (typeof window !== 'undefined') {
         try {
@@ -76,7 +73,7 @@ export default function RedaksiStaffLoginPage() {
       const json = await res.json()
 
       if (res.ok && json.success) {
-        setSuccessMsg(json.message || 'Login berhasil! Mengalihkan ke meja kerja redaksi...')
+        setSuccessMsg(json.message || 'Login berhasil! Mengalihkan ke meja redaksi...')
         if (typeof window !== 'undefined') {
           sessionStorage.setItem('admin_session_valid', 'true')
           localStorage.setItem(
@@ -105,44 +102,30 @@ export default function RedaksiStaffLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900 flex flex-col justify-between items-center p-4 sm:p-6 font-sans antialiased selection:bg-[#c00015] selection:text-white">
-      {/* Header Kecil */}
-      <div className="w-full max-w-md flex items-center justify-between py-2">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Kembali ke Beranda</span>
-        </Link>
-        <span className="text-[11px] font-semibold text-slate-600 bg-slate-200/80 px-2 py-0.5 rounded">
-          Portal Staf Redaksi
-        </span>
-      </div>
-
-      {/* Card Utama */}
-      <div className="w-full max-w-md bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-8 shadow-sm my-auto">
+    <div className="min-h-screen bg-[#fafafa] flex items-center justify-center p-4 selection:bg-[#c00015] selection:text-white">
+      <div className="w-full max-w-sm bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-xs">
+        {/* Header Minimalis */}
         <div className="text-center mb-6">
-          <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-[#c00015]/10 flex items-center justify-center">
-            <Users className="w-6 h-6 text-[#c00015]" />
+          <div className="w-11 h-11 mx-auto mb-3 rounded-xl bg-[#c00015]/10 flex items-center justify-center">
+            <Users className="w-5 h-5 text-[#c00015]" />
           </div>
-          <h1 className="font-heading font-extrabold text-xl text-slate-900 tracking-tight">
-            Masuk Staf Redaksi
+          <h1 className="font-heading font-extrabold text-lg text-slate-900 tracking-tight">
+            Staf Redaksi JurnalWave
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Khusus wartawan, reporter, &amp; redaktur pelaksana JurnalWave
+            Masuk dengan email &amp; kata sandi staf
           </p>
         </div>
 
         {errorMsg && (
-          <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-medium flex items-start gap-2.5 animate-in fade-in">
+          <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-medium flex items-start gap-2 animate-in fade-in">
             <ShieldAlert className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
             <div className="flex-1 leading-relaxed">{errorMsg}</div>
           </div>
         )}
 
         {successMsg && (
-          <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-start gap-2.5 animate-in fade-in">
+          <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-start gap-2 animate-in fade-in">
             <div className="flex-1 leading-relaxed">{successMsg}</div>
           </div>
         )}
@@ -150,7 +133,7 @@ export default function RedaksiStaffLoginPage() {
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Email Resmi Staf
+              Email Staf
             </label>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -159,8 +142,8 @@ export default function RedaksiStaffLoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="nama.staf@jurnalwave.com"
-                className="w-full pl-9 pr-3.5 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#c00015] focus:ring-1 focus:ring-[#c00015] transition"
+                placeholder="staf@jurnalwave.com"
+                className="w-full pl-9 pr-3.5 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#c00015] focus:ring-1 focus:ring-[#c00015] transition"
               />
             </div>
           </div>
@@ -176,8 +159,8 @@ export default function RedaksiStaffLoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Masukkan kata sandi staf"
-                className="w-full pl-9 pr-10 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#c00015] focus:ring-1 focus:ring-[#c00015] transition"
+                placeholder="Masukkan kata sandi"
+                className="w-full pl-9 pr-10 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#c00015] focus:ring-1 focus:ring-[#c00015] transition"
               />
               <button
                 type="button"
@@ -197,33 +180,25 @@ export default function RedaksiStaffLoginPage() {
             {loading ? (
               <span className="flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Memverifikasi Staf...</span>
+                <span>Memverifikasi...</span>
               </span>
             ) : lockCountdown > 0 ? (
-              <span>Terkunci Sementara ({lockCountdown}s)</span>
+              <span>Terkunci ({lockCountdown}s)</span>
             ) : (
-              <>
-                <span>Masuk Meja Redaksi</span>
-                <ArrowRight className="w-4 h-4" />
-              </>
+              <span>Masuk Meja Redaksi</span>
             )}
           </button>
         </form>
 
         <div className="mt-6 pt-4 border-t border-slate-100 text-center">
-          <span className="text-[11px] text-slate-500">
-            Pemilik / Superadmin?{' '}
-            <Link href="/superadmin-auth" className="text-[#c00015] font-semibold hover:underline">
-              Masuk Portal Superadmin
-            </Link>
-          </span>
+          <Link
+            href="/superadmin-auth"
+            className="text-xs text-slate-500 hover:text-[#c00015] transition"
+          >
+            Login Superadmin (Google SSO) &rarr;
+          </Link>
         </div>
       </div>
-
-      {/* Footer */}
-      <footer className="text-center text-xs text-slate-400 py-4">
-        © 2026 JurnalWave — Akses Khusus Tim Redaksi Terdaftar.
-      </footer>
     </div>
   )
 }

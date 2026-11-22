@@ -14,7 +14,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     pathname.startsWith('/login') ||
     pathname.startsWith('/daftar') ||
     pathname.startsWith('/reset-password') ||
-    pathname.startsWith('/auth')
+    pathname.startsWith('/auth') ||
+    pathname.startsWith('/superadmin-auth') ||
+    pathname.startsWith('/redaksi')
 
   // Dedicated sub-portal layout for Hallo Jurnal
   const isHaloJurnal = pathname.startsWith('/halo-jurnal')
