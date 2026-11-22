@@ -107,6 +107,12 @@ export const PollingWidget: React.FC<PollingWidgetProps> = ({ poll: initialPoll 
             });
             setVoteCounts(counts);
 
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.setItem('jurnal_wave_active_poll', JSON.stringify(json.data));
+              } catch {}
+            }
+
             // Cek apakah user sudah pernah vote di localStorage
             try {
               const saved = localStorage.getItem(`jv_poll_${json.data.id}`);
@@ -137,10 +143,21 @@ export const PollingWidget: React.FC<PollingWidgetProps> = ({ poll: initialPoll 
     const handleSyncEvent = () => {
       const hasLocalActive = syncFromLocalStorage();
       if (!hasLocalActive) {
-        setPoll(null);
-        setVoteCounts({});
-        setSelectedOption('');
-        setHasVoted(false);
+        // Hanya reset jika di localStorage admin secara eksplisit terdapat data yang menyatakan tidak ada polling aktif
+        if (typeof window !== 'undefined') {
+          const savedAdmin = localStorage.getItem('jurnal_wave_admin_polls');
+          if (savedAdmin) {
+            try {
+              const parsed = JSON.parse(savedAdmin);
+              if (Array.isArray(parsed) && !parsed.some((p: any) => p.isActive)) {
+                setPoll(null);
+                setVoteCounts({});
+                setSelectedOption('');
+                setHasVoted(false);
+              }
+            } catch {}
+          }
+        }
       }
     };
 
@@ -188,17 +205,14 @@ export const PollingWidget: React.FC<PollingWidgetProps> = ({ poll: initialPoll 
       localStorage.setItem(`jv_poll_${poll.id}`, optionId);
 
       // Sinkronkan kenaikan vote ke jurnal_wave_active_poll di localStorage
-      const savedActive = localStorage.getItem('jurnal_wave_active_poll');
-      if (savedActive) {
-        const parsed = JSON.parse(savedActive);
-        if (parsed.id === poll.id) {
-          parsed.options = parsed.options.map((opt: any) =>
-            opt.id === optionId ? { ...opt, votes: (opt.votes || 0) + 1 } : opt
-          );
-          parsed.totalVotes = (parsed.totalVotes || 0) + 1;
-          localStorage.setItem('jurnal_wave_active_poll', JSON.stringify(parsed));
-        }
-      }
+      const updatedPoll: Poll = {
+        ...poll,
+        totalVotes: (poll.totalVotes || 0) + 1,
+        options: poll.options.map((opt) =>
+          opt.id === optionId ? { ...opt, votes: (opt.votes || 0) + 1 } : opt
+        ),
+      };
+      localStorage.setItem('jurnal_wave_active_poll', JSON.stringify(updatedPoll));
 
       // Sinkronkan juga ke daftar polling admin di localStorage
       const savedAdmin = localStorage.getItem('jurnal_wave_admin_polls');
@@ -220,8 +234,6 @@ export const PollingWidget: React.FC<PollingWidgetProps> = ({ poll: initialPoll 
           localStorage.setItem('jurnal_wave_admin_polls', JSON.stringify(updatedList));
         }
       }
-
-      window.dispatchEvent(new CustomEvent('poll-updated'));
     } catch {}
 
     // Kirim vote ke server
