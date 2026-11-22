@@ -2,9 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import Script from 'next/script'
-import { ShieldAlert, ShieldCheck, Loader2, Lock } from 'lucide-react'
+import { ShieldAlert, ShieldCheck, Loader2 } from 'lucide-react'
 
 declare global {
   interface Window {
@@ -105,14 +104,19 @@ export default function SuperadminAuthPage() {
 
       <div className="min-h-screen bg-[#fafafa] flex items-center justify-center p-4 selection:bg-[#c00015] selection:text-white">
         <div className="w-full max-w-sm bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-xs">
-          {/* Header Minimalis */}
+          {/* Header Minimalis dengan Logo JurnalWave */}
           <div className="text-center mb-6">
-            <div className="w-11 h-11 mx-auto mb-3 rounded-xl bg-[#c00015]/10 flex items-center justify-center">
-              <Lock className="w-5 h-5 text-[#c00015]" />
+            <div className="flex justify-center mb-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logo-jurnal-wave.webp"
+                alt="JurnalWave"
+                className="h-9 sm:h-10 w-auto object-contain"
+              />
             </div>
 
             <h1 className="font-heading font-extrabold text-lg text-slate-900 tracking-tight">
-              Superadmin JurnalWave
+              Login Superadmin JurnalWave
             </h1>
             <p className="text-xs text-slate-500 mt-1">
               Masuk dengan akun Google terdaftar
@@ -145,16 +149,6 @@ export default function SuperadminAuthPage() {
             ) : (
               <div ref={googleBtnRef} className="w-full flex justify-center min-h-[44px]" />
             )}
-          </div>
-
-          {/* Link Staf */}
-          <div className="mt-6 pt-4 border-t border-slate-100 text-center">
-            <Link
-              href="/redaksi/login"
-              className="text-xs text-slate-500 hover:text-slate-800 transition"
-            >
-              Masuk sebagai Staf Redaksi &rarr;
-            </Link>
           </div>
         </div>
       </div>

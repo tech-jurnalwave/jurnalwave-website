@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import {
   Lock,
   Mail,
@@ -10,7 +9,6 @@ import {
   EyeOff,
   Loader2,
   ShieldAlert,
-  Users,
 } from 'lucide-react'
 
 export default function RedaksiStaffLoginPage() {
@@ -79,7 +77,7 @@ export default function RedaksiStaffLoginPage() {
           localStorage.setItem(
             'jurnal_wave_admin_user',
             JSON.stringify({
-              ...(json.user || { name: 'Staf Redaksi', email }),
+              ...(json.user || { name: 'Admin', email }),
               loginTime: Date.now(),
             })
           )
@@ -92,7 +90,7 @@ export default function RedaksiStaffLoginPage() {
         if (json.locked && json.remainingSec) {
           setLockCountdown(json.remainingSec)
         }
-        setErrorMsg(json.message || 'Email atau kata sandi staf tidak cocok.')
+        setErrorMsg(json.message || 'Email atau kata sandi tidak cocok.')
       }
     } catch (err: any) {
       setErrorMsg('Gagal terhubung ke server autentikasi: ' + (err?.message || 'Koneksi bermasalah'))
@@ -104,17 +102,19 @@ export default function RedaksiStaffLoginPage() {
   return (
     <div className="min-h-screen bg-[#fafafa] flex items-center justify-center p-4 selection:bg-[#c00015] selection:text-white">
       <div className="w-full max-w-sm bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-xs">
-        {/* Header Minimalis */}
+        {/* Header Minimalis dengan Logo JurnalWave */}
         <div className="text-center mb-6">
-          <div className="w-11 h-11 mx-auto mb-3 rounded-xl bg-[#c00015]/10 flex items-center justify-center">
-            <Users className="w-5 h-5 text-[#c00015]" />
+          <div className="flex justify-center mb-4">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo-jurnal-wave.webp"
+              alt="JurnalWave"
+              className="h-9 sm:h-10 w-auto object-contain"
+            />
           </div>
           <h1 className="font-heading font-extrabold text-lg text-slate-900 tracking-tight">
-            Staf Redaksi JurnalWave
+            Login Admin JurnalWave
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Masuk dengan email &amp; kata sandi staf
-          </p>
         </div>
 
         {errorMsg && (
@@ -133,7 +133,7 @@ export default function RedaksiStaffLoginPage() {
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Email Staf
+              Masukkan Email
             </label>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -142,7 +142,7 @@ export default function RedaksiStaffLoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="staf@jurnalwave.com"
+                placeholder="Masukkan email"
                 className="w-full pl-9 pr-3.5 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#c00015] focus:ring-1 focus:ring-[#c00015] transition"
               />
             </div>
@@ -189,15 +189,6 @@ export default function RedaksiStaffLoginPage() {
             )}
           </button>
         </form>
-
-        <div className="mt-6 pt-4 border-t border-slate-100 text-center">
-          <Link
-            href="/superadmin-auth"
-            className="text-xs text-slate-500 hover:text-[#c00015] transition"
-          >
-            Login Superadmin (Google SSO) &rarr;
-          </Link>
-        </div>
       </div>
     </div>
   )
