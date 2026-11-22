@@ -4,8 +4,7 @@
  * lalu perbarui data di latar belakang tanpa ada kedipan angka 0 atau layar kosong.
  */
 
-import { DUMMY_REPORTS } from '@/data/dummyReports'
-import { INITIAL_ARTICLES } from '@/lib/initialArticles'
+
 
 // Memory Cache RAM
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -45,7 +44,7 @@ export function getCachedAdminReports(): any[] {
       }
     } catch {}
   }
-  return DUMMY_REPORTS
+  return []
 }
 
 /**
@@ -82,7 +81,7 @@ export function getCachedAdminArticles(): any[] {
       }
     } catch {}
   }
-  return INITIAL_ARTICLES
+  return []
 }
 
 /**

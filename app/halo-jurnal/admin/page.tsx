@@ -12,7 +12,7 @@ import {
   Vote,
 } from 'lucide-react'
 import { Article, Poll } from '@/types'
-import { DummyReport, DUMMY_REPORTS } from '@/data/dummyReports'
+import { DummyReport } from '@/data/dummyReports'
 import { useAdminData } from '@/context/AdminDataContext'
 import { DEFAULT_ACTIVE_POLL } from '@/lib/polls'
 
@@ -32,56 +32,7 @@ const CATEGORY_DISPLAY_MAP: Record<string, string> = {
   inspirasi: 'Inspirasi',
 }
 
-const SAMPLE_SUPPLEMENTAL_ARTICLES: Article[] = [
-  {
-    id: 'art-demo-1',
-    title: 'Festival Kuliner Sukabumi 2026 Siap Digelar di Kawasan Selabintana',
-    slug: 'festival-kuliner-sukabumi-2026',
-    excerpt: 'Puluhan pelaku UMKM kuliner khas Sukabumi siap meramaikan festival tahunan dengan sajian legendaris.',
-    content: 'Festival kuliner...',
-    category: 'kuliner',
-    categoryLabel: 'Kuliner',
-    imageUrl: '/hero-banner.webp',
-    author: 'Revan Fatkhurezi',
-    reporter: 'Revan Fatkhurezi',
-    redaktur: 'Tim Redaksi',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 10).toISOString(),
-    publishedDate: new Date(Date.now() - 1000 * 60 * 60 * 10).toISOString(),
-    status: 'published',
-  },
-  {
-    id: 'art-demo-2',
-    title: 'Peluang Karir Digital & Tech Hub Berkembang Pesat bagi Gen Z Sukabumi',
-    slug: 'peluang-karir-digital-sukabumi',
-    excerpt: 'Ekosistem kerja remote dan industri kreatif digital membuka banyak kesempatan baru bagi talenta muda.',
-    content: 'Peluang karir...',
-    category: 'tech',
-    categoryLabel: 'Teknologi',
-    imageUrl: '/hero-banner.webp',
-    author: 'Ilham Nugraha',
-    reporter: 'Ilham Nugraha',
-    redaktur: 'Denis Febrian',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(),
-    publishedDate: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(),
-    status: 'published',
-  },
-  {
-    id: 'art-demo-3',
-    title: 'Revitalisasi Pasar Pelita Tingkatkan Perputaran Ekonomi Komoditas Lokal',
-    slug: 'revitalisasi-pasar-pelita-sukabumi',
-    excerpt: 'Penataan kios dan fasilitas sanitasi modern memberikan kenyamanan lebih bagi pedagang dan pembeli.',
-    content: 'Pasar pelita...',
-    category: 'berita',
-    categoryLabel: 'Berita',
-    imageUrl: '/hero-banner.webp',
-    author: 'Donie Makapeli',
-    reporter: 'Donie Makapeli',
-    redaktur: 'Tim Redaksi',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 40).toISOString(),
-    publishedDate: new Date(Date.now() - 1000 * 60 * 60 * 40).toISOString(),
-    status: 'published',
-  },
-]
+const SAMPLE_SUPPLEMENTAL_ARTICLES: Article[] = []
 
 export default function UnifiedMasterDashboardPage() {
   const {
@@ -183,8 +134,7 @@ export default function UnifiedMasterDashboardPage() {
 
   // Data Aduan Warga
   const displayReports = useMemo(() => {
-    if (reportsList.length > 0) return reportsList
-    return DUMMY_REPORTS
+    return reportsList
   }, [reportsList])
 
   // Helper resolusi status ACC & Hak Tayang

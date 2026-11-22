@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { getAdminSession } from '@/lib/auth';
-import { clearServerReelsCache, DEFAULT_FALLBACK_REELS } from '@/lib/reels';
+import { clearServerReelsCache } from '@/lib/reels';
 import { ensureCloudinaryUrl } from '@/lib/cloudinary';
 
 export const dynamic = 'force-dynamic';
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
       take: limit,
     });
 
-    const finalReels = reels.length > 0 ? reels : DEFAULT_FALLBACK_REELS;
+    const finalReels = reels;
 
     return NextResponse.json(
       { success: true, count: finalReels.length, data: finalReels },
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.warn('Notice fetching reels from DB (using fallback):', (error as any)?.message || error);
     return NextResponse.json(
-      { success: true, count: DEFAULT_FALLBACK_REELS.length, data: DEFAULT_FALLBACK_REELS },
+      { success: true, count: 0, data: [] },
       { status: 200 }
     );
   }

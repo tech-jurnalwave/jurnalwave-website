@@ -10,7 +10,6 @@ import {
   X,
 } from 'lucide-react'
 import { Poll } from '@/types'
-import { DEFAULT_FALLBACK_POLL } from '@/lib/polls'
 import AdminToast from '@/components/admin/AdminToast'
 import { useConfirm } from '@/components/admin/AdminConfirmDialog'
 
@@ -93,7 +92,7 @@ export default function AdminPollingPage() {
       } catch {}
     }
 
-    setPolls([DEFAULT_FALLBACK_POLL])
+    setPolls([])
   }
 
   useEffect(() => {
@@ -106,13 +105,13 @@ export default function AdminPollingPage() {
           if (Array.isArray(parsed) && parsed.length > 0) {
             setPolls(parsed)
           } else {
-            setPolls([DEFAULT_FALLBACK_POLL])
+            setPolls([])
           }
         } else {
-          setPolls([DEFAULT_FALLBACK_POLL])
+          setPolls([])
         }
       } catch {
-        setPolls([DEFAULT_FALLBACK_POLL])
+        setPolls([])
       }
     }
     loadPolls()

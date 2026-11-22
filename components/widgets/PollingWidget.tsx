@@ -10,15 +10,17 @@ interface PollingWidgetProps {
 }
 
 export const PollingWidget: React.FC<PollingWidgetProps> = ({ poll: initialPoll }) => {
-  const [poll, setPoll] = useState<Poll | null>(initialPoll || DEFAULT_FALLBACK_POLL);
+  const [poll, setPoll] = useState<Poll | null>(initialPoll || null);
   const [selectedOption, setSelectedOption] = useState<string>('');
   const [hasVoted, setHasVoted] = useState<boolean>(false);
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>(() => {
-    const base = initialPoll || DEFAULT_FALLBACK_POLL;
+    const base = initialPoll;
     const initialCounts: Record<string, number> = {};
-    base.options.forEach(opt => {
-      initialCounts[opt.id] = opt.votes || 0;
-    });
+    if (base?.options) {
+      base.options.forEach(opt => {
+        initialCounts[opt.id] = opt.votes || 0;
+      });
+    }
     return initialCounts;
   });
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -240,6 +242,10 @@ export const PollingWidget: React.FC<PollingWidgetProps> = ({ poll: initialPoll 
       setIsSubmitting(false);
     }
   };
+
+  if (!poll || !poll.options || poll.options.length === 0) {
+    return null;
+  }
 
   const totalVotes = Object.values(voteCounts).reduce((sum, count) => sum + count, 0);
 

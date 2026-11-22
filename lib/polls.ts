@@ -1,41 +1,11 @@
 import { prisma } from '@/lib/prisma';
 import { Poll } from '@/types';
 
-export const DEFAULT_ACTIVE_POLL: Poll = {
-  id: 'poll-persib-melbourne',
-  question: 'Bagaimana prediksi kamu untuk hasil laga sengit antara Persib Bandung melawan Melbourne City?',
-  category: 'Sport & E-Sport',
-  isActive: true,
-  createdAt: '2026-11-14T07:00:00.000Z',
-  totalVotes: 0,
-  options: [
-    { id: 'opt-persib-1', text: 'Persib Bandung menang tipis', votes: 0 },
-    { id: 'opt-persib-2', text: 'Melbourne City yang unggul', votes: 0 },
-    { id: 'opt-persib-3', text: 'Hasil akhir imbang/seri', votes: 0 },
-    { id: 'opt-persib-4', text: 'Persib bantai habis Melbourne', votes: 0 },
-  ],
-};
-
-export const DEFAULT_FALLBACK_POLL: Poll = DEFAULT_ACTIVE_POLL;
+export const DEFAULT_ACTIVE_POLL: Poll | null = null;
+export const DEFAULT_FALLBACK_POLL: Poll | null = null;
 
 // Fallback in-memory store agar polling tetap 100% fungsional saat database cloud timeout / offline
-let fallbackPollsList: Poll[] = [
-  DEFAULT_ACTIVE_POLL,
-  {
-    id: 'poll-big-match-archive',
-    question: 'Jelang laga big match akhir pekan ini, tim mana yang menurut kamu bakal menang dan mendominasi pertandingan?',
-    category: 'Sport & Komunitas',
-    isActive: false,
-    createdAt: '2026-11-13T10:00:00.000Z',
-    totalVotes: 415,
-    options: [
-      { id: 'opt-bm-1', text: 'Tuan Rumah Menang Telak', votes: 142 },
-      { id: 'opt-bm-2', text: 'Tim Tamu Bikin Kejutan', votes: 88 },
-      { id: 'opt-bm-3', text: 'Pertandingan Imbang (Draw)', votes: 65 },
-      { id: 'opt-bm-4', text: 'Nonton Saja Yang Penting Seru!', votes: 120 },
-    ],
-  },
-];
+let fallbackPollsList: Poll[] = [];
 
 let lastPollsFailureTimestamp = 0;
 const POLLS_RETRY_INTERVAL_MS = 15 * 1000;
@@ -46,7 +16,7 @@ export async function getActivePoll(): Promise<Poll | null> {
   // Circuit Breaker: Jika database baru saja timeout < 15 detik lalu, respon seketika (0ms)
   if (now - lastPollsFailureTimestamp < POLLS_RETRY_INTERVAL_MS) {
     const active = fallbackPollsList.find(p => Boolean(p.isActive));
-    return active || DEFAULT_ACTIVE_POLL;
+    return active || null;
   }
 
   try {
@@ -62,7 +32,7 @@ export async function getActivePoll(): Promise<Poll | null> {
 
     if (!poll) {
       const active = fallbackPollsList.find(p => Boolean(p.isActive));
-      return active || DEFAULT_ACTIVE_POLL;
+      return active || null;
     }
 
     const totalVotes = poll.options.reduce((sum, o) => sum + o.votes, 0);
@@ -83,7 +53,7 @@ export async function getActivePoll(): Promise<Poll | null> {
     lastPollsFailureTimestamp = Date.now();
     console.warn('Active poll DB lookup notice (using fallback):', (error as any)?.message || error);
     const active = fallbackPollsList.find(p => Boolean(p.isActive));
-    return active || DEFAULT_ACTIVE_POLL;
+    return active || null;
   }
 }
 
@@ -119,11 +89,11 @@ export async function getAllPolls(): Promise<Poll[]> {
         })),
       }));
     }
-    return fallbackPollsList;
+    return [];
   } catch (error) {
     lastPollsFailureTimestamp = Date.now();
     console.warn('All polls DB lookup notice (using fallback):', (error as any)?.message || error);
-    return fallbackPollsList;
+    return [];
   }
 }
 

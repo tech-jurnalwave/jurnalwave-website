@@ -252,7 +252,7 @@ export async function fetchArticlesFromWordPress(): Promise<Article[]> {
     } catch {}
   }
 
-  return INITIAL_ARTICLES;
+  return [];
 }
 
 /**
@@ -385,14 +385,6 @@ export async function fetchArticleByIdFromWordPress(idOrSlug: string): Promise<A
       }
     } catch {}
   }
-
-  const serverFallbackMatch = INITIAL_ARTICLES.find(
-    (a) =>
-      String(a.id) === String(idOrSlug) ||
-      a.slug === idOrSlug ||
-      a.slug.toLowerCase() === String(idOrSlug).toLowerCase()
-  );
-  if (serverFallbackMatch) return serverFallbackMatch;
 
   return null as any;
 }

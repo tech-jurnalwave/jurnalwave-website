@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
       const dbJobs = await prisma.job.findMany({
         orderBy: { createdAt: 'desc' },
       });
-      const finalJobs = dbJobs.length > 0 ? dbJobs.map(formatJobFromDb) : DUMMY_JOBS;
+      const finalJobs = dbJobs.length > 0 ? dbJobs.map(formatJobFromDb) : [];
       return NextResponse.json({
         success: true,
         count: finalJobs.length,

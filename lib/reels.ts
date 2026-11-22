@@ -1,56 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { Reel } from '@/types';
 
-export const DEFAULT_FALLBACK_REELS: Reel[] = [
-  {
-    id: 'reel-001',
-    title: 'Spot Hidden Gem Air Terjun Curug Cimarinjung Geopark Ciletuh',
-    category: 'Wisata',
-    creator: '@jurnalwave',
-    platform: 'tiktok',
-    socialUrl: 'https://tiktok.com/@jurnalwave',
-    location: 'Geopark Ciletuh, Sukabumi',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=700&q=80',
-    imageAlt: 'Curug Cimarinjung Geopark Ciletuh',
-    viewsCount: '18.4K',
-  },
-  {
-    id: 'reel-002',
-    title: 'Mencoba Mochi Lampion Kaswari Legendaris Khas Sukabumi Sejak 1983',
-    category: 'Kuliner',
-    creator: '@kuliner.sukabumi',
-    platform: 'instagram',
-    socialUrl: 'https://instagram.com',
-    location: 'Kec. Cikole, Kota Sukabumi',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=700&q=80',
-    imageAlt: 'Mochi Lampion Kaswari Sukabumi',
-    viewsCount: '24.1K',
-  },
-  {
-    id: 'reel-003',
-    title: 'Sensasi Dingin Menembus Kabut Situgunung Suspension Bridge',
-    category: 'Wisata',
-    creator: '@jurnalwave',
-    platform: 'tiktok',
-    socialUrl: 'https://tiktok.com/@jurnalwave',
-    location: 'Kadudampit, Sukabumi',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=700&q=80',
-    imageAlt: 'Jembatan Gantung Situgunung',
-    viewsCount: '31.5K',
-  },
-  {
-    id: 'reel-004',
-    title: 'Update Pembangunan Tol Bocimi Seksi 3 Menuju Sukabumi Barat',
-    category: 'Berita',
-    creator: '@redaksi.jurnalwave',
-    platform: 'youtube',
-    socialUrl: 'https://youtube.com',
-    location: 'Cibadak - Cisaat',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=700&q=80',
-    imageAlt: 'Proyek Tol Bocimi Seksi 3',
-    viewsCount: '42.9K',
-  },
-];
+export const DEFAULT_FALLBACK_REELS: Reel[] = [];
 
 // In-memory cache server-side agar query Neon DB instan (0ms delay)
 let serverReelsCache: { data: Reel[]; timestamp: number } | null = null;

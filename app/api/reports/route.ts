@@ -4,7 +4,6 @@ import { getAdminSession } from '@/lib/auth'
 import { z } from 'zod'
 import { getJenisForCategory, normalizeCategoryName } from '@/data/haloJurnalCategories'
 import { ensureCloudinaryUrl } from '@/lib/cloudinary'
-import { DUMMY_REPORTS } from '@/data/dummyReports'
 
 // Skema validasi masukan laporan aduan warga
 const ReportInputSchema = z.object({
@@ -120,7 +119,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         source: 'fallback-cache',
-        data: serverReportsCache?.data?.length ? serverReportsCache.data : DUMMY_REPORTS,
+        data: serverReportsCache?.data?.length ? serverReportsCache.data : [],
       })
     }
 
@@ -165,23 +164,6 @@ export async function GET(request: NextRequest) {
 
     let mappedData = dbReports.map((r) => mapReportFromDb(r, supportCountsMap[r.ticketNumber] || 0))
 
-    if (mappedData.length === 0) {
-      if (ticket) {
-        const found = DUMMY_REPORTS.find(
-          (d) =>
-            d.id === ticket ||
-            d.nomor_tiket === ticket ||
-            d.nomor_tiket.toLowerCase() === ticket.toLowerCase()
-        )
-        mappedData = found ? [found as any] : []
-      } else {
-        mappedData =
-          status && status !== 'semua'
-            ? (DUMMY_REPORTS.filter((d) => d.status === status) as any)
-            : (DUMMY_REPORTS as any)
-      }
-    }
-
     // Simpan ke server memory cache jika request umum (semua aduan)
     if (!status && !ticket) {
       serverReportsCache = {
@@ -201,7 +183,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       source: 'fallback-cache',
-      data: serverReportsCache?.data?.length ? serverReportsCache.data : DUMMY_REPORTS,
+      data: serverReportsCache?.data?.length ? serverReportsCache.data : [],
     }, { status: 200 })
   }
 }

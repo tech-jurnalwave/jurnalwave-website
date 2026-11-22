@@ -222,7 +222,7 @@ export async function GET(request: NextRequest) {
 
     // Circuit Breaker: Jika database baru saja timeout < 15 detik lalu, langsung kembalikan cache/fallback (0ms)
     if (Date.now() - lastArticlesDbFailureTimestamp < ARTICLES_DB_RETRY_MS) {
-      const baseData = serverArticlesCache ? serverArticlesCache.data : INITIAL_ARTICLES;
+      const baseData = serverArticlesCache ? serverArticlesCache.data : [];
       let circuitFiltered = baseData.filter((a) => {
         if (isAdmin) return true
         if (a.status === 'draft' || a.status === 'archived') return false
@@ -278,28 +278,6 @@ export async function GET(request: NextRequest) {
     })
 
     let mapped: any[] = dbArticles.map(mapArticleFromDb);
-    if (mapped.length === 0) {
-      if (category && category !== 'semua') {
-        const catKey = category.toLowerCase().trim();
-        mapped = INITIAL_ARTICLES.filter((a) => {
-          const aCat = a.category.toLowerCase().trim();
-          if (catKey === 'science' || catKey === 'sains' || catKey === 'sains & lingkungan') {
-            return aCat === 'science' || aCat === 'sains';
-          }
-          if (catKey === 'health' || catKey === 'kesehatan') {
-            return aCat === 'health' || aCat === 'kesehatan';
-          }
-          return aCat === catKey;
-        });
-      } else {
-        mapped = INITIAL_ARTICLES;
-      }
-    } else if (isAdmin && mapped.length < 6) {
-      // Lengkapi pratinjau artikel di admin agar melihat variasi rubrik dan data lengkap
-      const existingSlugs = new Set(mapped.map((a) => (a.slug || a.id || '').toLowerCase()));
-      const complement = INITIAL_ARTICLES.filter((a) => !existingSlugs.has((a.slug || a.id || '').toLowerCase()));
-      mapped = [...mapped, ...complement];
-    }
 
     if (!category && !slug && !limit) {
       if (!isAdmin) {
@@ -339,7 +317,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'Artikel tidak ditemukan' }, { status: 404 })
     }
 
-    const fallbackData = serverArticlesCache ? serverArticlesCache.data : INITIAL_ARTICLES;
+    const fallbackData = serverArticlesCache ? serverArticlesCache.data : [];
     let filteredFallback = fallbackData;
     if (category && category !== 'semua') {
       const catKey = category.toLowerCase().trim();

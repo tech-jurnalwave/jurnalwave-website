@@ -59,53 +59,21 @@ export async function fetchJobs(): Promise<Job[]> {
 
   try {
     const { prisma } = await import('@/lib/prisma');
-    let dbJobs = await prisma.job.findMany({
+    const dbJobs = await prisma.job.findMany({
       where: { isActive: true },
       orderBy: { createdAt: 'desc' },
     });
-
-    // Auto-seed baseline jobs jika tabel masih kosong
-    if (dbJobs.length === 0) {
-      try {
-        for (const dj of DUMMY_JOBS) {
-          await prisma.job.create({
-            data: {
-              id: dj.id,
-              title: dj.title,
-              company: dj.company,
-              location: dj.location,
-              region: dj.region,
-              salaryRange: dj.salaryRange,
-              type: dj.type,
-              education: dj.education,
-              description: dj.description,
-              requirements: JSON.stringify(dj.requirements),
-              benefits: JSON.stringify(dj.benefits),
-              applyEmail: dj.applyEmail,
-              applyUrl: dj.applyUrl,
-              isActive: true,
-            },
-          });
-        }
-        dbJobs = await prisma.job.findMany({
-          where: { isActive: true },
-          orderBy: { createdAt: 'desc' },
-        });
-      } catch (seedErr) {
-        console.warn('Auto-seed jobs notice:', seedErr);
-      }
-    }
 
     if (dbJobs.length > 0) {
       const mapped = dbJobs.map(formatJobFromDb);
       serverJobsCache = { data: mapped, timestamp: now };
       return mapped;
     }
-    return DUMMY_JOBS;
+    return [];
   } catch (err) {
     console.warn('Fetch jobs notice (using fallback):', (err as any)?.message || err);
     if (serverJobsCache) return serverJobsCache.data;
-    return DUMMY_JOBS;
+    return [];
   }
 }
 
