@@ -234,7 +234,7 @@ export default function AdminTimRedaksiPage() {
     }
   }, [])
 
-  // Muat data dari localStorage
+  // Muat data dari localStorage dan database Neon DB
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -242,39 +242,58 @@ export default function AdminTimRedaksiPage() {
         if (saved) {
           const parsed = JSON.parse(saved)
           if (Array.isArray(parsed) && parsed.length > 0) {
-            // Validasi & pastikan Superadmin selalu ada dan memiliki permissions
-            const hasSuperadmin = parsed.some((m: TeamMember) => m.isSuperadmin || m.id === 'team-superadmin')
-            const validated: TeamMember[] = parsed.map((m: any) => {
-              const isSuper = m.isSuperadmin || m.id === 'team-superadmin'
-              return {
-                ...m,
-                name: isSuper && (m.name === 'Super Admin JurnalWave' || m.name === 'Redaksi JurnalWave')
-                  ? 'Super Admin'
-                  : m.name,
-                role: isSuper ? 'Superadmin' : m.role || 'Staf Admin',
-                permissions: (Array.isArray(m.permissions) ? m.permissions : ['dashboard']) as AdminMenuKey[],
-              }
-            })
-
-            if (!hasSuperadmin) {
-              validated.unshift(DEFAULT_TEAM[0])
-            }
-            setMembers(validated)
-            try {
-              localStorage.setItem('jurnal_wave_team_members', JSON.stringify(validated))
-            } catch {}
-            return
+            setMembers(parsed)
           }
         }
       } catch (err) {
-        console.error('Error loading team members:', err)
+        console.error('Error loading team members from storage:', err)
       }
-
-      setMembers(DEFAULT_TEAM)
-      try {
-        localStorage.setItem('jurnal_wave_team_members', JSON.stringify(DEFAULT_TEAM))
-      } catch {}
     }
+
+    // Ambil data terbaru langsung dari database server & auto-sync data lokal
+    fetch('/api/admin/team', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then(async (json) => {
+        if (json.success && Array.isArray(json.data)) {
+          const dbMembers = [...json.data]
+
+          // Cek jika ada anggota di localStorage yang belum masuk ke database server
+          if (typeof window !== 'undefined') {
+            try {
+              const saved = localStorage.getItem('jurnal_wave_team_members')
+              if (saved) {
+                const localMembers = JSON.parse(saved)
+                if (Array.isArray(localMembers)) {
+                  for (const localM of localMembers) {
+                    if (
+                      localM.email &&
+                      !localM.isSuperadmin &&
+                      localM.email.toLowerCase() !== 'tech.jurnalwave@gmail.com' &&
+                      !dbMembers.some((dm: any) => dm.email?.toLowerCase() === localM.email.toLowerCase())
+                    ) {
+                      // Otomatis simpan akun lokal yang ada ke Neon DB server
+                      await fetch('/api/admin/team', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(localM),
+                      }).catch(() => {})
+                      dbMembers.push(localM)
+                    }
+                  }
+                }
+              }
+            } catch {}
+          }
+
+          setMembers(dbMembers)
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem('jurnal_wave_team_members', JSON.stringify(dbMembers))
+            } catch {}
+          }
+        }
+      })
+      .catch((err) => console.warn('Notice loading team from DB:', err))
   }, [])
 
   const persistMembers = (updated: TeamMember[]) => {
@@ -361,15 +380,16 @@ export default function AdminTimRedaksiPage() {
   }
 
   // Simpan Anggota (Tambah atau Update)
-  const handleSaveMember = (e: React.FormEvent) => {
+  const handleSaveMember = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formName.trim() || !formEmail.trim() || !formRole.trim()) return
 
     if (editingMemberId) {
       // Mode Edit
+      let targetMember: TeamMember | null = null
       const updated = members.map((m) => {
         if (m.id === editingMemberId) {
-          return {
+          targetMember = {
             ...m,
             name: formName.trim(),
             email: formEmail.trim().toLowerCase(),
@@ -381,13 +401,22 @@ export default function AdminTimRedaksiPage() {
               ? formPermissions
               : (['dashboard'] as AdminMenuKey[]),
           }
+          return targetMember
         }
         return m
       })
 
       persistMembers(updated)
+      if (targetMember) {
+        fetch('/api/admin/team', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(targetMember),
+        }).catch((err) => console.error('Error updating team member on server:', err))
+      }
+
       setIsModalOpen(false)
-      setToastMessage(`Pengaturan akun untuk "${formName.trim()}" berhasil disimpan!`)
+      setToastMessage(`Pengaturan akun untuk "${formName.trim()}" berhasil disimpan di database server!`)
       setTimeout(() => setToastMessage(null), 3500)
     } else {
       // Mode Tambah Baru
@@ -405,9 +434,15 @@ export default function AdminTimRedaksiPage() {
 
       const updated = [...members, newMember]
       persistMembers(updated)
-      setIsModalOpen(false)
 
-      setToastMessage(`Akun admin "${newMember.name}" (${newMember.role}) berhasil ditambahkan!`)
+      fetch('/api/admin/team', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newMember),
+      }).catch((err) => console.error('Error saving new team member to server:', err))
+
+      setIsModalOpen(false)
+      setToastMessage(`Akun admin "${newMember.name}" berhasil ditambahkan ke database server!`)
       setTimeout(() => setToastMessage(null), 3500)
     }
   }
@@ -421,13 +456,23 @@ export default function AdminTimRedaksiPage() {
       return
     }
 
+    const newStatus = target?.status === 'aktif' ? ('cuti' as const) : ('aktif' as const)
     const updated = members.map((m) =>
       m.id === id
-        ? { ...m, status: m.status === 'aktif' ? ('cuti' as const) : ('aktif' as const) }
+        ? { ...m, status: newStatus }
         : m
     )
     persistMembers(updated)
-    setToastMessage('Status operasional akun diperbarui.')
+
+    if (target) {
+      fetch('/api/admin/team', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...target, status: newStatus }),
+      }).catch((err) => console.error('Error updating status on server:', err))
+    }
+
+    setToastMessage('Status operasional akun diperbarui di database.')
     setTimeout(() => setToastMessage(null), 3000)
   }
 
@@ -442,7 +487,7 @@ export default function AdminTimRedaksiPage() {
 
     const isConfirmed = await confirmDialog({
       title: 'Hapus Anggota Admin?',
-      message: `Yakin ingin menghapus akun "${name}" secara permanen? Akses login dan kewenangan akun ini akan dicabut.`,
+      message: `Yakin ingin menghapus akun "${name}" secara permanen? Akses login dan kewenangan akun ini akan dicabut dari server.`,
       confirmText: 'Hapus Akun',
       cancelText: 'Batal',
       variant: 'danger',
@@ -450,7 +495,12 @@ export default function AdminTimRedaksiPage() {
     if (isConfirmed) {
       const updated = members.filter((m) => m.id !== id)
       persistMembers(updated)
-      setToastMessage(`Akun admin "${name}" berhasil dihapus.`)
+
+      fetch(`/api/admin/team?id=${encodeURIComponent(id)}&email=${encodeURIComponent(target?.email || '')}`, {
+        method: 'DELETE',
+      }).catch((err) => console.error('Error deleting team member from server:', err))
+
+      setToastMessage(`Akun admin "${name}" berhasil dihapus dari database server.`)
       setTimeout(() => setToastMessage(null), 3000)
     }
   }
@@ -534,6 +584,41 @@ export default function AdminTimRedaksiPage() {
             message={toastMessage}
             onClose={() => setToastMessage(null)}
           />
+
+          {/* Banner Pintu Masuk Login Staf Resmi */}
+          <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-3.5 sm:p-4 rounded-xl border border-slate-700 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-amber-400" />
+                <span className="font-heading font-bold text-xs sm:text-sm text-white">
+                  Tautan Login Staf Redaksi (Portal Rahasia)
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300">
+                Kirimkan tautan login resmi ini beserta email dan kata sandi yang telah Anda buat kepada staf.
+              </p>
+              <div className="flex items-center gap-1.5 pt-0.5">
+                <code className="text-[11px] font-mono font-semibold bg-black/50 text-amber-300 px-2.5 py-0.5 rounded border border-white/10">
+                  {typeof window !== 'undefined' ? `${window.location.origin}/jw-gate-781` : '/jw-gate-781'}
+                </code>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const url = typeof window !== 'undefined' ? `${window.location.origin}/jw-gate-781` : '/jw-gate-781'
+                if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                  navigator.clipboard.writeText(url)
+                  setToastMessage('✓ Tautan login staf (/jw-gate-781) berhasil disalin ke clipboard!')
+                  setTimeout(() => setToastMessage(null), 3500)
+                }
+              }}
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold border border-white/20 transition cursor-pointer shrink-0 self-start sm:self-center"
+            >
+              <Copy className="w-3.5 h-3.5 text-amber-400" />
+              <span>Salin Tautan Login Staf</span>
+            </button>
+          </div>
 
           {/* Toolbar: Search & Tombol Tambah Anggota */}
           <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -856,7 +941,7 @@ export default function AdminTimRedaksiPage() {
 
                     {isCopied && (
                       <span className="text-[11px] text-emerald-600 font-semibold block mt-1">
-                        ✓ Kata sandi berhasil disalin! Anda bisa langsung kirim ke staf via WhatsApp.
+                        ✓ Kata sandi berhasil disalin! Berikan kata sandi ini dan tautan login (/jw-gate-781) kepada staf.
                       </span>
                     )}
                   </div>

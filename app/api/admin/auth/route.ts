@@ -86,41 +86,71 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 2. Verifikasi dari daftar anggota staf yang dikelola Superadmin
+    // 2. Verifikasi staf admin langsung dari Database Server Neon DB
     let matchedMember: any = null
-    if (Array.isArray(teamMembers)) {
-      matchedMember = teamMembers.find(
+    let isValid = false
+
+    try {
+      const dbUser = await prisma.adminUser.findUnique({
+        where: { email },
+      })
+
+      if (dbUser) {
+        let meta: any = {}
+        try {
+          if (dbUser.avatarUrl && dbUser.avatarUrl.startsWith('{')) {
+            meta = JSON.parse(dbUser.avatarUrl)
+          }
+        } catch {}
+
+        if (meta.status === 'cuti') {
+          return NextResponse.json(
+            {
+              success: false,
+              message: 'Akun Anda sedang dinonaktifkan (status cuti). Silakan hubungi Superadmin.',
+            },
+            { status: 403 }
+          )
+        }
+
+        if (meta.password && meta.password === password) {
+          isValid = true
+          matchedMember = {
+            id: dbUser.id,
+            name: dbUser.name,
+            email: dbUser.email,
+            role: dbUser.role,
+            permissions:
+              Array.isArray(meta.permissions) && meta.permissions.length > 0
+                ? meta.permissions
+                : ['dashboard', 'berita'],
+            isSuperadmin: false,
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Neon DB admin lookup notice:', err)
+    }
+
+    // 3. Fallback: Verifikasi dari daftar anggota staf jika dikirim oleh client
+    if (!isValid && Array.isArray(teamMembers)) {
+      const clientMatch = teamMembers.find(
         (m: any) => m.email?.toLowerCase() === email.toLowerCase()
       )
-    }
-
-    let isValid = false
-    if (matchedMember) {
-      if (matchedMember.status === 'cuti') {
-        return NextResponse.json(
-          {
-            success: false,
-            message: 'Akun Anda sedang dinonaktifkan (status cuti). Silakan hubungi Superadmin.',
-          },
-          { status: 403 }
-        )
-      }
-      isValid = matchedMember.password ? password === matchedMember.password : false
-    }
-
-    // 3. Verifikasi staf admin di tabel database jika belum cocok
-    let dbUser: any = null
-    if (!isValid) {
-      try {
-        dbUser = await prisma.adminUser.findUnique({
-          where: { email },
-        })
-        if (dbUser && dbUser.passwordHash) {
-          const { comparePassword } = await import('@/lib/auth')
-          isValid = await comparePassword(password, dbUser.passwordHash)
+      if (clientMatch) {
+        if (clientMatch.status === 'cuti') {
+          return NextResponse.json(
+            {
+              success: false,
+              message: 'Akun Anda sedang dinonaktifkan (status cuti). Silakan hubungi Superadmin.',
+            },
+            { status: 403 }
+          )
         }
-      } catch (err) {
-        console.warn('Neon DB admin lookup notice:', err)
+        if (clientMatch.password && clientMatch.password === password) {
+          isValid = true
+          matchedMember = clientMatch
+        }
       }
     }
 
@@ -153,10 +183,10 @@ export async function POST(request: NextRequest) {
     resetAttempts(rateLimitKey)
 
     const userPayload = {
-      id: matchedMember?.id || dbUser?.id || 'staff-member',
-      name: matchedMember?.name || dbUser?.name || 'Staf Redaksi',
-      email: matchedMember?.email || dbUser?.email || email,
-      role: matchedMember?.role || dbUser?.role || 'staf',
+      id: matchedMember?.id || 'staff-member',
+      name: matchedMember?.name || 'Staf Redaksi',
+      email: matchedMember?.email || email,
+      role: matchedMember?.role || 'staf',
       isSuperadmin: false,
       permissions:
         matchedMember?.permissions || ['dashboard'],

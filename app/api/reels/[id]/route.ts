@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { clearServerReelsCache } from '@/lib/reels';
-import { ensureCloudinaryUrl } from '@/lib/cloudinary';
+import { ensureCloudinaryUrl, deleteFromCloudinary } from '@/lib/cloudinary';
 
 export const dynamic = 'force-dynamic';
 
@@ -88,6 +88,13 @@ export async function DELETE(
     }
 
     await prisma.reel.delete({ where: { id } });
+
+    // Hapus thumbnail dari Cloudinary jika ada
+    if (existing.thumbnailUrl) {
+      deleteFromCloudinary(existing.thumbnailUrl).catch((err) => {
+        console.warn('Notice deleting reel thumbnail from Cloudinary:', err);
+      });
+    }
 
     clearServerReelsCache();
     revalidatePath('/reels');

@@ -37,9 +37,17 @@ export const ReelsSection: React.FC<ReelsSectionProps> = ({
           const saved = localStorage.getItem('jurnal_wave_reels');
           if (saved) {
             const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed) && parsed.length > 0 && isMounted) {
-              setCurrentReels(parsed);
-              return true;
+            if (Array.isArray(parsed) && isMounted) {
+              const cleaned = parsed.filter((r: any) => !r.id?.startsWith('reel-default-'));
+              if (cleaned.length !== parsed.length) {
+                if (cleaned.length > 0) {
+                  localStorage.setItem('jurnal_wave_reels', JSON.stringify(cleaned));
+                } else {
+                  localStorage.removeItem('jurnal_wave_reels');
+                }
+              }
+              setCurrentReels(cleaned);
+              return cleaned.length > 0;
             }
           }
         } catch {}
@@ -54,10 +62,14 @@ export const ReelsSection: React.FC<ReelsSectionProps> = ({
         const res = await fetch('/api/reels', { cache: 'no-store' });
         if (res.ok) {
           const json = await res.json();
-          if (json.success && Array.isArray(json.data) && json.data.length > 0 && isMounted) {
+          if (json.success && Array.isArray(json.data) && isMounted) {
             setCurrentReels(json.data);
             if (typeof window !== 'undefined') {
-              localStorage.setItem('jurnal_wave_reels', JSON.stringify(json.data));
+              if (json.data.length > 0) {
+                localStorage.setItem('jurnal_wave_reels', JSON.stringify(json.data));
+              } else {
+                localStorage.removeItem('jurnal_wave_reels');
+              }
             }
           }
         }

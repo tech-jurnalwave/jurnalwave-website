@@ -37,24 +37,22 @@ export async function fetchReels(limit?: number): Promise<Reel[]> {
       take: limit,
     });
 
-    if (raw.length > 0) {
-      const mapped: Reel[] = raw.map((r) => ({
-        id: r.id,
-        title: r.title,
-        category: r.category || 'Berita',
-        creator: r.creator || '@jurnalwave',
-        platform: r.platform || 'tiktok',
-        socialUrl: r.socialUrl || '',
-        videoUrl: r.videoUrl || undefined,
-        location: r.location || 'Sukabumi',
-        thumbnailUrl: r.thumbnailUrl || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=700&q=80',
-        imageAlt: r.imageAlt || r.title,
-        viewsCount: r.viewsCount || '0',
-      }));
+    const mapped: Reel[] = raw.map((r) => ({
+      id: r.id,
+      title: r.title,
+      category: r.category || 'Berita',
+      creator: r.creator || '@jurnalwave',
+      platform: r.platform || 'tiktok',
+      socialUrl: r.socialUrl || '',
+      videoUrl: r.videoUrl || undefined,
+      location: r.location || 'Sukabumi',
+      thumbnailUrl: r.thumbnailUrl || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=700&q=80',
+      imageAlt: r.imageAlt || r.title,
+      viewsCount: r.viewsCount || '0',
+    }));
 
-      serverReelsCache = { data: mapped, timestamp: now };
-      return mapped;
-    }
+    serverReelsCache = { data: mapped, timestamp: now };
+    return limit && limit > 0 ? mapped.slice(0, limit) : mapped;
   } catch (error) {
     lastReelsFailureTimestamp = Date.now();
     console.warn('Reels database connection notice (using graceful fallback):', (error as any)?.message || error);

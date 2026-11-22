@@ -2,7 +2,8 @@ import type { Metadata } from 'next';
 import { ReelsSection } from '@/components/cards/ReelsSection';
 import { fetchReels } from '@/lib/reels';
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export const metadata: Metadata = {
   title: 'Wave Reels Sukabumi',
