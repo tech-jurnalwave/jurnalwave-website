@@ -157,7 +157,7 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
     }
 
     onClose()
-    router.replace('/halo-jurnal/admin/login')
+    router.replace('/')
   }
 
   const navSections = [

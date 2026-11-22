@@ -59,7 +59,7 @@ export default function AdminLayout({
           try {
             sessionStorage.removeItem('admin_session_valid')
           } catch {}
-          router.replace('/halo-jurnal/admin/login')
+          router.replace('/')
         }
       } catch {
         if (!isMounted) return
@@ -67,7 +67,7 @@ export default function AdminLayout({
         try {
           sessionStorage.removeItem('admin_session_valid')
         } catch {}
-        router.replace('/halo-jurnal/admin/login')
+        router.replace('/')
       }
     }
 

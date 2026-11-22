@@ -3,24 +3,29 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // 1. Alihkan akses URL lama admin ke rute staf resmi
+  // 1. Blokir akses ke URL tebakan umum: /admin, /admin/*, /redaksi, /superadmin-auth
+  // Langsung kembalikan tampilan 404 (Halaman Tidak Ditemukan)
   if (
-    pathname === '/halo-jurnal/admin/login' ||
+    pathname === '/admin' ||
     pathname === '/admin/login' ||
-    pathname === '/admin'
+    pathname.startsWith('/admin/') ||
+    pathname === '/halo-jurnal/admin/login' ||
+    pathname === '/redaksi/login' ||
+    pathname.startsWith('/redaksi/') ||
+    pathname === '/superadmin-auth'
   ) {
-    return NextResponse.redirect(new URL('/redaksi/login', request.url))
+    return NextResponse.rewrite(new URL('/_not-found', request.url))
   }
 
-  // 2. Abaikan rute admin resmi dan API agar tidak terjadi redirect loop
+  // 2. Abaikan rute admin resmi dan API agar tidak terjadi loop
   if (pathname.startsWith('/halo-jurnal/admin') || pathname.startsWith('/api')) {
     return NextResponse.next()
   }
 
-  // 3. Tangkap jika user mengetik /admin di URL lain (misal: /reels/admin)
+  // 3. Tangkap jika ada upaya mengetik /admin di URL lain (misal: /reels/admin) -> 404
   const adminMatch = pathname.match(/\/(admin)(?:$|\/)(.*)/)
   if (adminMatch) {
-    return NextResponse.redirect(new URL('/redaksi/login', request.url))
+    return NextResponse.rewrite(new URL('/_not-found', request.url))
   }
 
   return NextResponse.next()
