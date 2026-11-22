@@ -26,6 +26,7 @@ import {
   EyeOff,
   CheckCheck,
   KeyRound,
+  CheckCircle2,
 } from 'lucide-react'
 
 type AdminMenuKey =
@@ -131,6 +132,12 @@ export default function AdminTimRedaksiPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [createdCredentials, setCreatedCredentials] = useState<{
+    name: string
+    email: string
+    password: string
+    loginUrl: string
+  } | null>(null)
 
   // Form State
   const [formName, setFormName] = useState('')
@@ -166,7 +173,7 @@ export default function AdminTimRedaksiPage() {
       setFormEmail(generateEmailFromName(newName))
     }
 
-    // Jika mode tambah dan sandi belum diedit manual, sesuaikan sandi dengan nama baru
+    // Jika mode tambah dan sandi belum diedit manual, buatkan sandi acak otomatis berbasis nama
     if (!editingMemberId && !isPasswordManuallyEdited) {
       setFormPassword(generateRandomPassword(newName))
     }
@@ -420,12 +427,13 @@ export default function AdminTimRedaksiPage() {
       setTimeout(() => setToastMessage(null), 3500)
     } else {
       // Mode Tambah Baru
+      const finalPassword = formPassword.trim() || generateRandomPassword(formName.trim())
       const newMember: TeamMember = {
         id: `usr-${Date.now()}`,
         name: formName.trim(),
         email: formEmail.trim().toLowerCase(),
         role: formRole.trim(),
-        password: formPassword.trim() || generateRandomPassword(formName.trim()),
+        password: finalPassword,
         isSuperadmin: false,
         permissions: formPermissions.length > 0 ? formPermissions : (['dashboard'] as AdminMenuKey[]),
         status: 'aktif',
@@ -442,6 +450,13 @@ export default function AdminTimRedaksiPage() {
       }).catch((err) => console.error('Error saving new team member to server:', err))
 
       setIsModalOpen(false)
+      const url = typeof window !== 'undefined' ? `${window.location.origin}/jw-gate-781` : '/jw-gate-781'
+      setCreatedCredentials({
+        name: newMember.name,
+        email: newMember.email,
+        password: finalPassword,
+        loginUrl: url,
+      })
       setToastMessage(`Akun admin "${newMember.name}" berhasil ditambahkan ke database server!`)
       setTimeout(() => setToastMessage(null), 3500)
     }
@@ -776,6 +791,26 @@ export default function AdminTimRedaksiPage() {
                         {/* Aksi */}
                         <td className="py-3.5 px-4 text-right">
                           <div className="inline-flex items-center gap-1.5 justify-end">
+                            {/* Tombol Salin Kredensial Login */}
+                            {!member.isSuperadmin && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const url = typeof window !== 'undefined' ? `${window.location.origin}/jw-gate-781` : '/jw-gate-781'
+                                  const info = `Kredensial Login Staf JurnalWave:\nNama: ${member.name}\nEmail: ${member.email}\nKata Sandi: ${member.password || '(Sesuai yang Anda atur)'}\nTautan Login: ${url}`
+                                  if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                                    navigator.clipboard.writeText(info)
+                                    setToastMessage(`✓ Kredensial login untuk "${member.name}" berhasil disalin!`)
+                                    setTimeout(() => setToastMessage(null), 3500)
+                                  }
+                                }}
+                                className="p-1.5 rounded-lg text-amber-600 hover:text-amber-700 hover:bg-amber-50 transition cursor-pointer"
+                                title="Salin Info Login (Email, Sandi & Tautan)"
+                              >
+                                <KeyRound className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+
                             {/* Tombol Edit Hak Akses & Peran */}
                             <button
                               type="button"
@@ -1011,6 +1046,68 @@ export default function AdminTimRedaksiPage() {
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          )}
+          {/* Modal Berhasil Buat Akun & Salin Kredensial */}
+          {createdCredentials && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+              <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-100 text-center">
+                <div className="w-11 h-11 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-2.5">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+                <h3 className="text-sm font-bold text-slate-900 mb-0.5">
+                  Akun Staf Berhasil Dibuat!
+                </h3>
+                <p className="text-[11px] text-slate-500 mb-3.5">
+                  Simpan info login berikut untuk staf yang bersangkutan:
+                </p>
+
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-left space-y-2 mb-4 text-xs font-mono">
+                  <div>
+                    <span className="text-slate-400 block text-[10px] font-sans">Nama Staf</span>
+                    <span className="font-semibold text-slate-800">{createdCredentials.name}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] font-sans">Email Login</span>
+                    <span className="font-semibold text-slate-800">{createdCredentials.email}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] font-sans">Kata Sandi Acak</span>
+                    <span className="font-bold text-[#c00015] bg-red-50 px-2 py-0.5 rounded border border-red-200 inline-block">
+                      {createdCredentials.password}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] font-sans">Pintu Masuk Login</span>
+                    <span className="text-blue-600 text-[11px] truncate block">{createdCredentials.loginUrl}</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const info = `Kredensial Login Staf JurnalWave:\nNama: ${createdCredentials.name}\nEmail: ${createdCredentials.email}\nKata Sandi: ${createdCredentials.password}\nTautan Login: ${createdCredentials.loginUrl}`
+                      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                        navigator.clipboard.writeText(info)
+                        setToastMessage('✓ Kredensial login berhasil disalin ke clipboard!')
+                        setTimeout(() => setToastMessage(null), 3500)
+                      }
+                    }}
+                    className="flex-1 py-2 px-3 rounded-xl bg-[#c00015] hover:bg-[#a00012] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Salin Info Login</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCreatedCredentials(null)}
+                    className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition cursor-pointer"
+                  >
+                    Tutup
+                  </button>
+                </div>
               </div>
             </div>
           )}

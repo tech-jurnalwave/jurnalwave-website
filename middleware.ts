@@ -3,14 +3,18 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // 1. Blokir akses ke URL tebakan umum: /admin, /admin/*, /redaksi, /superadmin-auth
-  // Langsung kembalikan tampilan 404 (Halaman Tidak Ditemukan)
+  // 1. Arahkan akses URL login admin umum langsung ke pintu masuk login staf resmi
   if (
     pathname === '/admin' ||
     pathname === '/admin/login' ||
-    pathname.startsWith('/admin/') ||
     pathname === '/halo-jurnal/admin/login' ||
-    pathname === '/redaksi/login' ||
+    pathname === '/redaksi/login'
+  ) {
+    return NextResponse.redirect(new URL('/jw-gate-781', request.url))
+  }
+
+  if (
+    pathname.startsWith('/admin/') ||
     pathname.startsWith('/redaksi/') ||
     pathname === '/superadmin-auth'
   ) {
