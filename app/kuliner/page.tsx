@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import { CategoryTemplate } from '@/components/layout/CategoryTemplate';
 import { fetchArticles } from '@/lib/wordpress';
 
@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   title: 'Kuliner',
   description: 'Rekomendasi kafe estetik, tempat nongkrong, jajanan hits, dan kuliner terbaik Sukabumi.',
   openGraph: {
-    title: 'Kuliner | Jurnal Wave',
+    title: 'Kuliner | JurnalWave',
     description: 'Rekomendasi kafe estetik, tempat nongkrong, jajanan hits, dan kuliner terbaik Sukabumi.',
   },
 };

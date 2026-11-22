@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
@@ -40,14 +40,15 @@ import {
 import { Article, ArticleCategory } from '@/types'
 import AdminToast from '@/components/admin/AdminToast'
 import { useConfirm } from '@/components/admin/AdminConfirmDialog'
+import { convertImageToWebP } from '@/lib/imageUtils'
 
-export interface CategoryItem {
+interface CategoryItem {
   value: string
   label: string
   subCategories?: string[]
 }
 
-// Daftar 7 Kategori Resmi Jurnal Wave beserta nama tampilannya (Loker dikelola terpisah di menu Lowongan Kerja)
+// Daftar 7 Kategori Resmi JurnalWave beserta nama tampilannya (Loker dikelola terpisah di menu Lowongan Kerja)
 const CATEGORY_DISPLAY_MAP: Record<string, string> = {
   berita: 'Berita',
   kuliner: 'Kuliner',
@@ -181,7 +182,7 @@ const generateSmartLead = (title: string, content: string): string => {
   const clean = content
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/<[^>]+>/g, ' ')
-    .replace(/^(JURNALWAVE\.COM|JURNAL WAVE|JURNALVIBES\.COM|JURNAL VIBES)(\s*[-–—]\s*)/i, '')
+    .replace(/^(JURNALWAVE\.COM|JURNAL WAVE)(\s*[-–—]\s*)/i, '')
     .replace(/^([A-Z\s]+)\s*[-–—]\s*/, '')
     .replace(/\s+/g, ' ')
     .trim()
@@ -332,7 +333,7 @@ export default function AdminBeritaPage() {
   const [editingCatValue, setEditingCatValue] = useState<string | null>(null)
   const [editingCatLabel, setEditingCatLabel] = useState<string>('')
 
-  // Inisialisasi & Sinkronisasi 7 Kategori Resmi Jurnal Wave dari localStorage
+  // Inisialisasi & Sinkronisasi 7 Kategori Resmi JurnalWave dari localStorage
   useEffect(() => {
     try {
       const savedCats =
@@ -341,7 +342,7 @@ export default function AdminBeritaPage() {
       if (savedCats) {
         const parsed = JSON.parse(savedCats)
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Periksa apakah kategori inti Jurnal Wave sudah ada dan loker sudah dihapus dari artikel
+          // Periksa apakah kategori inti JurnalWave sudah ada dan loker sudah dihapus dari artikel
           const hasWaveCategories =
             parsed.some((c: CategoryItem) => c.value === 'kuliner') &&
             parsed.some((c: CategoryItem) => c.value === 'wisata') &&
@@ -354,7 +355,7 @@ export default function AdminBeritaPage() {
             return
           }
 
-          // Jika browser menyimpan cache lama, upgrade otomatis ke 7 kategori resmi Jurnal Wave
+          // Jika browser menyimpan cache lama, upgrade otomatis ke 7 kategori resmi JurnalWave
           const customAdded = parsed.filter(
             (c: CategoryItem) =>
               !DEFAULT_CATEGORIES.some((d) => d.value.toLowerCase() === c.value.toLowerCase()) &&
@@ -469,7 +470,7 @@ export default function AdminBeritaPage() {
   const handleResetCategories = async () => {
     const isConfirmed = await confirmDialog({
       title: 'Reset Kategori?',
-      message: 'Kembalikan ke 7 kategori resmi Jurnal Wave?',
+      message: 'Kembalikan ke 7 kategori resmi JurnalWave?',
       confirmText: 'Reset',
       cancelText: 'Batal',
       variant: 'warning',
@@ -479,7 +480,7 @@ export default function AdminBeritaPage() {
     setEditingCatValue(null)
     setEditingCatLabel('')
     persistCategories(DEFAULT_CATEGORIES)
-    showToast('Daftar kategori berhasil dikembalikan ke 7 kategori resmi Jurnal Wave.', 'success')
+    showToast('Daftar kategori berhasil dikembalikan ke 7 kategori resmi JurnalWave.', 'success')
   }
 
   const handleStartEditCategory = (cat: CategoryItem) => {
@@ -546,49 +547,9 @@ export default function AdminBeritaPage() {
     })
   }
 
-  // Helper kompres dan konversi gambar ke Base64 optimal
+  // Helper kompres dan konversi gambar ke Base64 optimal (Auto WebP)
   const compressImage = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const img = new Image()
-        img.onload = () => {
-          const canvas = document.createElement('canvas')
-          let { width, height } = img
-          const maxDimension = 1200
-          if (width > maxDimension || height > maxDimension) {
-            if (width > height) {
-              height = Math.round((height * maxDimension) / width)
-              width = maxDimension
-            } else {
-              width = Math.round((width * maxDimension) / height)
-              height = maxDimension
-            }
-          }
-          canvas.width = width
-          canvas.height = height
-          const ctx = canvas.getContext('2d')
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height)
-            try {
-              // Otomatis ubah & kompres ke WebP modern (standar Google SEO & super hemat bandwidth)
-              const webpData = canvas.toDataURL('image/webp', 0.85)
-              if (webpData.startsWith('data:image/webp')) {
-                resolve(webpData)
-                return
-              }
-            } catch {}
-            resolve(canvas.toDataURL('image/jpeg', 0.85))
-          } else {
-            resolve(e.target?.result as string)
-          }
-        }
-        img.onerror = () => reject(new Error('Gagal memproses berkas gambar'))
-        img.src = e.target?.result as string
-      }
-      reader.onerror = () => reject(new Error('Gagal membaca berkas'))
-      reader.readAsDataURL(file)
-    })
+    return convertImageToWebP(file, { maxDimension: 1200, quality: 0.85 })
   }
 
   // Handle Upload Foto Berita Baru
@@ -1067,7 +1028,7 @@ export default function AdminBeritaPage() {
             Manajemen Konten
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Publikasikan dan kelola artikel berita, liputan daerah, kuliner, wisata, dan kategori konten portal Jurnal Wave.
+            Publikasikan dan kelola artikel berita, liputan daerah, kuliner, wisata, dan kategori konten portal JurnalWave.
           </p>
         </div>
 
@@ -1680,7 +1641,7 @@ export default function AdminBeritaPage() {
                   <button
                     type="submit"
                     disabled={isSubmitting || isUploading || !editingArticle.title.trim()}
-                    className="px-4 py-2 rounded-lg bg-[#c00015] hover:bg-[#a00012] disabled:opacity-50 text-white font-bold transition text-xs flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    className="px-4 py-2 rounded-lg bg-[#c00015] hover:bg-[#a00012] disabled:opacity-50 text-white font-bold transition text-xs flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
                   >
                     {isSubmitting ? (
                       <>
@@ -1688,10 +1649,7 @@ export default function AdminBeritaPage() {
                         <span>Menyimpan...</span>
                       </>
                     ) : (
-                      <>
-                        <Save className="w-3.5 h-3.5" />
-                        <span>Simpan Perubahan</span>
-                      </>
+                      <span>Simpan Perubahan</span>
                     )}
                   </button>
                 </div>
@@ -1925,15 +1883,14 @@ export default function AdminBeritaPage() {
                     type="button"
                     disabled={isSubmitting || isUploading || !newTitle.trim()}
                     onClick={(e) => handleCreateArticle(e, 'draft')}
-                    className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 disabled:opacity-50 text-slate-800 font-semibold transition text-xs flex items-center gap-1.5 cursor-pointer"
+                    className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 disabled:opacity-50 text-slate-800 font-semibold transition text-xs flex items-center justify-center cursor-pointer"
                   >
-                    <FileText className="w-3.5 h-3.5" />
                     <span>Simpan Draf</span>
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting || isUploading || !newTitle.trim()}
-                    className="px-4 py-2 rounded-lg bg-[#c00015] hover:bg-[#a00012] disabled:opacity-50 text-white font-bold transition text-xs flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    className="px-4 py-2 rounded-lg bg-[#c00015] hover:bg-[#a00012] disabled:opacity-50 text-white font-bold transition text-xs flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
                   >
                     {isSubmitting ? (
                       <>
@@ -1941,10 +1898,7 @@ export default function AdminBeritaPage() {
                         <span>Menyimpan...</span>
                       </>
                     ) : (
-                      <>
-                        <Send className="w-3.5 h-3.5" />
-                        <span>Terbitkan</span>
-                      </>
+                      <span>Terbitkan</span>
                     )}
                   </button>
                 </div>
@@ -2057,7 +2011,7 @@ export default function AdminBeritaPage() {
                     Manajemen Kategori
                   </h3>
                   <p className="text-[11px] text-slate-500">
-                    Atur daftar dan urutan kategori konten portal Jurnal Wave
+                    Atur daftar dan urutan kategori konten portal JurnalWave
                   </p>
                 </div>
               </div>
@@ -2108,7 +2062,7 @@ export default function AdminBeritaPage() {
                 <div className="flex items-center justify-between mb-2">
                   <div>
                     <span className="text-xs font-bold text-slate-800">
-                      Urutan Kategori Resmi Jurnal Wave ({categoriesList.length}):
+                      Urutan Kategori Resmi JurnalWave ({categoriesList.length}):
                     </span>
                     <span className="text-[10px] text-slate-400 block">
                       Gunakan tombol panah untuk mengatur posisi urutan di menu.
@@ -2118,7 +2072,7 @@ export default function AdminBeritaPage() {
                     type="button"
                     onClick={handleResetCategories}
                     className="text-[11px] text-slate-500 hover:text-slate-800 hover:underline flex items-center gap-1 cursor-pointer shrink-0"
-                    title="Kembalikan ke 7 kategori resmi Jurnal Wave"
+                    title="Kembalikan ke 7 kategori resmi JurnalWave"
                   >
                     <RotateCcw className="w-3 h-3" />
                     <span>Reset Default</span>

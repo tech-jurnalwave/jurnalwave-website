@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
@@ -6,43 +6,20 @@ import {
   Film,
   Search,
   Plus,
-  Eye,
   Edit,
   Trash2,
-  Check,
   X,
   ExternalLink,
-  MapPin,
   LayoutGrid,
   List,
   Upload,
   Image as ImageIcon,
   Loader2,
-  Play,
 } from 'lucide-react'
-import { FaInstagram, FaTiktok, FaYoutube } from 'react-icons/fa6'
 import { Reel } from '@/types'
 import AdminToast from '@/components/admin/AdminToast'
 import { useConfirm } from '@/components/admin/AdminConfirmDialog'
-
-// Kategori Resmi Jurnal Wave (Portal Berita & Konten Kreatif)
-const JURNAL_WAVE_CATEGORIES = [
-  'Berita',
-  'Pendidikan & Sekolah',
-  'Lifestyle',
-  'Kuliner',
-  'Wisata',
-  'Otomotif',
-  'Sport & E-Sport',
-  'Teknologi',
-  'Science',
-  'Health',
-  'Loker',
-  'Hiburan',
-  'Lainnya',
-]
-
-const CATEGORY_OPTIONS = JURNAL_WAVE_CATEGORIES
+import { convertImageToWebP } from '@/lib/imageUtils'
 
 const DEFAULT_REEL_COVER =
   'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=700&q=80'
@@ -51,37 +28,30 @@ export default function AdminReelsPage() {
   const confirmDialog = useConfirm()
   const [reels, setReels] = useState<Reel[]>([])
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState<string>('semua')
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   // Modals State
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingReel, setEditingReel] = useState<Reel | null>(null)
-  const [previewReel, setPreviewReel] = useState<Reel | null>(null)
 
-  // Form Fields
-  const [formTitle, setFormTitle] = useState('')
-  const [formCategory, setFormCategory] = useState('Berita')
-  const [customCategory, setCustomCategory] = useState('')
-  const [formCreator, setFormCreator] = useState('')
-  const [formPlatform, setFormPlatform] = useState<'instagram' | 'tiktok' | 'youtube'>('tiktok')
+  // Form Fields (3 Inti: Link, Judul, Cover)
   const [formSocialUrl, setFormSocialUrl] = useState('')
-  const [formLocation, setFormLocation] = useState('')
+  const [formTitle, setFormTitle] = useState('')
   const [formThumbnail, setFormThumbnail] = useState('')
+  const [detectedPlatform, setDetectedPlatform] = useState<string>('tiktok')
+
   const [isFetchingMetadata, setIsFetchingMetadata] = useState(false)
   const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
 
   const coverFileInputRef = useRef<HTMLInputElement>(null)
 
-  const [isLoadingReels, setIsLoadingReels] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-
-  // Muat Reels dari Database Server & Auto-Sync video asli user jika pernah tersimpan
+  // Muat Reels dari Database Server & Auto-Sync
   useEffect(() => {
     let isMounted = true
 
-    // 1. Muat seketika dari localStorage agar video reels yang diunggah pengguna langsung muncul
+    // 1. Muat seketika dari localStorage
     if (typeof window !== 'undefined') {
       try {
         const saved = localStorage.getItem('jurnal_wave_reels')
@@ -96,7 +66,6 @@ export default function AdminReelsPage() {
 
     const loadAndSyncReels = async () => {
       try {
-        setIsLoadingReels(true)
         const res = await fetch('/api/reels', { cache: 'no-store' })
         if (res.ok) {
           const json = await res.json()
@@ -111,69 +80,39 @@ export default function AdminReelsPage() {
           }
         }
       } catch (err) {
-        console.warn('Notice saat memuat reels dari server:', err)
+        console.warn('Notice saat memuat reels:', err)
       }
 
-      // Fallback ke localStorage jika server offline
-      if (typeof window !== 'undefined') {
-        try {
-          const saved = localStorage.getItem('jurnal_wave_reels')
-          if (saved) {
-            const parsed = JSON.parse(saved)
-            if (Array.isArray(parsed) && parsed.length > 0 && isMounted) {
-              setReels(parsed)
-              return
-            }
-          }
-        } catch {}
-      }
-
-      // Jika belum ada data sama sekali, gunakan fallback reels resmi
+      // Fallback reels resmi jika data server/lokal kosong
       if (isMounted) {
         const fallbackReels: Reel[] = [
           {
             id: 'reel-default-1',
             title: 'Spot Kuliner & Senja Hits Sukabumi',
-            category: 'Kuliner',
-            creator: '@jurnalwave',
             platform: 'tiktok',
             socialUrl: 'https://tiktok.com',
-            location: 'Kota Sukabumi',
             thumbnailUrl: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=700&q=80',
-            viewsCount: '1.2K',
           },
           {
             id: 'reel-default-2',
             title: 'Suasana Akhir Pekan Alun-Alun Sukabumi',
-            category: 'Wisata',
-            creator: '@jurnalwave',
             platform: 'instagram',
             socialUrl: 'https://instagram.com',
-            location: 'Sukabumi',
             thumbnailUrl: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=700&q=80',
-            viewsCount: '2.5K',
           },
           {
             id: 'reel-default-3',
             title: 'Update Jalur Wisata & Transportasi Sukabumi',
-            category: 'Berita',
-            creator: '@jurnalwave',
             platform: 'youtube',
             socialUrl: 'https://youtube.com',
-            location: 'Kab. Sukabumi',
             thumbnailUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=700&q=80',
-            viewsCount: '980',
           },
           {
             id: 'reel-default-4',
             title: 'Tren Nongkrong & Fashion Pemuda Sukabumi',
-            category: 'Lifestyle',
-            creator: '@jurnalwave',
             platform: 'tiktok',
             socialUrl: 'https://tiktok.com',
-            location: 'Sukabumi',
             thumbnailUrl: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=700&q=80',
-            viewsCount: '3.1K',
           },
         ]
         setReels(fallbackReels)
@@ -189,7 +128,7 @@ export default function AdminReelsPage() {
     }
   }, [])
 
-  // Simpan data ke state lokal, localStorage, dan kirim event sinkronisasi real-time
+  // Simpan data ke state lokal & kirim event sinkronisasi real-time
   const persistReels = (updated: Reel[], toastText: string) => {
     setReels(updated)
     if (typeof window !== 'undefined') {
@@ -208,53 +147,34 @@ export default function AdminReelsPage() {
   // Buka Modal Tambah Baru
   const handleOpenCreateModal = () => {
     setEditingReel(null)
-    setFormTitle('')
-    setFormCategory('Berita')
-    setCustomCategory('')
-    setFormCreator('')
-    setFormPlatform('tiktok')
     setFormSocialUrl('')
-    setFormLocation('Sukabumi')
+    setFormTitle('')
     setFormThumbnail('')
+    setDetectedPlatform('tiktok')
     setIsModalOpen(true)
   }
 
   // Buka Modal Edit
   const handleOpenEditModal = (reel: Reel) => {
     setEditingReel(reel)
-    setFormTitle(reel.title)
-    const cat = reel.category || 'Pendidikan & Sekolah'
-    if (CATEGORY_OPTIONS.includes(cat)) {
-      setFormCategory(cat)
-      setCustomCategory('')
-    } else {
-      setFormCategory('Lainnya')
-      setCustomCategory(cat)
-    }
-    setFormCreator(reel.creator || '')
-    const plat = (reel.platform as any) || (reel.socialUrl?.includes('tiktok.com') ? 'tiktok' : reel.socialUrl?.includes('youtube.com') ? 'youtube' : 'instagram')
-    setFormPlatform(plat)
-    setFormSocialUrl(reel.socialUrl || (reel.creator ? `https://instagram.com/${reel.creator.replace('@', '')}` : ''))
-    setFormLocation(reel.location || '')
+    setFormSocialUrl(reel.socialUrl || reel.videoUrl || '')
+    setFormTitle(reel.title || '')
     setFormThumbnail(reel.thumbnailUrl || '')
+    setDetectedPlatform(reel.platform || 'tiktok')
     setIsModalOpen(true)
   }
 
-  // Cerdas: Deteksi platform & fetch metadata thumbnail otomatis dari link
+  // Otomatis deteksi platform & ekstrak cover saat link ditempel
   const handleSocialUrlChange = async (url: string) => {
     setFormSocialUrl(url)
     const lower = url.toLowerCase().trim()
     if (!lower) return
 
-    let detectedPlatform: 'instagram' | 'tiktok' | 'youtube' = formPlatform
+    let plat = 'tiktok'
     if (lower.includes('tiktok.com')) {
-      detectedPlatform = 'tiktok'
-      setFormPlatform('tiktok')
+      plat = 'tiktok'
     } else if (lower.includes('youtube.com') || lower.includes('youtu.be')) {
-      detectedPlatform = 'youtube'
-      setFormPlatform('youtube')
-
-      // Ekstraksi ID video YouTube instan
+      plat = 'youtube'
       let ytId = ''
       if (lower.includes('/shorts/')) {
         const match = url.match(/\/shorts\/([a-zA-Z0-9_-]+)/)
@@ -266,28 +186,15 @@ export default function AdminReelsPage() {
         const match = url.match(/youtu\.be\/([a-zA-Z0-9_-]+)/)
         if (match && match[1]) ytId = match[1]
       }
-      if (ytId) {
+      if (ytId && !formThumbnail) {
         setFormThumbnail(`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`)
       }
     } else if (lower.includes('instagram.com')) {
-      detectedPlatform = 'instagram'
-      setFormPlatform('instagram')
+      plat = 'instagram'
     }
+    setDetectedPlatform(plat)
 
-    // Ekstraksi handle kreator cepat dari pola URL jika formCreator masih kosong/default
-    if (!formCreator || formCreator === '@exploresukabumi' || formCreator === '@kreator_sukabumi') {
-      if (lower.includes('tiktok.com/@')) {
-        const match = url.match(/tiktok\.com\/@([a-zA-Z0-9_.-]+)/)
-        if (match && match[1]) setFormCreator(`@${match[1]}`)
-      } else if (lower.includes('instagram.com/')) {
-        const match = url.match(/instagram\.com\/([a-zA-Z0-9_.-]+)/)
-        if (match && match[1] && match[1] !== 'reel' && match[1] !== 'p') {
-          setFormCreator(`@${match[1]}`)
-        }
-      }
-    }
-
-    // Panggil server endpoint /api/reels/metadata untuk ambil cover thumbnail & info video asli
+    // Panggil server endpoint /api/reels/metadata untuk ekstrak cover & info otomatis
     if (lower.startsWith('http://') || lower.startsWith('https://')) {
       try {
         setIsFetchingMetadata(true)
@@ -295,14 +202,8 @@ export default function AdminReelsPage() {
         if (res.ok) {
           const json = await res.json()
           const data = json.data || json
-          if (data.thumbnailUrl) {
+          if (data.thumbnailUrl && !formThumbnail) {
             setFormThumbnail(data.thumbnailUrl)
-          }
-          if (data.creator && (!formCreator || formCreator === '@kreator_sukabumi' || formCreator === '@exploresukabumi')) {
-            setFormCreator(data.creator)
-          }
-          if (data.platform) {
-            setFormPlatform(data.platform)
           }
           if (data.title && !formTitle) {
             setFormTitle(data.title)
@@ -316,57 +217,7 @@ export default function AdminReelsPage() {
     }
   }
 
-  // Fungsi kompresi gambar cover ke format WebP sebelum upload
-  const compressReelCover = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const img = new Image()
-        img.onload = () => {
-          const canvas = document.createElement('canvas')
-          const ctx = canvas.getContext('2d')
-          const MAX_WIDTH = 1080
-          const MAX_HEIGHT = 1920
-          let width = img.width
-          let height = img.height
-
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height = Math.round((height * MAX_WIDTH) / width)
-              width = MAX_WIDTH
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width = Math.round((width * MAX_HEIGHT) / height)
-              height = MAX_HEIGHT
-            }
-          }
-
-          canvas.width = width
-          canvas.height = height
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height)
-            try {
-              const webpData = canvas.toDataURL('image/webp', 0.85)
-              if (webpData.startsWith('data:image/webp')) {
-                resolve(webpData)
-                return
-              }
-            } catch {}
-            resolve(canvas.toDataURL('image/jpeg', 0.85))
-          } else {
-            resolve(e.target?.result as string)
-          }
-        }
-        img.onerror = () => reject(new Error('Gagal memproses gambar'))
-        img.src = e.target?.result as string
-      }
-      reader.onerror = () => reject(new Error('Gagal membaca file'))
-      reader.readAsDataURL(file)
-    })
-  }
-
-  // Handle Upload Foto Cover Langsung dari Komputer / HP ke Cloudinary CDN
+  // Upload Foto Cover Manual dari Komputer / HP ke Cloudinary (Auto WebP)
   const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -378,133 +229,101 @@ export default function AdminReelsPage() {
 
     try {
       setIsUploadingThumbnail(true)
-      const base64 = await compressReelCover(file)
+      // 1. Konversi otomatis ke WebP di browser (kompresi hemat kuota)
+      const webpBase64 = await convertImageToWebP(file, { maxDimension: 1200, quality: 0.85 })
+
+      // 2. Kirim WebP ke server upload
       const res = await fetch('/api/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file: base64 }),
+        body: JSON.stringify({ file: webpBase64 }),
       })
       const data = await res.json()
       if (data.success && data.url) {
         setFormThumbnail(data.url)
+        setToastMessage('Foto cover berhasil dikonversi ke WebP & diunggah!')
       } else {
-        throw new Error(data.message || 'Gagal mengunggah foto ke Cloudinary')
+        alert('Gagal mengunggah foto cover. Silakan gunakan link URL.')
       }
-    } catch (err: any) {
-      console.error('Error uploading reel thumbnail:', err)
-      alert('Gagal mengunggah gambar cover: ' + (err?.message || 'Silakan coba lagi'))
+    } catch (err) {
+      console.error('Error konversi/upload webp cover:', err)
+      alert('Gagal mengunggah foto cover.')
     } finally {
       setIsUploadingThumbnail(false)
     }
   }
 
-  // Submit Simpan (Tambah / Edit) ke Database Server
+  // Submit Form (Tambah / Edit)
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formTitle.trim() || isSaving) return
 
     setIsSaving(true)
-    const effectiveCategory =
-      formCategory === 'Lainnya' ? customCategory.trim() || 'Umum' : formCategory
-
-    const cleanCreator = formCreator.trim()
-      ? formCreator.startsWith('@')
-        ? formCreator.trim()
-        : `@${formCreator.trim()}`
-      : '@kreator_sukabumi'
-
-    // Buat tautan medsos otomatis jika belum diisi lengkap
-    let finalSocialUrl = formSocialUrl.trim()
-    if (!finalSocialUrl) {
-      const username = cleanCreator.replace('@', '')
-      if (formPlatform === 'tiktok') {
-        finalSocialUrl = `https://www.tiktok.com/@${username}`
-      } else if (formPlatform === 'youtube') {
-        finalSocialUrl = `https://www.youtube.com/@${username}`
-      } else {
-        finalSocialUrl = `https://www.instagram.com/${username}`
-      }
-    }
-
+    const finalSocialUrl = formSocialUrl.trim() || 'https://instagram.com'
     const finalThumbnail = formThumbnail.trim() || DEFAULT_REEL_COVER
 
     try {
       if (editingReel) {
-        // Mode Edit via PUT /api/reels/[id]
         const res = await fetch(`/api/reels/${editingReel.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             title: formTitle.trim(),
-            category: effectiveCategory,
-            creator: cleanCreator,
-            platform: formPlatform,
+            platform: detectedPlatform,
             socialUrl: finalSocialUrl,
-            location: formLocation.trim() || 'Sukabumi',
             thumbnailUrl: finalThumbnail,
           }),
         })
 
-        if (!res.ok) throw new Error('Gagal memperbarui video reels di server')
+        if (!res.ok) throw new Error('Gagal memperbarui video reels')
         const json = await res.json()
         const updatedItem = json.data || {
           ...editingReel,
           title: formTitle.trim(),
-          category: effectiveCategory,
-          creator: cleanCreator,
-          platform: formPlatform,
+          platform: detectedPlatform,
           socialUrl: finalSocialUrl,
-          location: formLocation.trim() || 'Sukabumi',
           thumbnailUrl: finalThumbnail,
         }
         const updated = reels.map((r) => (r.id === editingReel.id ? updatedItem : r))
-        persistReels(updated, `Video Reels "${formTitle.trim()}" berhasil diperbarui di server!`)
+        persistReels(updated, `Video Reels "${formTitle.trim()}" berhasil diperbarui!`)
       } else {
-        // Mode Tambah Baru via POST /api/reels
         const res = await fetch('/api/reels', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             title: formTitle.trim(),
-            category: effectiveCategory,
-            creator: cleanCreator,
-            platform: formPlatform,
+            platform: detectedPlatform,
             socialUrl: finalSocialUrl,
-            location: formLocation.trim() || 'Sukabumi',
             thumbnailUrl: finalThumbnail,
           }),
         })
 
-        if (!res.ok) throw new Error('Gagal menambahkan video reels ke server')
+        if (!res.ok) throw new Error('Gagal menambahkan video reels')
         const json = await res.json()
         const newItem: Reel = json.data || {
           id: `reel-${Date.now()}`,
           title: formTitle.trim(),
-          category: effectiveCategory,
-          creator: cleanCreator,
-          platform: formPlatform,
+          platform: detectedPlatform,
           socialUrl: finalSocialUrl,
-          location: formLocation.trim() || 'Sukabumi',
           thumbnailUrl: finalThumbnail,
-          viewsCount: '0',
           imageAlt: formTitle.trim(),
         }
         const updated = [newItem, ...reels]
-        persistReels(updated, `Video Reels "${formTitle.trim()}" berhasil disimpan ke server!`)
+        persistReels(updated, `Video Reels "${formTitle.trim()}" berhasil disimpan!`)
       }
       setIsModalOpen(false)
     } catch (err: any) {
-      alert(err.message || 'Terjadi kesalahan saat menyimpan video ke server.')
+      alert(err.message || 'Terjadi kesalahan saat menyimpan video.')
     } finally {
       setIsSaving(false)
     }
   }
 
-  // Hapus Video Reels dari Database Server
+  // Hapus Video Reels
   const handleDeleteReel = async (id: string, title: string) => {
     const isConfirmed = await confirmDialog({
       title: 'Hapus Video Reels?',
-      message: 'Yakin ingin menghapus video ini secara permanen?',
+      message: `Yakin ingin menghapus "${title}"?`,
       confirmText: 'Hapus',
       cancelText: 'Batal',
       variant: 'danger',
@@ -512,77 +331,26 @@ export default function AdminReelsPage() {
     if (isConfirmed) {
       try {
         const res = await fetch(`/api/reels/${id}`, { method: 'DELETE' })
-        if (!res.ok) throw new Error('Gagal menghapus video dari server')
+        if (!res.ok) throw new Error('Gagal menghapus video')
         const updated = reels.filter((r) => r.id !== id)
-        persistReels(updated, `Video Reels "${title}" telah dihapus dari database.`)
+        persistReels(updated, `Video Reels "${title}" telah dihapus.`)
       } catch (err: any) {
-        alert(err.message || 'Gagal menghapus video dari server.')
+        alert(err.message || 'Gagal menghapus video.')
       }
     }
   }
 
-  // Kategori List
-  const categories = useMemo(() => {
-    const set = new Set<string>()
-    reels.forEach((r) => {
-      if (r.category) set.add(r.category)
-    })
-    return Array.from(set)
-  }, [reels])
-
-  // Filtered Reels
+  // Filtered Reels berdasarkan pencarian judul
   const filteredReels = useMemo(() => {
-    return reels.filter((r) => {
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase()
-        const matchTitle = r.title.toLowerCase().includes(q)
-        const matchCreator = r.creator?.toLowerCase().includes(q)
-        const matchLoc = r.location?.toLowerCase().includes(q)
-        if (!matchTitle && !matchCreator && !matchLoc) return false
-      }
-      if (selectedCategory !== 'semua' && r.category?.toLowerCase() !== selectedCategory.toLowerCase()) {
-        return false
-      }
-      return true
-    })
-  }, [reels, searchQuery, selectedCategory])
-
-  const renderPlatformBadge = (platform?: string) => {
-    const p = platform?.toLowerCase()
-    if (p === 'tiktok') {
-      return (
-        <span
-          title="Buka di TikTok"
-          className="w-6 h-6 rounded-md bg-black border border-white/20 flex items-center justify-center text-white shadow-xs"
-        >
-          <FaTiktok className="w-3 h-3 text-white" />
-        </span>
-      )
-    }
-    if (p === 'youtube') {
-      return (
-        <span
-          title="Buka di YouTube Shorts"
-          className="w-6 h-6 rounded-md bg-[#FF0000] border border-white/20 flex items-center justify-center text-white shadow-xs"
-        >
-          <FaYoutube className="w-3.5 h-3.5 text-white" />
-        </span>
-      )
-    }
-    return (
-      <span
-        title="Buka di Instagram"
-        className="w-6 h-6 rounded-md bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] border border-white/20 flex items-center justify-center text-white shadow-xs"
-      >
-        <FaInstagram className="w-3.5 h-3.5 text-white" />
-      </span>
-    )
-  }
+    if (!searchQuery.trim()) return reels
+    const q = searchQuery.toLowerCase()
+    return reels.filter((r) => r.title.toLowerCase().includes(q))
+  }, [reels, searchQuery])
 
   return (
-    <div className="space-y-6">
-      {/* 1. Top Header Bersih & Aksi Utama */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4 sm:space-y-5">
+      {/* 1. Header Sederhana */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1 border-b border-slate-200">
         <div>
           <h1 className="text-xl sm:text-2xl font-heading font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
             <span>Wave Reels</span>
@@ -590,19 +358,18 @@ export default function AdminReelsPage() {
               {reels.length} Konten
             </span>
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Kurasi video kreasi kreator Sukabumi. Warga dapat menjelajahi video dan langsung terhubung ke konten asli media sosial kreator.
+          <p className="text-xs text-slate-500 mt-0.5">
+            Kelola kurasi video reels beranda portal JurnalWave.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 self-start sm:self-auto">
+        <div className="flex items-center gap-2 self-start sm:self-auto">
           <Link
             href="/reels"
             target="_blank"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition shadow-2xs cursor-pointer"
           >
-            <Eye className="w-3.5 h-3.5 text-slate-400" />
-            <span>Lihat Galeri Publik</span>
+            <span>Lihat Galeri</span>
             <ExternalLink className="w-3 h-3 text-slate-400" />
           </Link>
 
@@ -622,125 +389,69 @@ export default function AdminReelsPage() {
         onClose={() => setToastMessage(null)}
       />
 
-      {/* 2. Kartu Metrik Ringkasan */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
-          <span className="text-xs font-medium text-slate-500">Total Video Reels</span>
-          <p className="text-2xl font-bold font-heading text-slate-900">{reels.length}</p>
-          <p className="text-[11px] text-slate-500">Tayang di galeri publik &amp; beranda portal</p>
+      {/* 2. Bar Pencarian & Switch View (Grid vs Tabel) */}
+      <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Cari judul video reels..."
+            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#c00015] transition"
+          />
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
-          <span className="text-xs font-medium text-slate-500">Kategori Kurasi</span>
-          <p className="text-2xl font-bold font-heading text-slate-900">{categories.length}</p>
-          <p className="text-[11px] text-slate-500">Kuliner, Wisata, Lifestyle, dll</p>
-        </div>
-
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
-          <span className="text-xs font-medium text-slate-500">Integrasi Kreator</span>
-          <p className="text-2xl font-bold font-heading text-slate-900">Direct Link</p>
-          <p className="text-[11px] text-slate-500 font-medium">Instagram, TikTok, &amp; YouTube</p>
-        </div>
-      </div>
-
-      {/* 3. Bar Pencarian, Filter Kategori, & Switch View */}
-      <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Input Pencarian */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari judul video, @kreator, atau lokasi..."
-              className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#c00015] transition"
-            />
-          </div>
-
-          {/* Toggle View Mode: Grid 9:16 vs Tabel */}
-          <div className="flex items-center gap-1 self-end sm:self-auto border border-slate-200 rounded-lg p-0.5 bg-slate-50">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-1.5 rounded-md text-xs font-semibold transition cursor-pointer flex items-center gap-1 ${
-                viewMode === 'grid'
-                  ? 'bg-white text-slate-900 shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-              title="Tampilan Grid Video 9:16"
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span className="text-[11px] hidden sm:inline">Grid 9:16</span>
-            </button>
-            <button
-              onClick={() => setViewMode('table')}
-              className={`p-1.5 rounded-md text-xs font-semibold transition cursor-pointer flex items-center gap-1 ${
-                viewMode === 'table'
-                  ? 'bg-white text-slate-900 shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-              title="Tampilan Tabel Ringkas"
-            >
-              <List className="w-3.5 h-3.5" />
-              <span className="text-[11px] hidden sm:inline">Tabel</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Filter Kategori Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+        <div className="flex items-center gap-1 border border-slate-200 rounded-lg p-0.5 bg-slate-50 shrink-0">
           <button
-            onClick={() => setSelectedCategory('semua')}
-            className={`px-3 py-1 rounded-md text-xs font-medium transition cursor-pointer shrink-0 ${
-              selectedCategory === 'semua'
-                ? 'bg-[#c00015] text-white shadow-2xs font-semibold'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            onClick={() => setViewMode('grid')}
+            className={`p-1.5 rounded-md text-xs font-semibold transition cursor-pointer flex items-center gap-1 ${
+              viewMode === 'grid'
+                ? 'bg-white text-slate-900 shadow-2xs'
+                : 'text-slate-500 hover:text-slate-800'
             }`}
+            title="Tampilan Grid 9:16"
           >
-            Semua ({reels.length})
+            <LayoutGrid className="w-3.5 h-3.5" />
+            <span className="text-[11px] hidden sm:inline">Grid 9:16</span>
           </button>
-          {categories.map((cat) => {
-            const count = reels.filter((r) => r.category?.toLowerCase() === cat.toLowerCase()).length
-            const isSelected = selectedCategory.toLowerCase() === cat.toLowerCase()
-            return (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition cursor-pointer shrink-0 ${
-                  isSelected
-                    ? 'bg-[#c00015] text-white shadow-2xs font-semibold'
-                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                }`}
-              >
-                {cat} ({count})
-              </button>
-            )
-          })}
+          <button
+            onClick={() => setViewMode('table')}
+            className={`p-1.5 rounded-md text-xs font-semibold transition cursor-pointer flex items-center gap-1 ${
+              viewMode === 'table'
+                ? 'bg-white text-slate-900 shadow-2xs'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+            title="Tampilan Tabel"
+          >
+            <List className="w-3.5 h-3.5" />
+            <span className="text-[11px] hidden sm:inline">Tabel</span>
+          </button>
         </div>
       </div>
 
-      {/* 4. Konten Utama: Grid 9:16 atau Tabel Ringkas */}
+      {/* 3. Konten Utama: Grid 9:16 atau Tabel Ringkas */}
       {filteredReels.length === 0 ? (
         <div className="p-12 text-center bg-white rounded-xl border border-dashed border-slate-300 space-y-2">
           <Film className="w-8 h-8 text-slate-400 mx-auto" />
           <h3 className="font-heading font-semibold text-slate-800 text-sm">Tidak ada video Reels ditemukan</h3>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            Coba sesuaikan kata kunci pencarian atau pilih filter kategori lain.
+            Belum ada konten video yang ditambahkan atau kata kunci pencarian tidak cocok.
           </p>
         </div>
       ) : viewMode === 'grid' ? (
-        /* ================= TAMPILAN GRID VISUAL 9:16 ================= */
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        /* ================= TAMPILAN GRID VISUAL 9:16 (IDENTIK DENGAN BERANDA) ================= */
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5 sm:gap-4">
           {filteredReels.map((reel) => {
-            const socialTarget = reel.socialUrl || `https://instagram.com/${(reel.creator || 'jurnalwave').replace('@', '')}`
+            const targetUrl = reel.socialUrl || reel.videoUrl || 'https://instagram.com'
 
             return (
               <div
                 key={reel.id}
-                className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col group transition hover:shadow-md"
+                className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col group transition hover:shadow-md"
               >
-                {/* Thumbnail 9:16 dengan Overlay Info */}
-                <div className="relative aspect-[9/16] bg-slate-900 overflow-hidden">
+                {/* Kartu Vertikal 9:16 */}
+                <div className="relative aspect-[9/16] bg-zinc-950 overflow-hidden">
                   {/* eslint-disable-next-img-element */}
                   <img
                     src={reel.thumbnailUrl}
@@ -748,90 +459,42 @@ export default function AdminReelsPage() {
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = DEFAULT_REEL_COVER
                     }}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
                   />
 
-                  {/* Dark Gradient Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/30 to-black/50" />
-
-                  {/* Top Chips: Kategori & Badge Medsos */}
-                  <div className="absolute top-2.5 inset-x-2.5 flex items-center justify-between gap-1 text-[10px] z-10">
-                    <span className="font-semibold px-2 py-0.5 rounded bg-black/60 backdrop-blur-xs text-white border border-white/20">
-                      {!reel.category || reel.category === '-' ? 'Berita' : reel.category}
-                    </span>
-                    {renderPlatformBadge(reel.platform || (reel.socialUrl?.includes('tiktok') ? 'tiktok' : reel.socialUrl?.includes('youtube') ? 'youtube' : 'instagram'))}
-                  </div>
-
-                  {/* Tombol Tengah (Play Video Medsos) - Selaras 100% dengan Beranda */}
-                  <a
-                    href={socialTarget}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="absolute inset-0 flex items-center justify-center text-white/90 group-hover:text-white z-0 cursor-pointer"
-                    title={`Buka postingan ${reel.creator} di media sosial`}
-                  >
-                    <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md border border-white/40 flex items-center justify-center group-hover:scale-110 group-hover:bg-[#c00015] group-hover:border-[#c00015] transition shadow-lg">
-                      <Play className="w-4 h-4 fill-white text-white ml-0.5" />
-                    </div>
-                  </a>
-
-                  {/* Bottom Overlay Info */}
-                  <div className="absolute bottom-2.5 inset-x-2.5 space-y-1 text-white z-10 pointer-events-none">
-                    <h3 className="font-heading font-bold text-xs line-clamp-2 leading-tight drop-shadow-xs">
+                  {/* Dark Gradient Overlay & Judul Simpel (Sesuai 100% dengan Beranda) */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/25 to-transparent flex flex-col justify-end p-2.5 sm:p-3 pointer-events-none">
+                    <p className="text-white font-heading font-semibold text-[11px] sm:text-xs leading-snug line-clamp-2 drop-shadow-xs">
                       {reel.title}
-                    </h3>
-                    <div className="flex items-center justify-between text-[10px] text-white/90 pt-0.5">
-                      <a
-                        href={socialTarget}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-semibold hover:underline truncate max-w-[120px] pointer-events-auto flex items-center gap-1 text-white"
-                        title={`Buka profil ${reel.creator}`}
-                      >
-                        <span>{reel.creator}</span>
-                        <ExternalLink className="w-2.5 h-2.5 text-white/70" />
-                      </a>
-                      {reel.location && (
-                        <span className="text-[9px] text-white/70 truncate max-w-[70px]">
-                          {reel.location}
-                        </span>
-                      )}
-                    </div>
+                    </p>
                   </div>
                 </div>
 
-                {/* Action Buttons Footer */}
+                {/* Bar Tombol Aksi Praktis */}
                 <div className="p-2 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs">
                   <a
-                    href={socialTarget}
+                    href={targetUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-slate-700 hover:text-[#c00015] hover:bg-slate-200/70 text-[11px] font-semibold transition cursor-pointer"
-                    title="Buka Link Medsos Asli"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-slate-600 hover:text-[#c00015] hover:bg-slate-200/60 text-[11px] font-medium transition cursor-pointer"
+                    title="Buka Video Asli di Tab Baru"
                   >
                     <ExternalLink className="w-3 h-3 text-[#c00015]" />
-                    <span>Medsos</span>
+                    <span>Buka</span>
                   </a>
 
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setPreviewReel(reel)}
-                      className="p-1.5 rounded text-slate-600 hover:text-slate-900 hover:bg-slate-200/70 transition cursor-pointer"
-                      title="Lihat Pratinjau Kartu"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                    </button>
+                  <div className="flex items-center gap-0.5">
                     <button
                       onClick={() => handleOpenEditModal(reel)}
-                      className="p-1.5 rounded text-slate-600 hover:text-slate-900 hover:bg-slate-200/70 transition cursor-pointer"
-                      title="Edit Data Reels"
+                      className="p-1.5 rounded text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 transition cursor-pointer"
+                      title="Edit Judul / Link / Cover"
                     >
                       <Edit className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => handleDeleteReel(reel.id, reel.title)}
                       className="p-1.5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                      title="Hapus Video Reels"
+                      title="Hapus Video"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -842,32 +505,27 @@ export default function AdminReelsPage() {
           })}
         </div>
       ) : (
-        /* ================= TAMPILAN TABEL DATA ================= */
+        /* ================= TAMPILAN TABEL DATA RINGKAS ================= */
         <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
           <div className="w-full overflow-x-auto">
-            <table className="w-full min-w-[720px] table-fixed text-left text-xs">
+            <table className="w-full min-w-[600px] text-left text-xs">
               <thead className="bg-slate-50 text-slate-600 font-semibold uppercase text-[10px] tracking-wider border-b border-slate-200">
                 <tr>
-                  <th className="py-3 pl-4 pr-3 whitespace-nowrap w-[80px]">Cover</th>
+                  <th className="py-3 pl-4 pr-3 whitespace-nowrap w-[70px]">Cover</th>
                   <th className="py-3 px-3">Judul Video</th>
-                  <th className="py-3 px-2.5 whitespace-nowrap w-[100px]">Kategori</th>
-                  <th className="py-3 px-2.5 whitespace-nowrap w-[160px]">Kreator &amp; Medsos</th>
-                  <th className="py-3 px-2.5 whitespace-nowrap w-[120px]">Lokasi</th>
-                  <th className="py-3 pl-2 pr-4 whitespace-nowrap w-[120px] text-center">Aksi</th>
+                  <th className="py-3 px-3">Tautan Video</th>
+                  <th className="py-3 pl-2 pr-4 whitespace-nowrap w-[100px] text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredReels.map((reel) => {
-                  const socialTarget = reel.socialUrl || `https://instagram.com/${(reel.creator || 'jurnalwave').replace('@', '')}`
+                  const targetUrl = reel.socialUrl || reel.videoUrl || 'https://instagram.com'
 
                   return (
                     <tr key={reel.id} className="hover:bg-slate-50/70 transition-colors">
                       {/* Thumbnail Mini 9:16 */}
                       <td className="py-2.5 pl-4 pr-3 align-middle">
-                        <div
-                          onClick={() => setPreviewReel(reel)}
-                          className="w-11 h-14 rounded-md overflow-hidden bg-slate-900 border border-slate-200 relative group cursor-pointer shrink-0"
-                        >
+                        <div className="w-10 h-14 rounded-md overflow-hidden bg-zinc-950 border border-slate-200 relative shrink-0">
                           {/* eslint-disable-next-img-element */}
                           <img
                             src={reel.thumbnailUrl}
@@ -875,82 +533,44 @@ export default function AdminReelsPage() {
                             onError={(e) => {
                               (e.target as HTMLImageElement).src = DEFAULT_REEL_COVER
                             }}
-                            className="w-full h-full object-cover group-hover:scale-110 transition"
+                            className="w-full h-full object-cover"
                           />
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-white">
-                            <Eye className="w-3.5 h-3.5" />
-                          </div>
                         </div>
                       </td>
 
                       {/* Judul Video */}
                       <td className="py-2.5 px-3 align-middle min-w-0">
-                        <p className="font-heading font-semibold text-slate-900 truncate">
+                        <p className="font-heading font-semibold text-slate-900 line-clamp-2">
                           {reel.title}
                         </p>
-                        <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                          ID: {reel.id}
-                        </p>
                       </td>
 
-                      {/* Kategori */}
-                      <td className="py-2.5 px-2.5 whitespace-nowrap align-middle">
-                        <span className="font-medium text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
-                          {reel.category || 'Reels'}
-                        </span>
-                      </td>
-
-                      {/* Kreator & Link Medsos */}
-                      <td className="py-2.5 px-2.5 whitespace-nowrap align-middle">
-                        <div className="flex items-center gap-1.5">
-                          {renderPlatformBadge(reel.platform || (reel.socialUrl?.includes('tiktok') ? 'tiktok' : reel.socialUrl?.includes('youtube') ? 'youtube' : 'instagram'))}
-                          <a
-                            href={socialTarget}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 font-semibold text-slate-900 hover:text-[#c00015] hover:underline"
-                            title="Buka postingan asli di media sosial"
-                          >
-                            <span>{reel.creator}</span>
-                            <ExternalLink className="w-2.5 h-2.5 text-slate-400" />
-                          </a>
-                        </div>
-                      </td>
-
-                      {/* Lokasi */}
-                      <td className="py-2.5 px-2.5 whitespace-nowrap align-middle text-slate-600 text-[11px] truncate">
-                        {reel.location || '-'}
+                      {/* Tautan Video */}
+                      <td className="py-2.5 px-3 align-middle text-slate-600 truncate max-w-xs font-mono text-[11px]">
+                        <a
+                          href={targetUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:text-[#c00015] hover:underline inline-flex items-center gap-1 text-slate-600"
+                        >
+                          <span className="truncate max-w-[200px]">{targetUrl}</span>
+                          <ExternalLink className="w-3 h-3 shrink-0" />
+                        </a>
                       </td>
 
                       {/* Aksi */}
                       <td className="py-2.5 pl-2 pr-4 whitespace-nowrap text-center align-middle">
                         <div className="inline-flex items-center justify-center gap-1">
-                          <a
-                            href={socialTarget}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-1 rounded-md text-slate-400 hover:text-[#c00015] hover:bg-slate-100 transition cursor-pointer"
-                            title="Buka Postingan Medsos Asli"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
-                          <button
-                            onClick={() => setPreviewReel(reel)}
-                            className="p-1 rounded-md text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer"
-                            title="Lihat Pratinjau Kartu"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
                           <button
                             onClick={() => handleOpenEditModal(reel)}
-                            className="p-1 rounded-md text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer"
+                            className="p-1.5 rounded-md text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer"
                             title="Edit"
                           >
                             <Edit className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteReel(reel.id, reel.title)}
-                            className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                            className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
                             title="Hapus"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -966,54 +586,47 @@ export default function AdminReelsPage() {
         </div>
       )}
 
-      {/* ================= MODAL TAMBAH / EDIT VIDEO REELS ================= */}
+      {/* ================= MODAL TAMBAH / EDIT VIDEO REELS (SUPER SIMPEL) ================= */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-xl w-full overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[90vh]">
             {/* Header Modal */}
             <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Film className="w-5 h-5 text-[#c00015]" />
                 <h3 className="font-heading font-bold text-slate-900 text-sm sm:text-base">
-                  {editingReel ? 'Edit Konten Wave Reels' : 'Tambah Konten Wave Reels Baru'}
+                  {editingReel ? 'Edit Video Reels' : 'Tambah Video Reels'}
                 </h3>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
                 className="text-slate-400 hover:text-slate-700 p-1 rounded-md transition cursor-pointer"
+                title="Tutup"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Form Body - Terfokus pada Kurasi Medsos & Auto Thumbnail */}
+            {/* Form Body - Hanya 3 Kolom Inti */}
             <form onSubmit={handleSubmitForm} className="p-5 space-y-4 overflow-y-auto flex-1 text-xs">
-              {/* 1. Tautan Postingan Medsos (Cerdas: Auto Detect Platform & Auto Fetch Cover) */}
-              <div className="space-y-1.5 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
-                <div className="flex items-center justify-between">
-                  <label className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <Film className="w-4 h-4 text-[#c00015]" />
-                    <span>Link Video Medsos (TikTok / Instagram / YouTube Shorts) *</span>
-                  </label>
-                  {isFetchingMetadata ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      Mengambil data...
-                    </span>
-                  ) : (
-                    <span className="text-[10px] font-semibold text-[#c00015] bg-[#c00015]/10 px-2 py-0.5 rounded">
-                      Wajib
+              {/* 1. Link Video Medsos */}
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-800 flex items-center justify-between">
+                  <span>Link Video (TikTok / Instagram / YouTube Shorts) <span className="text-[#c00015]">*</span></span>
+                  {isFetchingMetadata && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                      <Loader2 className="w-3 h-3 animate-spin" /> Mengambil cover...
                     </span>
                   )}
-                </div>
+                </label>
                 <div className="relative">
                   <input
                     type="url"
                     required
                     value={formSocialUrl}
                     onChange={(e) => handleSocialUrlChange(e.target.value)}
-                    placeholder="Tempel tautan video di sini: https://vt.tiktok.com/... atau https://youtube.com/shorts/..."
-                    className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-[#c00015] transition font-mono pr-8"
+                    placeholder="https://vt.tiktok.com/... atau https://youtube.com/shorts/..."
+                    className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-[#c00015] transition font-mono pr-8"
                   />
                   {isFetchingMetadata && (
                     <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400">
@@ -1022,7 +635,7 @@ export default function AdminReelsPage() {
                   )}
                 </div>
                 <p className="text-[11px] text-slate-500">
-                  Cukup tempel tautan video, sistem otomatis mendeteksi platform, kreator, dan mengambil cover video aslinya.
+                  Tempelkan link video, sistem otomatis mencoba mengambil foto cover aslinya.
                 </p>
               </div>
 
@@ -1036,277 +649,100 @@ export default function AdminReelsPage() {
                   required
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
-                  placeholder="Contoh: Siswa SDN Cikole Raih Prestasi di Ajang Kreativitas Pelajar Sukabumi"
-                  className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-[#c00015] transition"
+                  placeholder="Masukkan judul video yang tampil di kartu..."
+                  className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-[#c00015] transition"
                 />
               </div>
 
-              {/* 3. Kategori Video (Dropdown Simpel & Bersih + Ketik Manual Jika 'Lainnya') */}
+              {/* 3. Cover Thumbnail (9:16) */}
               <div className="space-y-1.5">
                 <label className="font-bold text-slate-800 block">
-                  Kategori Video <span className="text-[#c00015]">*</span>
+                  Foto Cover (Rasio 9:16)
                 </label>
-                <select
-                  value={formCategory}
-                  onChange={(e) => setFormCategory(e.target.value)}
-                  className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-[#c00015] transition font-medium"
-                >
-                  {CATEGORY_OPTIONS.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
 
-                {formCategory === 'Lainnya' && (
-                  <div className="pt-1.5">
-                    <input
-                      type="text"
-                      required
-                      value={customCategory}
-                      onChange={(e) => setCustomCategory(e.target.value)}
-                      placeholder="Ketik nama kategori baru (contoh: Prestasi Siswa, Loker Sukabumi, dll)..."
-                      className="w-full px-3.5 py-2 text-xs bg-white border border-[#c00015]/40 rounded-lg text-slate-900 focus:outline-none focus:border-[#c00015] transition font-medium"
-                      autoFocus
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* 4. Platform, Akun Kreator & Lokasi Spot */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-slate-700 block">Platform Medsos</label>
-                  <select
-                    value={formPlatform}
-                    onChange={(e) => setFormPlatform(e.target.value as any)}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015] transition font-semibold"
-                  >
-                    <option value="tiktok">TikTok</option>
-                    <option value="instagram">Instagram Reels</option>
-                    <option value="youtube">YouTube Shorts</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-slate-700 block">
-                    Nama Akun Kreator <span className="text-[#c00015]">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formCreator}
-                    onChange={(e) => setFormCreator(e.target.value)}
-                    placeholder="Contoh: @jurnalsukabumi"
-                    className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:outline-none focus:border-[#c00015] transition font-mono"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-slate-700 block">Lokasi Spot</label>
-                  <input
-                    type="text"
-                    value={formLocation}
-                    onChange={(e) => setFormLocation(e.target.value)}
-                    placeholder="Misal: Kota Sukabumi"
-                    className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:outline-none focus:border-[#c00015] transition"
-                  />
-                </div>
-              </div>
-
-              {/* 5. Cover Thumbnail (Otomatis dari Video + Opsi Upload Manual) */}
-              <div className="space-y-2.5 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
-                <div className="flex items-center justify-between">
-                  <label className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <ImageIcon className="w-4 h-4 text-[#c00015]" />
-                    <span>Cover Thumbnail Video</span>
-                  </label>
-                  {formThumbnail ? (
-                    <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 font-semibold px-2 py-0.5 rounded flex items-center gap-1">
-                      <Check className="w-3 h-3" /> Cover Siap
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-slate-400">Otomatis dari video</span>
-                  )}
-                </div>
-
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <p className="text-[11px] text-slate-600 flex-1">
-                    {formThumbnail
-                      ? 'Cover video berhasil diambil otomatis dari tautan. Anda juga dapat menggantinya dengan foto cover dari perangkat jika diinginkan.'
-                      : 'Cover otomatis diekstrak saat Anda menempelkan tautan video TikTok, YouTube Shorts, atau Instagram.'}
-                  </p>
-                  <input
-                    type="file"
-                    ref={coverFileInputRef}
-                    accept="image/*"
-                    onChange={handleImageFileChange}
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    disabled={isUploadingThumbnail}
-                    onClick={() => coverFileInputRef.current?.click()}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 text-xs font-semibold transition cursor-pointer shadow-2xs shrink-0 disabled:opacity-60"
-                  >
-                    {isUploadingThumbnail ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-[#c00015]" />
-                        <span>Mengunggah ke Cloudinary CDN...</span>
-                      </>
+                <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  {/* Thumbnail Mini Preview */}
+                  <div className="w-14 aspect-[9/16] rounded-lg overflow-hidden bg-zinc-950 border border-slate-200 shrink-0 relative shadow-2xs">
+                    {formThumbnail ? (
+                      /* eslint-disable-next-img-element */
+                      <img
+                        src={formThumbnail}
+                        alt="Preview Cover"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = DEFAULT_REEL_COVER
+                        }}
+                      />
                     ) : (
-                      <>
-                        <Upload className="w-3.5 h-3.5 text-[#c00015]" />
-                        <span>Pilih Foto dari Perangkat</span>
-                      </>
+                      <div className="w-full h-full flex items-center justify-center text-slate-400">
+                        <ImageIcon className="w-5 h-5" />
+                      </div>
                     )}
-                  </button>
-                </div>
-              </div>
+                  </div>
 
-              {/* 6. Pratinjau Tampilan Beranda (Harmonis & Clean) */}
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-4">
-                <div className="w-16 sm:w-20 aspect-[9/16] rounded-lg overflow-hidden bg-slate-900 border border-slate-200 relative shrink-0 shadow-xs">
-                  {formThumbnail ? (
-                    // eslint-disable-next-img-element
-                    <img
-                      src={formThumbnail}
-                      alt="Preview Cover"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = DEFAULT_REEL_COVER
-                      }}
+                  {/* Input URL & Tombol Upload */}
+                  <div className="flex-1 space-y-2">
+                    <input
+                      type="url"
+                      value={formThumbnail}
+                      onChange={(e) => setFormThumbnail(e.target.value)}
+                      placeholder="URL cover (otomatis atau isi manual)..."
+                      className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-[#c00015] transition"
                     />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-slate-400">
-                      <Film className="w-6 h-6" />
-                    </div>
-                  )}
 
-                  {/* Gradient Overlay Selaras 100% dengan Beranda */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-black/40 flex flex-col justify-between p-1.5 pointer-events-none">
-                    <div className="flex items-center justify-between w-full">
-                      <span className="text-[7px] font-semibold text-white bg-black/60 backdrop-blur-xs px-1.5 py-0.5 rounded border border-white/20 leading-none truncate max-w-[55px]">
-                        {formCategory === 'Lainnya' ? customCategory || 'Lainnya' : formCategory}
-                      </span>
-                      {renderPlatformBadge(formPlatform)}
-                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="file"
+                        ref={coverFileInputRef}
+                        accept="image/*"
+                        onChange={handleImageFileChange}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        disabled={isUploadingThumbnail}
+                        onClick={() => coverFileInputRef.current?.click()}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 text-xs font-semibold transition cursor-pointer shadow-2xs disabled:opacity-60"
+                      >
+                        {isUploadingThumbnail ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-[#c00015]" />
+                            <span>Mengunggah...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-3.5 h-3.5 text-[#c00015]" />
+                            <span>Pilih File Gambar</span>
+                          </>
+                        )}
+                      </button>
 
-                    <div className="text-[8px] text-white leading-tight space-y-0.5">
-                      <p className="font-semibold text-white/80 text-[7px] truncate">{formCreator || '@kreator'}</p>
-                      <p className="font-bold line-clamp-1">{formTitle || 'Judul Video'}</p>
+                      {formThumbnail && (
+                        <button
+                          type="button"
+                          onClick={() => setFormThumbnail('')}
+                          className="px-2 py-1.5 rounded-lg text-rose-600 hover:bg-rose-50 border border-rose-200 text-xs font-medium transition cursor-pointer"
+                          title="Hapus Cover"
+                        >
+                          Hapus
+                        </button>
+                      )}
                     </div>
                   </div>
-                </div>
-
-                <div className="text-xs space-y-1 min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 bg-white border border-slate-200 px-2 py-0.5 rounded">
-                      Pratinjau Tampilan Beranda
-                    </span>
-                    <span className="text-[10px] text-slate-500 font-mono capitalize">
-                      {formPlatform}
-                    </span>
-                  </div>
-                  <p className="font-heading font-bold text-slate-900 text-xs truncate">
-                    {formTitle || 'Judul Video Reels'}
-                  </p>
-                  <p className="text-slate-500 font-mono text-[11px] truncate">
-                    {formCreator || '@kreator'} • {formLocation || 'Sukabumi'} • <span className="text-[#c00015] font-semibold">{formCategory === 'Lainnya' ? (customCategory || 'Lainnya') : formCategory}</span>
-                  </p>
-                  <p className="text-[11px] text-slate-600 font-normal pt-0.5">
-                    Tampilan kartu ini akan muncul langsung di bagian <strong>Wave Reels</strong> beranda portal.
-                  </p>
                 </div>
               </div>
 
-              {/* Tombol Aksi */}
-              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition cursor-pointer"
-                >
-                  Batal
-                </button>
+              {/* Tombol Simpan */}
+              <div className="pt-3 flex items-center justify-end border-t border-slate-100">
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-[#c00015] hover:bg-[#a00012] text-white text-xs font-bold transition cursor-pointer shadow-2xs"
+                  disabled={isSaving}
+                  className="px-5 py-2.5 rounded-lg bg-[#c00015] hover:bg-[#a00012] text-white text-xs font-bold transition cursor-pointer shadow-2xs disabled:opacity-50"
                 >
-                  {editingReel ? 'Simpan Perubahan' : 'Terbitkan Video Reels'}
+                  {isSaving ? 'Menyimpan...' : editingReel ? 'Simpan Perubahan' : 'Terbitkan Video Reels'}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* ================= MODAL PRATINJAU KARTU REELS LENGKAP ================= */}
-      {previewReel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="relative max-w-xs w-full aspect-[9/16] bg-zinc-950 rounded-2xl overflow-hidden shadow-2xl border border-white/20 flex flex-col justify-between">
-            {/* Tombol Tutup */}
-            <button
-              onClick={() => setPreviewReel(null)}
-              className="absolute top-3 right-3 z-30 p-1.5 rounded-full bg-black/60 hover:bg-black/90 text-white transition cursor-pointer border border-white/20"
-              title="Tutup Pratinjau"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            {/* Gambar Cover Vertikal */}
-            <div className="absolute inset-0">
-              {/* eslint-disable-next-img-element */}
-              <img
-                src={previewReel.thumbnailUrl}
-                alt={previewReel.title}
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = DEFAULT_REEL_COVER
-                }}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/30 to-black/50 pointer-events-none" />
-            </div>
-
-            {/* Top Bar Preview */}
-            <div className="relative z-10 p-3.5 flex items-center justify-between text-white text-xs">
-              <span className="text-[10px] font-semibold tracking-wide text-white bg-black/60 backdrop-blur-xs px-2.5 py-1 rounded border border-white/20">
-                {previewReel.category || 'Berita'}
-              </span>
-
-              {renderPlatformBadge(previewReel.platform || (previewReel.socialUrl?.includes('tiktok') ? 'tiktok' : previewReel.socialUrl?.includes('youtube') ? 'youtube' : 'instagram'))}
-            </div>
-
-            {/* Bottom Content Preview & Tombol Buka Medsos */}
-            <div className="relative z-10 p-4 space-y-2.5 text-white">
-              <div className="space-y-1">
-                <span className="text-xs font-bold text-white/90 block">
-                  {previewReel.creator}
-                </span>
-
-                <p className="text-sm font-heading font-bold leading-snug drop-shadow-sm">
-                  {previewReel.title}
-                </p>
-
-                {previewReel.location && (
-                  <p className="text-[11px] text-white/75 flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-[#c00015]" />
-                    <span>{previewReel.location}</span>
-                  </p>
-                )}
-              </div>
-
-              {/* Tombol CTA Buka Postingan Asli */}
-              <a
-                href={previewReel.socialUrl || `https://instagram.com/${(previewReel.creator || 'jurnalwave').replace('@', '')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full py-2.5 px-3 rounded-xl bg-[#c00015] hover:bg-[#a00012] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg transition active:scale-95"
-              >
-                <span>Buka Postingan Asli Medsos</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            </div>
           </div>
         </div>
       )}

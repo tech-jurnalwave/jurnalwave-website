@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
     const {
       title,
       company,
+      logo,
       location,
       region = 'Kota Sukabumi',
       salaryRange,
@@ -78,6 +79,11 @@ export async function POST(req: NextRequest) {
       ? benefits
       : '';
 
+    let finalDesc = (description || '').trim();
+    if (logo && typeof logo === 'string' && logo.trim()) {
+      finalDesc = `<!-- LOGO:${logo.trim()} -->\n${finalDesc}`;
+    }
+
     const newJob = await prisma.job.create({
       data: {
         title: title.trim(),
@@ -87,7 +93,7 @@ export async function POST(req: NextRequest) {
         salaryRange: salaryRange?.trim() || 'Kompetitif',
         type: type?.trim() || 'Full-Time',
         education: education?.trim() || null,
-        description: description.trim(),
+        description: finalDesc,
         requirements: reqString,
         benefits: benString,
         applyEmail: applyEmail?.trim() || null,
@@ -122,6 +128,7 @@ export async function PUT(req: NextRequest) {
       id,
       title,
       company,
+      logo,
       location,
       region,
       salaryRange,
@@ -154,6 +161,16 @@ export async function PUT(req: NextRequest) {
         : String(benefits)
       : undefined;
 
+    let finalDesc: string | undefined = undefined;
+    if (description !== undefined) {
+      const cleanDesc = (description || '').trim().replace(/<!--\s*LOGO:.*?\s*-->\r?\n?/, '');
+      if (logo && typeof logo === 'string' && logo.trim()) {
+        finalDesc = `<!-- LOGO:${logo.trim()} -->\n${cleanDesc}`;
+      } else {
+        finalDesc = cleanDesc;
+      }
+    }
+
     const updated = await prisma.job.update({
       where: { id },
       data: {
@@ -164,7 +181,7 @@ export async function PUT(req: NextRequest) {
         salaryRange: salaryRange?.trim(),
         type: type?.trim(),
         education: education?.trim(),
-        description: description?.trim(),
+        ...(finalDesc !== undefined ? { description: finalDesc } : {}),
         requirements: reqString,
         benefits: benString,
         applyEmail: applyEmail?.trim(),

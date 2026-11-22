@@ -62,13 +62,14 @@ export function LokerClient({
   const types = ['Semua', 'Full-Time', 'Part-Time', 'Freelance', 'Remote', 'Magang'];
 
   const filteredJobs = jobs.filter(job => {
+    const isJobActive = job.isActive !== false;
     const matchType = activeType === 'Semua' || job.type === activeType;
     const matchSearch =
       searchQuery.trim() === '' ||
       job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.location.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchType && matchSearch;
+    return isJobActive && matchType && matchSearch;
   });
 
   const visibleJobs = filteredJobs.slice(0, visibleCount);

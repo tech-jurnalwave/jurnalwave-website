@@ -46,6 +46,7 @@ export interface Job {
   id: string;
   title: string;
   company: string;
+  logo?: string;
   location: string;
   salaryRange: string;
   type: 'Full-Time' | 'Part-Time' | 'Freelance' | 'Remote' | 'Magang';
@@ -67,6 +68,7 @@ export interface Job {
   applyEmail: string;
   applyUrl?: string;
   isSaved?: boolean;
+  isActive?: boolean;
   createdAt: string;
 }
 

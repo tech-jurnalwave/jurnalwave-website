@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+﻿import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 
@@ -19,7 +19,7 @@ export default function HaloJurnalTentangPage() {
   const redaksi = [
     { jabatan: 'Chief Executive Officer (CEO)', nama: 'Eman Sulaeman, S.IP' },
     { jabatan: 'Pemimpin Redaksi', nama: 'Ujang Herlan, S.Pd' },
-    { jabatan: 'Redaksi & Kreatif Digital', nama: 'Tim Jurnal Wave' },
+    { jabatan: 'Redaksi & Kreatif Digital', nama: 'Tim JurnalWave' },
   ]
 
   const legalitas = [
@@ -56,7 +56,7 @@ export default function HaloJurnalTentangPage() {
       {/* 3. Ringkasan Platform (Simpel Tanpa Tombol Berlebih) */}
       <div className="bg-surface border border-outline-variant/80 rounded-2xl sm:rounded-3xl p-5 sm:p-7 shadow-xs">
         <p className="text-xs sm:text-sm text-on-surface/90 leading-relaxed">
-          <strong className="text-primary font-bold">Hallo Jurnal</strong> adalah inisiatif ruang publik yang dikelola secara independen oleh redaksi media <strong className="text-on-surface font-semibold">Jurnal Wave (PT Media Jurnal Sukabumi)</strong>. Kami hadir sebagai wadah komunikasi langsung bagi warga Sukabumi dalam menyampaikan aspirasi, keluhan layanan masyarakat, dan kerusakan infrastruktur untuk diverifikasi serta diteruskan ke pihak berwenang secara transparan.
+          <strong className="text-primary font-bold">Hallo Jurnal</strong> adalah inisiatif ruang publik yang dikelola secara independen oleh redaksi media <strong className="text-on-surface font-semibold">JurnalWave (PT Media Jurnal Sukabumi)</strong>. Kami hadir sebagai wadah komunikasi langsung bagi warga Sukabumi dalam menyampaikan aspirasi, keluhan layanan masyarakat, dan kerusakan infrastruktur untuk diverifikasi serta diteruskan ke pihak berwenang secara transparan.
         </p>
       </div>
 

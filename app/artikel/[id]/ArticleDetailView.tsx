@@ -68,7 +68,7 @@ const FONT_SIZE_CLASSES: Record<FontSize, string> = {
 };
 
 // Kamus Fonetik Istilah Serapan / Bahasa Inggris agar Dilafalkan Alami & Pas oleh TTS Bahasa Indonesia
-// Berlaku otomatis untuk seluruh artikel berita di situs Jurnal Wave
+// Berlaku otomatis untuk seluruh artikel berita di situs JurnalWave
 const LOANWORD_PHONETICS: [RegExp, string][] = [
   // Musik & Event
   [/\bline[- ]?up\b/gi, 'lain ap'],
@@ -400,10 +400,10 @@ export function ArticleDetailView({
       try {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: article.title,
-          artist: 'Jurnal Wave',
+          artist: 'JurnalWave',
           album: article.categoryLabel || 'Berita Sukabumi',
           artwork: [
-            { src: article.imageUrl || '/logo-white.png', sizes: '512x512', type: 'image/jpeg' },
+            { src: article.imageUrl || '/logo-jurnal-wave.webp', sizes: '512x512', type: 'image/webp' },
           ],
         });
 
@@ -642,7 +642,7 @@ export function ArticleDetailView({
     return formatted.length > 0 ? formatted : [cleaned];
   }, [article?.content]);
 
-  // Topik Terkait Dinamis dari Artikel Jurnal Wave (Deduplikasi Bersih)
+  // Topik Terkait Dinamis dari Artikel JurnalWave (Deduplikasi Bersih)
   const uniqueTags = useMemo(() => {
     let rawList: string[] = [];
     if (Array.isArray(article?.tags) && article.tags.length > 0) {
@@ -658,7 +658,7 @@ export function ArticleDetailView({
         rawList = [
           article?.categoryLabel || article?.category || 'Berita',
           article?.subCategory || 'Sukabumi',
-          'Jurnal Wave',
+          'JurnalWave',
         ];
       }
     }
@@ -820,7 +820,7 @@ export function ArticleDetailView({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={article?.imageUrl || '/hero-banner.webp'}
-                alt={article?.imageCaption || article?.imageAlt || article?.title || 'Jurnal Wave'}
+                alt={article?.imageCaption || article?.imageAlt || article?.title || 'JurnalWave'}
                 fetchPriority="high"
                 loading="eager"
                 decoding="async"
@@ -968,7 +968,7 @@ export function ArticleDetailView({
           {contentParagraphs.map((paragraph, idx) => {
             const isFirst = idx === 0;
             const cleanFirst = isFirst
-              ? paragraph.replace(/^(JURNALWAVE\.COM|JURNAL WAVE|JURNALVIBES\.COM|JURNAL VIBES)(\s*[-–—]\s*)/i, '')
+              ? paragraph.replace(/^(JURNALWAVE\.COM|JURNAL WAVE)(\s*[-–—]\s*)/i, '')
               : paragraph;
 
             // Posisi sisipan BACA JUGA (paragraf ke-2 atau ke-3)

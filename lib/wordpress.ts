@@ -1,8 +1,6 @@
-import { Article, ArticleCategory } from '@/types';
+﻿import { Article, ArticleCategory } from '@/types';
 import { formatIndoDateTime } from '@/lib/utils';
 import { INITIAL_ARTICLES } from '@/lib/initialArticles';
-
-const WORDPRESS_URL = process.env.NEXT_PUBLIC_WORDPRESS_URL || '';
 
 /**
  * Helper to strip HTML tags from WordPress rendered strings
@@ -185,7 +183,7 @@ export async function fetchArticlesFromWordPress(): Promise<Article[]> {
             imageUrl: getSafeImageUrl(item.imageUrl),
             imageAlt: item.imageAlt || item.title,
             author: item.author || 'Tim Redaksi',
-            reporter: item.reporter || 'Redaksi Jurnal Wave',
+            reporter: item.reporter || 'Redaksi JurnalWave',
             redaktur: item.redaktur || 'Redaksi Pelaksana',
             readTime: item.readTime || '5 min read',
             isHero: Boolean(item.isHero),
@@ -315,7 +313,7 @@ export async function fetchArticleByIdFromWordPress(idOrSlug: string): Promise<A
           imageUrl: getSafeImageUrl(item.imageUrl),
           imageAlt: item.imageAlt || item.title,
           author: item.author || 'Tim Redaksi',
-          reporter: item.reporter || 'Redaksi Jurnal Wave',
+          reporter: item.reporter || 'Redaksi JurnalWave',
           redaktur: item.redaktur || 'Redaksi Pelaksana',
           readTime: item.readTime || '5 min read',
           isHero: Boolean(item.isHero),

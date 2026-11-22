@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -10,7 +10,6 @@ import { ReelsSection } from '@/components/cards/ReelsSection';
 import { HalloJurnalBanner } from '@/components/cards/HalloJurnalBanner';
 import { PollingWidget } from '@/components/widgets/PollingWidget';
 import { Article, Reel } from '@/types';
-import { fetchArticles } from '@/lib/wordpress';
 
 interface HomeClientProps {
   initialArticles?: Article[];
@@ -92,7 +91,7 @@ export function HomeClient({ initialArticles = [], initialReels = [] }: HomeClie
   // Tampilkan seluruh artikel terkini sesuai urutan publikasi redaksi
   const displayArticles = articles;
 
-  // Filter 7 Kategori Resmi Jurnal Wave (Murni dari Database & Sistem)
+  // Filter 7 Kategori Resmi JurnalWave (Murni dari Database & Sistem)
   const beritaArticles = articles.filter(
     a =>
       a.category === 'berita' ||

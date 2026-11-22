@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import UserAvatar from '@/components/halo-jurnal/UserAvatar'
+import { canvasToWebP } from '@/lib/imageUtils'
 import {
   User,
   Phone,
@@ -211,7 +212,8 @@ export default function HaloJurnalProfilPage() {
 
       ctx.drawImage(img, drawX, drawY, drawW, drawH)
 
-      const croppedDataUrl = canvas.toDataURL('image/png')
+      // Otomatis simpan sebagai WebP modern (kompresi ringan untuk localStorage & avatar)
+      const croppedDataUrl = canvasToWebP(canvas, 0.88, 'image/png')
       setAvatarUrl(croppedDataUrl)
 
       const updated = {

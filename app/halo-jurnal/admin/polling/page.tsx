@@ -3,17 +3,11 @@
 import React, { useState, useEffect } from 'react'
 import {
   Plus,
-  Check,
   Edit3,
   Trash2,
-  CheckCircle2,
   Loader2,
   RefreshCw,
-  Power,
-  HelpCircle,
   X,
-  Vote,
-  Sparkles,
 } from 'lucide-react'
 import { Poll } from '@/types'
 import { DEFAULT_FALLBACK_POLL } from '@/lib/polls'
@@ -36,10 +30,6 @@ export default function AdminPollingPage() {
   const [formOptions, setFormOptions] = useState<string[]>(['', '', ''])
   const [formIsActive, setFormIsActive] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-
-  // AI Assist State
-  const [aiTopicInput, setAiTopicInput] = useState('')
-  const [isGeneratingAi, setIsGeneratingAi] = useState(false)
 
   // Tampilkan toast selama 3.5 detik
   const showToast = (msg: string) => {
@@ -70,33 +60,16 @@ export default function AdminPollingPage() {
       if (res.ok) {
         const json = await res.json()
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          // Periksa apakah localStorage memiliki polling kustom yang dibuat pengguna
-          let finalPolls = json.data
+          setPolls(json.data)
           if (typeof window !== 'undefined') {
             try {
-              const saved = localStorage.getItem('jurnal_wave_admin_polls')
-              if (saved) {
-                const parsed = JSON.parse(saved)
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                  const hasCustom = parsed.some(
-                    (p: Poll) =>
-                      p.id !== 'default-active-poll' &&
-                      p.id !== 'poll-big-match-archive' &&
-                      p.id !== 'poll-persib-melbourne'
-                  )
-                  if (hasCustom) {
-                    finalPolls = parsed
-                  }
-                }
+              localStorage.setItem('jurnal_wave_admin_polls', JSON.stringify(json.data))
+              const active = json.data.find((p: Poll) => Boolean(p.isActive))
+              if (active) {
+                localStorage.setItem('jurnal_wave_active_poll', JSON.stringify(active))
               }
             } catch {}
-            localStorage.setItem('jurnal_wave_admin_polls', JSON.stringify(finalPolls))
-            const active = finalPolls.find((p: Poll) => Boolean(p.isActive))
-            if (active) {
-              localStorage.setItem('jurnal_wave_active_poll', JSON.stringify(active))
-            }
           }
-          setPolls(finalPolls)
           return
         }
       }
@@ -152,7 +125,6 @@ export default function AdminPollingPage() {
     setFormCategory('Sport & E-Sport')
     setFormOptions(['', '', ''])
     setFormIsActive(true)
-    setAiTopicInput('')
     setIsModalOpen(true)
   }
 
@@ -163,7 +135,6 @@ export default function AdminPollingPage() {
     setFormCategory(poll.category || 'Umum')
     setFormOptions(poll.options.map((o) => o.text))
     setFormIsActive(Boolean(poll.isActive))
-    setAiTopicInput('')
     setIsModalOpen(true)
   }
 
@@ -192,38 +163,6 @@ export default function AdminPollingPage() {
     setFormOptions(updated)
   }
 
-  // Panggil AI Generator untuk membuat draft polling otomatis
-  const handleGenerateAi = async () => {
-    try {
-      setIsGeneratingAi(true)
-      const res = await fetch('/api/polls/generate-ai', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: aiTopicInput }),
-      })
-
-      if (res.ok) {
-        const json = await res.json()
-        if (json.success && json.data) {
-          setFormQuestion(json.data.question || '')
-          if (json.data.category) {
-            setFormCategory(json.data.category)
-          }
-          if (Array.isArray(json.data.options) && json.data.options.length >= 2) {
-            setFormOptions(json.data.options)
-          }
-          showToast('✨ Draf polling otomatis berhasil disusun oleh AI!')
-        }
-      } else {
-        showToast('Gagal menghasilkan polling otomatis. Silakan coba lagi.')
-      }
-    } catch (err) {
-      console.error('Error generating AI poll:', err)
-      showToast('Terjadi kesalahan saat memanggil asisten AI.')
-    } finally {
-      setIsGeneratingAi(false)
-    }
-  }
 
   // Simpan Polling (Tambah atau Edit)
   const handleSavePoll = async (e: React.FormEvent) => {
@@ -268,9 +207,9 @@ export default function AdminPollingPage() {
 
         if (res.ok) {
           const json = await res.json().catch(() => ({}))
-          showToast('✅ Polling berhasil diperbarui.')
+          showToast('Polling berhasil diperbarui.')
         } else {
-          showToast('✅ Polling berhasil diperbarui di penyimpanan lokal.')
+          showToast('Polling berhasil diperbarui di penyimpanan lokal.')
         }
 
         let updatedPolls = polls.map((p) => {
@@ -322,9 +261,9 @@ export default function AdminPollingPage() {
         })
 
         if (res.ok) {
-          showToast('🎉 Polling baru berhasil diterbitkan!')
+          showToast('Polling baru berhasil diterbitkan!')
         } else {
-          showToast('🎉 Polling baru berhasil diterbitkan di penyimpanan lokal!')
+          showToast('Polling baru berhasil diterbitkan di penyimpanan lokal!')
         }
 
         let nextPolls = [newPollItem, ...polls]
@@ -385,21 +324,21 @@ export default function AdminPollingPage() {
       if (res.ok && json.success) {
         showToast(
           nextState
-            ? '✅ Polling berhasil ditayangkan di Beranda.'
-            : '⏸️ Polling berhasil dinonaktifkan dari Beranda.'
+            ? 'Polling berhasil ditayangkan di Beranda.'
+            : 'Polling berhasil dinonaktifkan dari Beranda.'
         )
       } else {
         showToast(
           nextState
-            ? '✅ Polling ditayangkan di Beranda (penyimpanan lokal).'
-            : '⏸️ Polling dinonaktifkan dari Beranda.'
+            ? 'Polling ditayangkan di Beranda (penyimpanan lokal).'
+            : 'Polling dinonaktifkan dari Beranda.'
         )
       }
     } catch {
       showToast(
         nextState
-          ? '✅ Polling ditayangkan di Beranda (penyimpanan lokal).'
-          : '⏸️ Polling dinonaktifkan dari Beranda.'
+          ? 'Polling ditayangkan di Beranda (penyimpanan lokal).'
+          : 'Polling dinonaktifkan dari Beranda.'
       )
     }
   }
@@ -435,32 +374,32 @@ export default function AdminPollingPage() {
       const res = await fetch(`/api/polls?id=${encodeURIComponent(pollId)}`, {
         method: 'DELETE',
       })
-      showToast('🗑️ Polling berhasil dihapus.')
+      showToast('Polling berhasil dihapus.')
     } catch {
-      showToast('🗑️ Polling berhasil dihapus dari penyimpanan lokal.')
+      showToast('Polling berhasil dihapus dari penyimpanan lokal.')
     }
   }
 
   // Polling aktif saat ini di beranda (hanya jika isActive bernilai true)
   const activePoll = polls.find((p) => Boolean(p.isActive)) || null
+  const inactivePolls = polls.filter((p) => !p.isActive)
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12 font-sans">
+    <div className="space-y-5 max-w-7xl mx-auto pb-12 font-sans">
       {/* Toast Notification */}
       <AdminToast
         message={toastMessage}
         onClose={() => setToastMessage(null)}
       />
 
-      {/* 1. Header Halaman Standar Admin */}
+      {/* 1. Header Halaman */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
         <div>
-          <h1 className="text-xl font-heading font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <Vote className="w-5 h-5 text-[#c00015]" />
-            <span>Kelola Polling Pembaca</span>
+          <h1 className="text-xl sm:text-2xl font-heading font-extrabold text-slate-900 tracking-tight">
+            Polling Pembaca
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Atur pertanyaan interaktif, kelola opsi pilihan, serta pantau hasil suara pembaca di beranda website.
+            Atur pertanyaan interaktif dan pantau hasil suara pembaca di beranda website.
           </p>
         </div>
 
@@ -469,34 +408,35 @@ export default function AdminPollingPage() {
             type="button"
             onClick={loadPolls}
             disabled={isLoading}
-            className="p-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition shadow-2xs cursor-pointer hover:border-[#c00015]/40 hover:text-[#c00015]"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition shadow-2xs cursor-pointer hover:border-[#c00015]/40 hover:text-[#c00015] disabled:opacity-50"
             title="Muat Ulang Data"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-[#c00015]' : ''}`} />
+            <span>{isLoading ? 'Memuat...' : 'Muat Ulang'}</span>
           </button>
           <button
             type="button"
             onClick={handleOpenCreateModal}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#c00015] hover:bg-[#a00012] text-white text-xs font-semibold transition shadow-2xs cursor-pointer active:scale-95"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#c00015] hover:bg-[#a00012] text-white text-xs font-semibold transition shadow-2xs cursor-pointer active:scale-95"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Buat Polling Baru</span>
+            <span>Tambah Polling Baru</span>
           </button>
         </div>
       </div>
 
-      {/* 2. Section: Live Preview Beranda (Proporsional, Selaras, & Responsif) */}
+      {/* 2. Kartu Polling yang Sedang Aktif di Beranda */}
       {activePoll ? (
         <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-3.5">
-          {/* Top Bar Preview */}
+          {/* Top Bar Card */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100">
             <div className="flex items-center gap-2">
-              <span className="w-1.5 h-4 bg-[#c00015] rounded-full shrink-0" />
+              <span className="w-1.5 h-4 bg-[#c00015] rounded-none shrink-0" />
               <h2 className="font-heading font-extrabold text-xs sm:text-sm text-slate-900 tracking-wider uppercase">
-                POLLING PEMBACA
+                POLLING AKTIF DI BERANDA
               </h2>
-              <span className="text-[9px] sm:text-[10px] font-bold bg-[#c00015] text-white px-2 py-0.5 rounded uppercase tracking-wider">
-                Live di Beranda
+              <span className="text-[10px] font-bold bg-[#c00015] text-white px-2 py-0.5 rounded uppercase tracking-wider">
+                Live
               </span>
             </div>
 
@@ -504,47 +444,41 @@ export default function AdminPollingPage() {
               <button
                 type="button"
                 onClick={() => handleToggleActive(activePoll.id, true)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg border border-slate-200 text-[11px] sm:text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer select-none active:scale-95"
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer select-none"
                 title="Hentikan penayangan polling ini di Beranda"
               >
-                <Power className="w-3 h-3 text-slate-400" />
                 <span>Nonaktifkan</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleOpenEditModal(activePoll)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg border border-slate-200 text-[11px] sm:text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#c00015] hover:border-[#c00015]/30 transition-colors cursor-pointer select-none active:scale-95"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#c00015] hover:border-[#c00015]/30 transition-colors cursor-pointer select-none"
               >
                 <Edit3 className="w-3 h-3" />
-                <span>Ubah Polling</span>
+                <span>Edit Polling</span>
               </button>
             </div>
           </div>
 
-          {/* Grid 2-Kolom Compact & Rapi untuk Desktop, Tablet, & Mobile */}
+          {/* Grid 2-Kolom: Konten & Hasil Suara */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6 items-start w-full">
-            {/* Kolom Kiri: Konteks & Pertanyaan */}
-            <div className="flex flex-col justify-between h-full">
+            {/* Kolom Kiri: Pertanyaan & Total Suara */}
+            <div className="flex flex-col justify-between h-full space-y-3">
               <div>
-                {activePoll.category && (
-                  <span className="inline-block text-[#c00015] font-bold text-[10px] uppercase tracking-wider mb-1">
-                    {activePoll.category}
-                  </span>
-                )}
-                <h3 className="font-heading font-bold text-sm sm:text-base text-slate-900 leading-snug mb-1.5">
+                <h3 className="font-heading font-bold text-sm sm:text-base text-slate-900 leading-snug">
                   {activePoll.question}
                 </h3>
               </div>
 
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] sm:text-[11px] text-slate-500">
-                <span>✓ Pratinjau tampilan beranda portal</span>
-                <span className="font-semibold text-slate-700">
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                <span>Tayang di halaman utama website</span>
+                <span className="font-semibold text-slate-800">
                   {(activePoll.totalVotes || 0).toLocaleString('id-ID')} suara masuk
                 </span>
               </div>
             </div>
 
-            {/* Kolom Kanan: Rekapitulasi Data Analitik Suara Pembaca (Selaras 100%) */}
+            {/* Kolom Kanan: Rekap Opsi & Progress Bar */}
             <div className="flex flex-col gap-2">
               {activePoll.options.map((opt) => {
                 const total = activePoll.totalVotes || 0
@@ -560,7 +494,7 @@ export default function AdminPollingPage() {
                         {opt.text}
                       </span>
                       <div className="flex items-center gap-2 shrink-0 text-xs">
-                        <span className="text-slate-500 text-[10px] sm:text-[11px]">
+                        <span className="text-slate-500 text-[11px]">
                           {opt.votes.toLocaleString('id-ID')} suara
                         </span>
                         <span className="font-bold text-[#c00015] min-w-8 text-right">
@@ -569,7 +503,7 @@ export default function AdminPollingPage() {
                       </div>
                     </div>
 
-                    {/* Progress Bar Selaras Bersih */}
+                    {/* Progress Bar */}
                     <div className="w-full h-1.5 bg-slate-200/70 rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full bg-[#c00015] transition-all duration-500 ease-out"
@@ -583,94 +517,83 @@ export default function AdminPollingPage() {
           </div>
         </div>
       ) : (
-        <div className="p-6 text-center bg-white rounded-xl border border-dashed border-slate-300">
-          <Vote className="w-8 h-8 text-slate-400 mx-auto mb-1.5 opacity-60" />
+        <div className="p-5 text-center bg-white rounded-xl border border-dashed border-slate-300 space-y-1">
           <p className="text-sm font-semibold text-slate-800">
-            Saat ini tidak ada polling yang tayang di Beranda
+            Saat ini tidak ada polling yang aktif di Beranda
           </p>
-          <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-            Klik tombol &quot;Nonaktif&quot; pada salah satu topik polling di tabel bawah untuk menayangkannya, atau klik &quot;Buat Polling Baru&quot;.
+          <p className="text-xs text-slate-500">
+            Aktifkan saklar pada salah satu polling di riwayat bawah untuk menayangkannya, atau buat polling baru.
           </p>
         </div>
       )}
 
-      {/* 3. Section: Tabel Arsip Seluruh Polling */}
+      {/* 3. Tabel Riwayat Polling Tidak Aktif */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
         <div className="p-3 border-b border-slate-200 flex items-center justify-between text-xs text-slate-500">
-          <span className="font-semibold text-slate-800">
-            Semua Daftar Polling ({polls.length})
-          </span>
-          <span className="text-[11px]">Daftar riwayat seluruh topik polling pembaca</span>
+          <div>
+            <span className="font-semibold text-slate-800">Riwayat Polling</span>
+            <span className="ml-1 text-slate-400">({inactivePolls.length})</span>
+          </div>
+          <span className="text-[11px]">Daftar polling yang telah selesai atau tidak aktif</span>
         </div>
 
         <div className="w-full overflow-x-auto [scrollbar-width:thin]">
-          <table className="w-full min-w-[750px] table-fixed text-left text-xs">
+          <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 text-slate-600 font-semibold uppercase text-[10px] tracking-wider border-b border-slate-200">
               <tr>
-                <th className="py-3 px-4 min-w-[280px]">Pertanyaan & Kategori</th>
-                <th className="py-3 px-4 min-w-[220px]">Opsi Jawaban</th>
-                <th className="py-3 px-4 whitespace-nowrap w-[110px] text-center">Total Suara</th>
-                <th className="py-3 px-4 whitespace-nowrap w-[120px] text-center">Status Tayang</th>
-                <th className="py-3 px-4 whitespace-nowrap w-[100px] text-center">Aksi</th>
+                <th className="py-3 px-4 w-[40%]">Pertanyaan</th>
+                <th className="py-3 px-4 w-[36%]">Pilihan Jawaban & Hasil Suara</th>
+                <th className="py-3 px-3 w-[12%] text-center">Total Suara</th>
+                <th className="py-3 px-3 w-[6%] text-center">Tayangkan</th>
+                <th className="py-3 px-4 w-[6%] text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {polls.map((p) => {
-                const isActive = Boolean(p.isActive)
+              {inactivePolls.map((p) => {
                 return (
-                  <tr
-                    key={p.id}
-                    className={`hover:bg-slate-50/70 transition-colors ${
-                      isActive ? 'bg-slate-50/50' : ''
-                    }`}
-                  >
-                    <td className="py-3.5 px-4 min-w-[280px] align-top">
+                  <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="py-3 px-4 align-top">
                       <p className="font-semibold text-slate-900 leading-snug">
                         {p.question}
                       </p>
-                      <span className="inline-block mt-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200/80">
-                        {p.category || 'Umum'}
-                      </span>
                     </td>
 
-                    <td className="py-3.5 px-4 min-w-[220px] align-top">
-                      <ul className="space-y-1 text-xs text-slate-600">
-                        {p.options.map((opt) => (
-                          <li key={opt.id} className="flex items-center justify-between gap-2">
-                            <span className="truncate max-w-[170px]">• {opt.text}</span>
-                            <span className="font-medium text-[11px] text-slate-500">
-                              {opt.votes}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
+                    <td className="py-3 px-4 align-top">
+                      <div className="space-y-1">
+                        {p.options.map((opt) => {
+                          const pct = p.totalVotes && p.totalVotes > 0 ? Math.round((opt.votes / p.totalVotes) * 100) : 0
+                          return (
+                            <div key={opt.id} className="flex items-center justify-between gap-2 text-xs text-slate-700">
+                              <span className="truncate max-w-[200px]">• {opt.text}</span>
+                              <span className="font-medium text-[11px] text-slate-500 shrink-0">
+                                {opt.votes} ({pct}%)
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
                     </td>
 
-                    <td className="py-3.5 px-4 text-center font-bold text-slate-800 whitespace-nowrap align-middle">
+                    <td className="py-3 px-3 text-center font-bold text-slate-800 whitespace-nowrap align-middle">
                       {(p.totalVotes || 0).toLocaleString('id-ID')}
                     </td>
 
-                    <td className="py-3.5 px-4 text-center whitespace-nowrap align-middle">
+                    <td className="py-3 px-3 text-center whitespace-nowrap align-middle">
                       <button
                         type="button"
-                        onClick={() => handleToggleActive(p.id, isActive)}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold transition cursor-pointer select-none active:scale-95 ${
-                          isActive
-                            ? 'bg-[#c00015] hover:bg-[#a00012] text-white shadow-2xs'
-                            : 'text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200'
-                        }`}
-                        title={
-                          isActive
-                            ? 'Sedang tayang di Beranda. Klik untuk menonaktifkan.'
-                            : 'Nonaktif. Klik untuk menayangkan di Beranda.'
-                        }
+                        onClick={() => handleToggleActive(p.id, false)}
+                        title="Klik untuk menayangkan polling ini di Beranda"
+                        className="relative inline-flex h-3.5 w-6 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none"
+                        style={{ backgroundColor: '#d1d5db' }}
                       >
-                        <Power className="w-3 h-3" />
-                        <span>{isActive ? 'Aktif' : 'Nonaktif'}</span>
+                        <span
+                          className="inline-block h-2.5 w-2.5 rounded-full bg-white shadow-sm transition-transform duration-200"
+                          style={{ transform: 'translateX(1px)' }}
+                        />
                       </button>
                     </td>
 
-                    <td className="py-3.5 px-4 text-center whitespace-nowrap align-middle">
+                    <td className="py-3 px-4 text-center whitespace-nowrap align-middle">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
                           type="button"
@@ -693,10 +616,10 @@ export default function AdminPollingPage() {
                   </tr>
                 )
               })}
-              {polls.length === 0 && !isLoading && (
+              {inactivePolls.length === 0 && !isLoading && (
                 <tr>
                   <td colSpan={5} className="py-8 text-center text-slate-500 text-xs">
-                    Tidak ada data polling ditemukan.
+                    Tidak ada riwayat polling nonaktif.
                   </td>
                 </tr>
               )}
@@ -711,9 +634,8 @@ export default function AdminPollingPage() {
           <div className="bg-white rounded-xl border border-slate-200 w-full max-w-xl max-h-[92vh] overflow-y-auto shadow-2xl p-5 sm:p-6 space-y-5">
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <h3 className="font-heading font-bold text-slate-900 text-base sm:text-lg flex items-center gap-2">
-                <Vote className="w-5 h-5 text-[#c00015]" />
-                <span>{editingPollId ? 'Ubah Polling Pembaca' : 'Buat Polling Pembaca Baru'}</span>
+              <h3 className="font-heading font-bold text-slate-900 text-sm">
+                {editingPollId ? 'Edit Polling' : 'Tambah Polling Baru'}
               </h3>
               <button
                 type="button"
@@ -724,45 +646,6 @@ export default function AdminPollingPage() {
               </button>
             </div>
 
-            {/* Kotak Rekomendasi Draf Cepat AI (Opsional) */}
-            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Rekomendasi Draf Cepat (Opsional)</span>
-                </span>
-                <span className="text-[10px] text-slate-500">
-                  Bantu susun pertanyaan & opsi otomatis
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 leading-relaxed">
-                Ketik kata kunci topik (misal: <em>sepak bola, jalan rusak, kuliner lokal</em>) atau kosongkan untuk merujuk berita terkini:
-              </p>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={aiTopicInput}
-                  onChange={(e) => setAiTopicInput(e.target.value)}
-                  placeholder="Contoh: pertandingan bola / transportasi umum..."
-                  className="flex-1 px-3 py-2 rounded-lg bg-white border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#c00015]"
-                />
-                <button
-                  type="button"
-                  onClick={handleGenerateAi}
-                  disabled={isGeneratingAi}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition shrink-0 disabled:opacity-50 cursor-pointer"
-                >
-                  {isGeneratingAi ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Menyusun...</span>
-                    </>
-                  ) : (
-                    <span>Buat Draf</span>
-                  )}
-                </button>
-              </div>
-            </div>
 
             {/* Form Input Utama */}
             <form onSubmit={handleSavePoll} className="space-y-4">
@@ -780,18 +663,6 @@ export default function AdminPollingPage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Kategori / Topik
-                </label>
-                <input
-                  type="text"
-                  value={formCategory}
-                  onChange={(e) => setFormCategory(e.target.value)}
-                  placeholder="Misal: Sport & E-Sport, Hiburan, Politik..."
-                  className="w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#c00015]"
-                />
-              </div>
 
               {/* Opsi-opsi Jawaban */}
               <div className="space-y-2">
@@ -865,18 +736,15 @@ export default function AdminPollingPage() {
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#c00015] hover:bg-[#a00012] text-white text-xs font-semibold transition-all disabled:opacity-50 cursor-pointer shadow-2xs"
+                  className="inline-flex items-center justify-center px-5 py-2 rounded-lg bg-[#c00015] hover:bg-[#a00012] text-white text-xs font-bold transition-all disabled:opacity-50 cursor-pointer shadow-xs"
                 >
                   {isSaving ? (
                     <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
                       <span>Menyimpan...</span>
                     </>
                   ) : (
-                    <>
-                      <Check className="w-3.5 h-3.5" />
-                      <span>{editingPollId ? 'Simpan Perubahan' : 'Terbitkan Polling'}</span>
-                    </>
+                    <span>{editingPollId ? 'Simpan Perubahan' : 'Terbitkan Polling'}</span>
                   )}
                 </button>
               </div>

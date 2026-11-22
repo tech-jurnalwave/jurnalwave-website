@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { convertImageToWebP } from '@/lib/imageUtils'
 import {
   UploadCloud,
   Send,
@@ -59,39 +60,7 @@ function LaporForm() {
   }, [])
 
   const compressImage = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const img = new Image()
-        img.onload = () => {
-          const canvas = document.createElement('canvas')
-          let { width, height } = img
-          const maxDimension = 1200
-          if (width > maxDimension || height > maxDimension) {
-            if (width > height) {
-              height = Math.round((height * maxDimension) / width)
-              width = maxDimension
-            } else {
-              width = Math.round((width * maxDimension) / height)
-              height = maxDimension
-            }
-          }
-          canvas.width = width
-          canvas.height = height
-          const ctx = canvas.getContext('2d')
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height)
-            resolve(canvas.toDataURL('image/jpeg', 0.8))
-          } else {
-            resolve(e.target?.result as string)
-          }
-        }
-        img.onerror = () => reject(new Error('Gagal memproses berkas gambar'))
-        img.src = e.target?.result as string
-      }
-      reader.onerror = () => reject(new Error('Gagal membaca berkas'))
-      reader.readAsDataURL(file)
-    })
+    return convertImageToWebP(file, { maxDimension: 1280, quality: 0.85 })
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -170,6 +139,33 @@ function LaporForm() {
       return
     }
 
+    // Validasi status penangguhan akun warga di Kelola Pengguna
+    let isUserSuspended = false
+    if (typeof window !== 'undefined') {
+      try {
+        const overrides = JSON.parse(
+          localStorage.getItem('halo_jurnal_citizen_status_overrides') || '{}'
+        )
+        const uId = user?.id || ''
+        const uPhone = user?.phone || user?.telepon || user?.user_metadata?.phone || ''
+        const uEmail = user?.email || user?.user_metadata?.email || ''
+        if (
+          overrides[uId] === false ||
+          (uPhone && overrides[uPhone] === false) ||
+          (uEmail && overrides[uEmail] === false) ||
+          user?.isVerified === false ||
+          user?.status === 'ditangguhkan'
+        ) {
+          isUserSuspended = true
+        }
+      } catch {}
+    }
+
+    if (isUserSuspended) {
+      alert('Mohon maaf, akun Anda sedang ditangguhkan oleh meja redaksi karena pelanggaran ketentuan. Anda tidak dapat mengirimkan laporan.')
+      return
+    }
+
     setLoading(true)
     try {
       // Hitung urutan nomor tiket HJ secara berurutan
@@ -226,7 +222,15 @@ function LaporForm() {
         komentar_count: 0,
         created_at: new Date().toISOString(),
         laporan_lampiran: previewUrl
-          ? [{ id: `lamp-${Date.now()}`, file_url: previewUrl, file_type: file?.type || (previewUrl.startsWith('data:video') ? 'video/mp4' : 'image/jpeg') }]
+          ? [{
+              id: `lamp-${Date.now()}`,
+              file_url: previewUrl,
+              file_type: previewUrl.startsWith('data:image/webp')
+                ? 'image/webp'
+                : previewUrl.startsWith('data:video')
+                ? 'video/mp4'
+                : file?.type || 'image/jpeg',
+            }]
           : [],
         status_log: [
           {
@@ -290,7 +294,7 @@ function LaporForm() {
           sender: 'Redaksi Hallo Jurnal',
           sender_name: 'Redaksi Hallo Jurnal',
           role: 'admin',
-          avatar: '/logo-white.png',
+          avatar: '/logo-jurnal-wave.webp',
           message: `Halo ${pelaporDisplayName}, terima kasih telah berbagi informasi ini. Ruang obrolan ini dapat Anda gunakan untuk koordinasi langsung atau menambahkan keterangan tambahan jika diperlukan.`,
           created_at: new Date().toISOString(),
           timestamp: 'Baru saja',

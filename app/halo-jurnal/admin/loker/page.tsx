@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
@@ -10,24 +10,27 @@ import {
   Trash2,
   ExternalLink,
   MapPin,
-  Building,
-  DollarSign,
   GraduationCap,
   Save,
   X,
-  CheckCircle2,
-  Filter,
+  Building2,
+  Upload,
+  Loader2,
+  RefreshCw,
+  MoreHorizontal,
 } from 'lucide-react'
 import { Job } from '@/types'
 import { DUMMY_JOBS } from '@/data/dummyJobs'
 import AdminToast from '@/components/admin/AdminToast'
 import { useConfirm } from '@/components/admin/AdminConfirmDialog'
+import { convertImageToWebP } from '@/lib/imageUtils'
 
 export default function AdminLokerPage() {
   const confirmDialog = useConfirm()
   const [jobs, setJobs] = useState<Job[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedType, setSelectedType] = useState('semua')
+  const [selectedStatus, setSelectedStatus] = useState<'semua' | 'aktif' | 'ditutup'>('semua')
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   // Modals
@@ -38,8 +41,9 @@ export default function AdminLokerPage() {
   // Form State Tambah Loker
   const [newTitle, setNewTitle] = useState('')
   const [newCompany, setNewCompany] = useState('')
+  const [newLogo, setNewLogo] = useState('')
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
   const [newLocation, setNewLocation] = useState('')
-  const [newRegion, setNewRegion] = useState<any>('Kota Sukabumi')
   const [newSalary, setNewSalary] = useState('')
   const [newType, setNewType] = useState<'Full-Time' | 'Part-Time' | 'Freelance' | 'Remote' | 'Magang'>('Full-Time')
   const [newEducation, setNewEducation] = useState('')
@@ -47,6 +51,14 @@ export default function AdminLokerPage() {
   const [newRequirements, setNewRequirements] = useState('')
   const [newBenefits, setNewBenefits] = useState('')
   const [newApplyEmail, setNewApplyEmail] = useState('')
+
+  // Edit State Upload
+  const [isUploadingEditLogo, setIsUploadingEditLogo] = useState(false)
+
+
+  // Dropdown menu per baris (portal level)
+  const [activeMenuJob, setActiveMenuJob] = useState<Job | null>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 })
 
   // Load from API (Neon DB) with localStorage fallback
   useEffect(() => {
@@ -102,20 +114,84 @@ export default function AdminLokerPage() {
     setTimeout(() => setToastMessage(null), 3000)
   }
 
+  // Handle Upload Logo (Auto WebP)
+  const handleProcessLogoUpload = async (
+    file: File,
+    onSuccess: (url: string) => void,
+    setLoading: (val: boolean) => void
+  ) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      alert('Mohon pilih file gambar yang valid (JPG, PNG, WebP, dll).')
+      return
+    }
+
+    try {
+      setLoading(true)
+      // 1. Konversi otomatis ke WebP di browser (canvas)
+      const webpBase64 = await convertImageToWebP(file, { maxDimension: 512, quality: 0.88 })
+      
+      // 2. Kirim gambar WebP yang sudah ringan ke backend Cloudinary
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file: webpBase64 }),
+      })
+      const data = await res.json()
+      if (data.success && data.url) {
+        onSuccess(data.url)
+        showToast('Logo berhasil dikonversi ke WebP & disimpan!')
+      } else {
+        alert('Gagal mengunggah logo ke server cloud. Silakan coba kembali.')
+      }
+    } catch (err) {
+      console.error('Error konversi/upload webp logo:', err)
+      alert('Gagal mengonversi atau mengunggah logo.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Filtered jobs
   const filteredJobs = useMemo(() => {
     return jobs.filter((j) => {
+      const isActive = j.isActive !== false
       const matchType = selectedType === 'semua' || j.type.toLowerCase() === selectedType.toLowerCase()
+      const matchStatus =
+        selectedStatus === 'semua' ||
+        (selectedStatus === 'aktif' && isActive) ||
+        (selectedStatus === 'ditutup' && !isActive)
       const matchQuery =
         !searchQuery.trim() ||
         j.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         j.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
         j.location.toLowerCase().includes(searchQuery.toLowerCase())
-      return matchType && matchQuery
+      return matchType && matchStatus && matchQuery
     })
-  }, [jobs, selectedType, searchQuery])
+  }, [jobs, selectedType, selectedStatus, searchQuery])
 
-  // Create Job (Database Server Sync)
+  // Toggle Status Aktif / Ditutup (1-klik)
+  const handleToggleStatus = async (job: Job) => {
+    const newStatus = job.isActive === false ? true : false
+    const updated = jobs.map((j) =>
+      j.id === job.id ? { ...j, isActive: newStatus } : j
+    )
+    saveToStorage(updated)
+
+    try {
+      await fetch('/api/jobs', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: job.id, isActive: newStatus }),
+      })
+    } catch (err) {
+      console.warn('Gagal sinkronisasi status ke server:', err)
+    }
+
+    showToast(`Lowongan "${job.title}" ${newStatus ? 'diaktifkan' : 'ditutup'}.`)
+  }
+
+  // Create Job
   const handleCreateJob = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newTitle.trim() || !newCompany.trim()) {
@@ -144,8 +220,9 @@ export default function AdminLokerPage() {
     const jobPayload = {
       title: newTitle.trim(),
       company: newCompany.trim(),
+      logo: newLogo.trim() || undefined,
       location: newLocation.trim() || 'Sukabumi',
-      region: newRegion,
+      region: 'Kota Sukabumi',
       salaryRange: newSalary.trim() || 'Kompetitif',
       type: newType,
       education: newEducation.trim() || 'SMA / SMK / D3 / S1',
@@ -166,7 +243,7 @@ export default function AdminLokerPage() {
       if (json.success && json.data) {
         const updated = [json.data, ...jobs]
         saveToStorage(updated)
-        showToast(`Lowongan "${json.data.title}" berhasil dipublikasikan ke server!`)
+        showToast(`Lowongan "${json.data.title}" berhasil dipublikasikan!`)
       } else {
         throw new Error(json.message || 'Gagal menyimpan ke server')
       }
@@ -175,6 +252,7 @@ export default function AdminLokerPage() {
       const newJob: Job = {
         id: `job-${Date.now()}`,
         ...jobPayload,
+        region: 'Kota Sukabumi',
         createdAt: new Date().toISOString(),
       }
       const updated = [newJob, ...jobs]
@@ -185,6 +263,7 @@ export default function AdminLokerPage() {
     // Reset Form
     setNewTitle('')
     setNewCompany('')
+    setNewLogo('')
     setNewLocation('')
     setNewSalary('')
     setNewEducation('')
@@ -201,7 +280,7 @@ export default function AdminLokerPage() {
     setIsEditModalOpen(true)
   }
 
-  // Save Edit (Database Server Sync)
+  // Save Edit
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingJob) return
@@ -216,7 +295,7 @@ export default function AdminLokerPage() {
       if (json.success && json.data) {
         const updated = jobs.map((j) => (j.id === editingJob.id ? json.data : j))
         saveToStorage(updated)
-        showToast(`Lowongan "${editingJob.title}" berhasil diperbarui di server!`)
+        showToast(`Lowongan "${editingJob.title}" berhasil diperbarui!`)
       } else {
         throw new Error(json.message || 'Gagal memperbarui di server')
       }
@@ -230,11 +309,11 @@ export default function AdminLokerPage() {
     setEditingJob(null)
   }
 
-  // Delete Job (Database Server Sync)
+  // Delete Job
   const handleDeleteJob = async (id: string, title: string) => {
     const isConfirmed = await confirmDialog({
       title: 'Hapus Lowongan?',
-      message: 'Yakin ingin menghapus lowongan pekerjaan ini?',
+      message: `Yakin ingin menghapus lowongan pekerjaan "${title}"?`,
       confirmText: 'Hapus',
       cancelText: 'Batal',
       variant: 'danger',
@@ -254,113 +333,110 @@ export default function AdminLokerPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Toast Notification */}
+    <div className="space-y-4 sm:space-y-5">
+      {/* 1. Header Halaman */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1 border-b border-slate-200">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-heading font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
+            <span>Lowongan Kerja</span>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+              {jobs.filter((j) => j.isActive !== false).length} Aktif
+            </span>
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Kelola lowongan pekerjaan yang tayang di portal bursa karir JurnalWave.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <Link
+            href="/loker"
+            target="_blank"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition shadow-2xs cursor-pointer"
+          >
+            <span>Lihat di Web</span>
+            <ExternalLink className="w-3 h-3 text-slate-400" />
+          </Link>
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#c00015] hover:bg-[#a00012] text-white text-xs font-semibold transition shadow-2xs cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Tambah Lowongan Kerja</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Toast Feedback */}
       <AdminToast
         message={toastMessage}
         onClose={() => setToastMessage(null)}
       />
 
-      {/* 1. Header Halaman */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200">
-        <div>
-          <h1 className="text-xl font-heading font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <Briefcase className="w-5 h-5 text-[#c00015]" />
-            <span>Manajemen Lowongan Kerja (Loker)</span>
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Kelola lowongan pekerjaan yang tayang langsung pada halaman bursa karir portal Jurnal Wave.
-          </p>
-        </div>
+      {/* 2. Filter & Search Bar */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-2xs p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* Filter Status Cepat (Gaya Tab Berita) */}
+          {(
+            [
+              { key: 'semua', label: 'Semua', count: jobs.length },
+              { key: 'aktif', label: 'Aktif', count: jobs.filter((j) => j.isActive !== false).length },
+              { key: 'ditutup', label: 'Ditutup', count: jobs.filter((j) => j.isActive === false).length },
+            ] as const
+          ).map(({ key, label, count }) => (
+            <button
+              key={key}
+              onClick={() => setSelectedStatus(key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                selectedStatus === key
+                  ? 'bg-[#c00015] text-white shadow-2xs'
+                  : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {label} ({count})
+            </button>
+          ))}
 
-        <div className="flex items-center gap-2">
-          <Link
-            href="/loker"
-            target="_blank"
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span>Lihat di Web</span>
-          </Link>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#c00015] hover:bg-[#a00012] text-white text-xs font-semibold transition shadow-2xs cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Pasang Loker Baru</span>
-          </button>
-        </div>
-      </div>
+          <span className="text-slate-300 mx-0.5 hidden sm:inline">|</span>
 
-      {/* 2. Kartu Metrik Ringkas */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
-          <span className="text-xs text-slate-500 font-medium">Total Loker Aktif</span>
-          <p className="text-2xl font-bold font-heading text-slate-900">{jobs.length}</p>
-          <p className="text-[11px] text-slate-500">Tayang di bursa kerja Jurnal Wave</p>
-        </div>
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
-          <span className="text-xs text-slate-500 font-medium">Full-Time</span>
-          <p className="text-2xl font-bold font-heading text-slate-900">
-            {jobs.filter((j) => j.type === 'Full-Time').length}
-          </p>
-          <p className="text-[11px] text-slate-500">Pekerjaan penuh waktu</p>
-        </div>
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
-          <span className="text-xs text-slate-500 font-medium">Part-Time &amp; Magang</span>
-          <p className="text-2xl font-bold font-heading text-slate-900">
-            {jobs.filter((j) => j.type === 'Part-Time' || j.type === 'Magang').length}
-          </p>
-          <p className="text-[11px] text-slate-500">Paruh waktu &amp; mahasiswa</p>
-        </div>
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1">
-          <span className="text-xs text-slate-500 font-medium">Remote &amp; Freelance</span>
-          <p className="text-2xl font-bold font-heading text-slate-900">
-            {jobs.filter((j) => j.type === 'Remote' || j.type === 'Freelance').length}
-          </p>
-          <p className="text-[11px] text-slate-500">Bekerja fleksibel dari rumah</p>
-        </div>
-      </div>
-
-      {/* 3. Filter & Search Bar */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-2xs p-3.5 space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {['semua', 'Full-Time', 'Part-Time', 'Remote', 'Freelance', 'Magang'].map((t) => (
+          {/* Filter Tipe Kerja */}
+          {['Full-Time', 'Part-Time', 'Remote', 'Freelance', 'Magang'].map((t) => {
+            const count = jobs.filter((j) => j.type.toLowerCase() === t.toLowerCase()).length
+            const isActive = selectedType.toLowerCase() === t.toLowerCase()
+            return (
               <button
                 key={t}
-                onClick={() => setSelectedType(t)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition cursor-pointer ${
-                  selectedType.toLowerCase() === t.toLowerCase()
+                onClick={() => setSelectedType(isActive ? 'semua' : t)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                  isActive
                     ? 'bg-[#c00015] text-white shadow-2xs'
                     : 'bg-slate-100 text-slate-600 hover:text-slate-900'
                 }`}
               >
-                {t}
+                {t} ({count})
               </button>
-            ))}
-          </div>
+            )
+          })}
+        </div>
 
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari posisi atau perusahaan..."
-              className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#c00015]"
-            />
-          </div>
+        <div className="relative w-full sm:w-64 shrink-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Cari posisi atau perusahaan..."
+            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#c00015]"
+          />
         </div>
       </div>
 
-      {/* 4. Tabel Daftar Lowongan Kerja */}
+      {/* 3. Tabel Daftar Lowongan Kerja */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
-        <div className="p-3 border-b border-slate-200 flex items-center justify-between text-xs text-slate-500">
+        <div className="p-3 border-b border-slate-200 text-xs text-slate-500">
           <span>
             Menampilkan <strong>{filteredJobs.length}</strong> posisi lowongan kerja
           </span>
-          <span className="text-[11px]">Dapat langsung diedit atau dihapus</span>
         </div>
 
         {filteredJobs.length === 0 ? (
@@ -375,109 +451,142 @@ export default function AdminLokerPage() {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 text-slate-500 font-semibold uppercase text-[10px] tracking-wider border-b border-slate-200">
                 <tr>
-                  <th className="py-3 px-4">Posisi &amp; Perusahaan</th>
-                  <th className="py-3 px-4">Lokasi &amp; Wilayah</th>
-                  <th className="py-3 px-4">Tipe &amp; Pendidikan</th>
-                  <th className="py-3 px-4">Kisaran Gaji</th>
-                  <th className="py-3 px-4">Link Pendaftaran</th>
-                  <th className="py-3 px-4 text-right">Aksi</th>
+                  <th className="py-2.5 pl-4 pr-3 w-[34%]">Perusahaan &amp; Posisi</th>
+                  <th className="py-2.5 px-3 w-[24%]">Lokasi</th>
+                  <th className="py-2.5 px-3 w-[16%]">Tipe</th>
+                  <th className="py-2.5 px-3 w-[16%]">Gaji</th>
+                  <th className="py-2.5 pl-2 pr-4 text-right w-[10%]">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredJobs.map((job) => (
-                  <tr key={job.id} className="hover:bg-slate-50/70 transition-colors">
-                    {/* Posisi & Perusahaan */}
-                    <td className="py-3.5 px-4 max-w-xs">
-                      <div>
-                        <h3 className="font-heading font-semibold text-slate-900 text-sm line-clamp-1">
-                          {job.title}
-                        </h3>
-                        <p className="text-[11px] text-slate-500 font-medium flex items-center gap-1 mt-0.5">
-                          <Building className="w-3 h-3 text-slate-400 shrink-0" />
-                          <span>{job.company}</span>
-                        </p>
+              {filteredJobs.map((job) => {
+                  const isActive = job.isActive !== false
+                  return (
+                  <tr key={job.id} className={`hover:bg-slate-50/70 transition-colors ${!isActive ? 'opacity-60' : ''}`}>
+                    {/* Logo + Posisi & Perusahaan */}
+                    <td className="py-2.5 pl-4 pr-3 align-middle">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden p-1 shadow-2xs">
+                          {job.logo ? (
+                            <img
+                              src={job.logo}
+                              alt={job.company}
+                              className="w-full h-full object-contain"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLElement).style.display = 'none'
+                                const parent = e.currentTarget.parentElement
+                                if (parent) {
+                                  const fallback = parent.querySelector('.table-fallback')
+                                  if (fallback) fallback.classList.remove('hidden')
+                                }
+                              }}
+                            />
+                          ) : null}
+                          <div className={`table-fallback ${job.logo ? 'hidden' : 'flex'} items-center justify-center w-full h-full text-slate-400`}>
+                            <Building2 className="w-4 h-4" />
+                          </div>
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-heading font-semibold text-slate-900 text-xs line-clamp-1">
+                            {job.title}
+                          </h3>
+                          <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                            {job.company}
+                          </p>
+                        </div>
                       </div>
                     </td>
 
                     {/* Lokasi */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-1 text-slate-700 font-medium">
-                        <MapPin className="w-3 h-3 text-[#c00015] shrink-0" />
-                        <span>{job.location}</span>
+                    <td className="py-2.5 px-3 align-middle">
+                      <div className="flex items-center gap-1.5 text-slate-700 text-xs font-medium">
+                        <MapPin className="w-3.5 h-3.5 text-[#c00015] shrink-0" />
+                        <span className="truncate">{job.location}</span>
                       </div>
                     </td>
 
-                    {/* Tipe & Pendidikan */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="space-y-1">
-                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                    {/* Tipe */}
+                    <td className="py-2.5 px-3 align-middle">
+                      <div className="space-y-0.5">
+                        <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
                           {job.type}
                         </span>
                         {job.education && (
                           <p className="text-[10px] text-slate-500 flex items-center gap-1">
                             <GraduationCap className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span>{job.education}</span>
+                            <span className="truncate">{job.education}</span>
                           </p>
                         )}
                       </div>
                     </td>
 
                     {/* Kisaran Gaji */}
-                    <td className="py-3.5 px-4 whitespace-nowrap font-medium text-slate-800">
+                    <td className="py-2.5 px-3 whitespace-nowrap font-medium text-slate-800 text-xs align-middle">
                       {job.salaryRange}
                     </td>
 
-                    {/* Link Pendaftaran */}
-                    <td className="py-3.5 px-4 max-w-[200px] truncate text-slate-600 font-mono text-[11px]" title={job.applyUrl || job.applyEmail}>
-                      {job.applyUrl || job.applyEmail}
-                    </td>
-
                     {/* Aksi */}
-                    <td className="py-3.5 px-4 whitespace-nowrap text-right">
-                      <div className="inline-flex items-center gap-1">
+                    <td className="py-2.5 pl-2 pr-4 whitespace-nowrap text-right align-middle">
+                      <div className="inline-flex items-center gap-2 justify-end">
+                        {/* Toggle Status — ramping */}
                         <button
-                          onClick={() => handleOpenEdit(job)}
-                          className="p-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
-                          title="Edit Lowongan"
+                          onClick={() => handleToggleStatus(job)}
+                          title={isActive ? 'Tutup lowongan' : 'Aktifkan lowongan'}
+                          className="relative inline-flex h-3.5 w-6 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none"
+                          style={{ backgroundColor: isActive ? '#c00015' : '#d1d5db' }}
                         >
-                          <Edit className="w-3.5 h-3.5" />
+                          <span
+                            className="inline-block h-2.5 w-2.5 rounded-full bg-white shadow-sm transition-transform duration-200"
+                            style={{ transform: isActive ? 'translateX(11px)' : 'translateX(1px)' }}
+                          />
                         </button>
-                        <Link
-                          href={`/loker/${job.id}`}
-                          target="_blank"
-                          className="p-1.5 rounded-md text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition"
-                          title="Lihat Tampilan Pelamar"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </Link>
+
+                        {/* Titik 3 — trigger dropdown */}
                         <button
-                          onClick={() => handleDeleteJob(job.id, job.title)}
-                          className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                          title="Hapus Lowongan"
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (activeMenuJob?.id === job.id) {
+                              setActiveMenuJob(null)
+                              return
+                            }
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                            const spaceBelow = window.innerHeight - rect.bottom
+                            const menuHeight = 135
+                            const top = spaceBelow < menuHeight ? rect.top - menuHeight - 4 : rect.bottom + 4
+                            const right = Math.max(16, document.documentElement.clientWidth - rect.right)
+                            setMenuPos({ top, right })
+                            setActiveMenuJob(job)
+                          }}
+                          className={`p-1.5 rounded-md transition cursor-pointer ${
+                            activeMenuJob?.id === job.id
+                              ? 'bg-slate-200 text-slate-900'
+                              : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                          }`}
+                          title="Aksi lainnya"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <MoreHorizontal className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
 
-      {/* 5. Modal Tambah Loker Baru */}
+      {/* 4. Modal Tambah Lowongan Kerja */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Briefcase className="w-5 h-5 text-[#c00015]" />
-                <h3 className="font-heading font-bold text-sm text-slate-900">
-                  Pasang Lowongan Kerja Baru
-                </h3>
-              </div>
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[92vh]">
+            <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="font-heading font-bold text-sm text-slate-900">
+                Tambah Lowongan Kerja
+              </h3>
               <button
                 onClick={() => setIsCreateModalOpen(false)}
                 className="p-1 rounded-md text-slate-400 hover:text-slate-800 transition cursor-pointer"
@@ -486,41 +595,109 @@ export default function AdminLokerPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateJob} className="p-5 overflow-y-auto space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <form onSubmit={handleCreateJob} className="p-5 overflow-y-auto space-y-3.5 text-xs">
+              {/* Logo Perusahaan */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Logo Perusahaan <span className="font-normal text-slate-400">(Opsional)</span>
+                </label>
+                <div className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-50 border border-slate-200">
+                  {/* Thumbnail / Placeholder */}
+                  {isUploadingLogo ? (
+                    <div className="shrink-0 w-14 h-10 rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center text-[#c00015] bg-white shadow-2xs">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    </div>
+                  ) : newLogo ? (
+                    <div className="relative shrink-0 w-14 h-10 rounded-lg overflow-hidden border border-slate-200 bg-white p-1 shadow-2xs flex items-center justify-center">
+                      <img
+                        src={newLogo}
+                        alt="Logo Preview"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="shrink-0 w-14 h-10 rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-400 bg-white shadow-2xs">
+                      <Building2 className="w-4 h-4" />
+                    </div>
+                  )}
+
+                  {/* Input URL Logo */}
+                  <input
+                    type="url"
+                    value={newLogo}
+                    onChange={(e) => setNewLogo(e.target.value)}
+                    placeholder="Masukkan tautan URL logo (https://...)"
+                    className="flex-1 min-w-0 h-9 px-3 text-xs rounded-lg bg-white border border-slate-200 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#c00015]"
+                  />
+
+                  {/* Tombol Unggah File */}
+                  <label className="h-9 px-3.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold cursor-pointer border border-slate-200 flex items-center gap-1.5 transition shrink-0 shadow-2xs">
+                    <Upload className="w-3.5 h-3.5 text-slate-600" />
+                    <span>{isUploadingLogo ? 'Mengunggah...' : 'Pilih File'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={isUploadingLogo}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          handleProcessLogoUpload(file, setNewLogo, setIsUploadingLogo)
+                        }
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+
+                  {/* Tombol Hapus jika ada logo */}
+                  {newLogo && (
+                    <button
+                      type="button"
+                      onClick={() => setNewLogo('')}
+                      className="h-9 w-9 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 flex items-center justify-center transition cursor-pointer shrink-0"
+                      title="Hapus logo"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Posisi & Nama Perusahaan */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Judul Posisi / Jabatan: <span className="text-[#c00015]">*</span>
+                    Posisi / Jabatan <span className="text-[#c00015]">*</span>
                   </label>
                   <input
                     type="text"
                     required
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
-                    placeholder="Contoh: Staff Administrasi & Keuangan"
+                    placeholder="Contoh: Barista & Staff Kasir"
                     className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-900 font-semibold focus:bg-white focus:outline-none focus:border-[#c00015]"
                   />
                 </div>
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Nama Perusahaan / Instansi: <span className="text-[#c00015]">*</span>
+                    Perusahaan <span className="text-[#c00015]">*</span>
                   </label>
                   <input
                     type="text"
                     required
                     value={newCompany}
                     onChange={(e) => setNewCompany(e.target.value)}
-                    placeholder="Contoh: PT Sukabumi Indo Prima"
+                    placeholder="Contoh: PT Sukabumi Kuliner Nusantara"
                     className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:border-[#c00015]"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Tipe Kerja & Lokasi */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Tipe Pekerjaan:
+                    Tipe Kerja
                   </label>
                   <select
                     value={newType}
@@ -537,42 +714,7 @@ export default function AdminLokerPage() {
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Wilayah Sukabumi:
-                  </label>
-                  <select
-                    value={newRegion}
-                    onChange={(e) => setNewRegion(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015] cursor-pointer"
-                  >
-                    <option value="Kota Sukabumi">Kota Sukabumi</option>
-                    <option value="Cikole">Cikole</option>
-                    <option value="Cisaat">Cisaat</option>
-                    <option value="Cibadak">Cibadak</option>
-                    <option value="Cicurug">Cicurug</option>
-                    <option value="Parungkuda">Parungkuda</option>
-                    <option value="Sukaraja">Sukaraja</option>
-                    <option value="Palabuhanratu">Palabuhanratu</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Kisaran Gaji:
-                  </label>
-                  <input
-                    type="text"
-                    value={newSalary}
-                    onChange={(e) => setNewSalary(e.target.value)}
-                    placeholder="Contoh: Rp 3.200.000 - Rp 4.500.000"
-                    className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015]"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Lokasi Kantor / Cabang:
+                    Lokasi
                   </label>
                   <input
                     type="text"
@@ -582,93 +724,94 @@ export default function AdminLokerPage() {
                     className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015]"
                   />
                 </div>
+              </div>
 
+              {/* Pendidikan & Gaji */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Minimal Pendidikan:
+                    Pendidikan
                   </label>
                   <input
                     type="text"
                     value={newEducation}
                     onChange={(e) => setNewEducation(e.target.value)}
-                    placeholder="Contoh: D3 / S1 Akuntansi atau Manajemen"
+                    placeholder="Contoh: SMA / SMK / D3 / S1"
+                    className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Gaji
+                  </label>
+                  <input
+                    type="text"
+                    value={newSalary}
+                    onChange={(e) => setNewSalary(e.target.value)}
+                    placeholder="Contoh: Rp 2.500.000 - Rp 3.500.000"
                     className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015]"
                   />
                 </div>
               </div>
 
+              {/* Deskripsi & Persyaratan (Di Atas Tautan Lamar) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Deskripsi Pekerjaan
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={newDescription}
+                    onChange={(e) => setNewDescription(e.target.value)}
+                    placeholder="Gambaran umum tugas dan tanggung jawab..."
+                    className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015] leading-relaxed"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Persyaratan
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={newRequirements}
+                    onChange={(e) => setNewRequirements(e.target.value)}
+                    placeholder={'Pria/Wanita maksimal 25 tahun\nPendidikan minimal SMA/SMK\nJujur & disiplin'}
+                    className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015] leading-relaxed"
+                  />
+                </div>
+              </div>
+
+              {/* Tautan Lamar / WA (Di Bawah) */}
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Tautan / Link Pendaftaran Loker: <span className="text-[#c00015]">*</span>
+                  Link / Kontak Pendaftaran <span className="text-[#c00015]">*</span>
                 </label>
                 <input
                   type="text"
                   required
                   value={newApplyEmail}
                   onChange={(e) => setNewApplyEmail(e.target.value)}
-                  placeholder="Contoh: https://forms.gle/xyz, https://perusahaan.com/karir, atau https://wa.me/62812..."
+                  placeholder="Link Google Form / website karir, atau nomor WhatsApp"
                   className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015]"
                 />
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Pengunjung akan langsung diarahkan ke tautan ini saat mengklik tombol &quot;Lamar Sekarang&quot;.
-                </p>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Deskripsi Pekerjaan:
-                </label>
-                <textarea
-                  rows={3}
-                  value={newDescription}
-                  onChange={(e) => setNewDescription(e.target.value)}
-                  placeholder="Tuliskan gambaran umum tanggung jawab pekerjaan..."
-                  className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015] leading-relaxed"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Persyaratan / Kualifikasi (1 baris per poin):
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={newRequirements}
-                    onChange={(e) => setNewRequirements(e.target.value)}
-                    placeholder={'Pria/Wanita maksimal 28 tahun\nPendidikan minimal D3/S1\nTeliti & disiplin'}
-                    className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015] leading-relaxed"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Benefit / Fasilitas (1 baris per poin):
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={newBenefits}
-                    onChange={(e) => setNewBenefits(e.target.value)}
-                    placeholder={'Gaji pokok sesuai UMK\nBPJS Kesehatan & Ketenagakerjaan\nTunjangan makan'}
-                    className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015] leading-relaxed"
-                  />
-                </div>
               </div>
 
               <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer"
+                  className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer text-xs"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-lg bg-[#c00015] hover:bg-[#a00012] text-white font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  className="px-5 py-2 rounded-lg bg-[#c00015] hover:bg-[#a00012] text-white font-bold transition shadow-xs cursor-pointer text-xs"
                 >
-                  <Save className="w-4 h-4" />
-                  <span>Publikasikan Loker</span>
+                  Publikasikan Lowongan
                 </button>
               </div>
             </form>
@@ -676,17 +819,14 @@ export default function AdminLokerPage() {
         </div>
       )}
 
-      {/* 6. Modal Edit Loker */}
+      {/* 5. Modal Edit Lowongan Kerja */}
       {isEditModalOpen && editingJob && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Edit className="w-5 h-5 text-blue-600" />
-                <h3 className="font-heading font-bold text-sm text-slate-900">
-                  Edit Lowongan: <span className="text-slate-600 font-normal">{editingJob.title}</span>
-                </h3>
-              </div>
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[92vh]">
+            <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="font-heading font-bold text-sm text-slate-900">
+                Edit Lowongan Kerja
+              </h3>
               <button
                 onClick={() => {
                   setIsEditModalOpen(false)
@@ -698,11 +838,82 @@ export default function AdminLokerPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSaveEdit} className="p-5 overflow-y-auto space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <form onSubmit={handleSaveEdit} className="p-5 overflow-y-auto space-y-3.5 text-xs">
+              {/* Logo Perusahaan */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Logo Perusahaan <span className="font-normal text-slate-400">(Opsional)</span>
+                </label>
+                <div className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-50 border border-slate-200">
+                  {/* Thumbnail / Placeholder */}
+                  {isUploadingEditLogo ? (
+                    <div className="shrink-0 w-14 h-10 rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center text-[#c00015] bg-white shadow-2xs">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    </div>
+                  ) : editingJob.logo ? (
+                    <div className="relative shrink-0 w-14 h-10 rounded-lg overflow-hidden border border-slate-200 bg-white p-1 shadow-2xs flex items-center justify-center">
+                      <img
+                        src={editingJob.logo}
+                        alt="Logo Preview"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="shrink-0 w-14 h-10 rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-400 bg-white shadow-2xs">
+                      <Building2 className="w-4 h-4" />
+                    </div>
+                  )}
+
+                  {/* Input URL Logo */}
+                  <input
+                    type="url"
+                    value={editingJob.logo || ''}
+                    onChange={(e) => setEditingJob({ ...editingJob, logo: e.target.value })}
+                    placeholder="Masukkan tautan URL logo (https://...)"
+                    className="flex-1 min-w-0 h-9 px-3 text-xs rounded-lg bg-white border border-slate-200 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#c00015]"
+                  />
+
+                  {/* Tombol Unggah File */}
+                  <label className="h-9 px-3.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold cursor-pointer border border-slate-200 flex items-center gap-1.5 transition shrink-0 shadow-2xs">
+                    <Upload className="w-3.5 h-3.5 text-slate-600" />
+                    <span>{isUploadingEditLogo ? 'Mengunggah...' : 'Pilih File'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={isUploadingEditLogo}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          handleProcessLogoUpload(
+                            file,
+                            (url) => setEditingJob({ ...editingJob, logo: url }),
+                            setIsUploadingEditLogo
+                          )
+                        }
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+
+                  {/* Tombol Hapus jika ada logo */}
+                  {editingJob.logo && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingJob({ ...editingJob, logo: undefined })}
+                      className="h-9 w-9 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 flex items-center justify-center transition cursor-pointer shrink-0"
+                      title="Hapus logo"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Posisi & Perusahaan */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Judul Posisi: <span className="text-[#c00015]">*</span>
+                    Posisi / Jabatan <span className="text-[#c00015]">*</span>
                   </label>
                   <input
                     type="text"
@@ -715,7 +926,7 @@ export default function AdminLokerPage() {
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Nama Perusahaan: <span className="text-[#c00015]">*</span>
+                    Perusahaan <span className="text-[#c00015]">*</span>
                   </label>
                   <input
                     type="text"
@@ -727,10 +938,11 @@ export default function AdminLokerPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Tipe Kerja & Lokasi */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Tipe:
+                    Tipe Kerja
                   </label>
                   <select
                     value={editingJob.type}
@@ -747,27 +959,34 @@ export default function AdminLokerPage() {
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Wilayah:
+                    Lokasi
                   </label>
-                  <select
-                    value={editingJob.region}
-                    onChange={(e) => setEditingJob({ ...editingJob, region: e.target.value as any })}
-                    className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015] cursor-pointer"
-                  >
-                    <option value="Kota Sukabumi">Kota Sukabumi</option>
-                    <option value="Cikole">Cikole</option>
-                    <option value="Cisaat">Cisaat</option>
-                    <option value="Cibadak">Cibadak</option>
-                    <option value="Cicurug">Cicurug</option>
-                    <option value="Parungkuda">Parungkuda</option>
-                    <option value="Sukaraja">Sukaraja</option>
-                    <option value="Palabuhanratu">Palabuhanratu</option>
-                  </select>
+                  <input
+                    type="text"
+                    value={editingJob.location}
+                    onChange={(e) => setEditingJob({ ...editingJob, location: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015]"
+                  />
+                </div>
+              </div>
+
+              {/* Pendidikan & Gaji */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Pendidikan
+                  </label>
+                  <input
+                    type="text"
+                    value={editingJob.education || ''}
+                    onChange={(e) => setEditingJob({ ...editingJob, education: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015]"
+                  />
                 </div>
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Gaji:
+                    Gaji
                   </label>
                   <input
                     type="text"
@@ -778,35 +997,23 @@ export default function AdminLokerPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Lokasi Lengkap:
-                  </label>
-                  <input
-                    type="text"
-                    value={editingJob.location}
-                    onChange={(e) => setEditingJob({ ...editingJob, location: e.target.value })}
-                    className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Pendidikan:
-                  </label>
-                  <input
-                    type="text"
-                    value={editingJob.education || ''}
-                    onChange={(e) => setEditingJob({ ...editingJob, education: e.target.value })}
-                    className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015]"
-                  />
-                </div>
-              </div>
-
+              {/* Deskripsi */}
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Tautan / Link Pendaftaran Loker: <span className="text-[#c00015]">*</span>
+                  Deskripsi Pekerjaan
+                </label>
+                <textarea
+                  rows={3}
+                  value={editingJob.description}
+                  onChange={(e) => setEditingJob({ ...editingJob, description: e.target.value })}
+                  className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015] leading-relaxed"
+                />
+              </div>
+
+              {/* Tautan Lamar */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Link / Kontak Pendaftaran <span className="text-[#c00015]">*</span>
                 </label>
                 <input
                   type="text"
@@ -819,23 +1026,8 @@ export default function AdminLokerPage() {
                       applyEmail: e.target.value,
                     })
                   }
-                  placeholder="Contoh: https://forms.gle/xyz, https://perusahaan.com/karir, atau https://wa.me/62812..."
+                  placeholder="Link Google Form / website karir, atau nomor WhatsApp"
                   className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015]"
-                />
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Pengunjung akan langsung diarahkan ke tautan ini saat mengklik tombol &quot;Lamar Sekarang&quot;.
-                </p>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Deskripsi Pekerjaan:
-                </label>
-                <textarea
-                  rows={3}
-                  value={editingJob.description}
-                  onChange={(e) => setEditingJob({ ...editingJob, description: e.target.value })}
-                  className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015] leading-relaxed"
                 />
               </div>
 
@@ -846,19 +1038,72 @@ export default function AdminLokerPage() {
                     setIsEditModalOpen(false)
                     setEditingJob(null)
                   }}
-                  className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer"
+                  className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer text-xs"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  className="px-5 py-2 rounded-lg bg-[#c00015] hover:bg-[#a00012] text-white font-bold transition shadow-xs cursor-pointer text-xs"
                 >
-                  <Save className="w-4 h-4" />
-                  <span>Simpan Perubahan Loker</span>
+                  Simpan Perubahan
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 6. Dropdown Menu Aksi Titik 3 (Render di Root Level agar selalu tajam, solid & tidak terpotong) */}
+      {activeMenuJob && (
+        <div className="fixed inset-0 z-50 pointer-events-auto">
+          {/* Backdrop transparan untuk deteksi klik di luar */}
+          <div
+            className="fixed inset-0"
+            onClick={() => setActiveMenuJob(null)}
+          />
+
+          {/* Kotak Menu Solid Putih */}
+          <div
+            className="fixed z-50 w-44 bg-white rounded-xl border border-slate-200 shadow-2xl overflow-hidden py-1 text-xs ring-1 ring-slate-900/5 animate-in fade-in duration-100"
+            style={{ top: `${menuPos.top}px`, right: `${menuPos.right}px` }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                handleOpenEdit(activeMenuJob)
+                setActiveMenuJob(null)
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-slate-800 hover:bg-slate-50 transition cursor-pointer font-medium text-left"
+            >
+              <Edit className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+              <span>Edit Lowongan</span>
+            </button>
+
+            <Link
+              href={`/loker/${activeMenuJob.id}`}
+              target="_blank"
+              onClick={() => setActiveMenuJob(null)}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-slate-800 hover:bg-slate-50 transition cursor-pointer font-medium text-left"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+              <span>Lihat di Web</span>
+            </Link>
+
+            <div className="border-t border-slate-100 my-1" />
+
+            <button
+              type="button"
+              onClick={() => {
+                const jobToDelete = activeMenuJob
+                setActiveMenuJob(null)
+                handleDeleteJob(jobToDelete.id, jobToDelete.title)
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-rose-600 hover:bg-rose-50 transition cursor-pointer font-semibold text-left"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+              <span>Hapus Lowongan</span>
+            </button>
           </div>
         </div>
       )}

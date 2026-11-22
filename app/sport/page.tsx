@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import { CategoryTemplate } from '@/components/layout/CategoryTemplate';
 import { fetchArticles } from '@/lib/wordpress';
 
@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   title: 'Sport',
   description: 'Kabar sepak bola Persib, Timnas Indonesia, liga top dunia, dan olahraga anak muda.',
   openGraph: {
-    title: 'Sport | Jurnal Wave',
+    title: 'Sport | JurnalWave',
     description: 'Kabar sepak bola Persib, Timnas Indonesia, liga top dunia, dan olahraga anak muda.',
   },
 };

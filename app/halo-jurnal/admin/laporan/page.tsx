@@ -1,31 +1,35 @@
 'use client'
 
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
   FileText,
   Search,
-  ChevronRight,
-  Eye,
+  ExternalLink,
   Download,
   RotateCcw,
   X,
   MessageSquare,
   Trash2,
-  Globe,
+  Check,
   Lock,
+  Globe,
+  Clock,
+  ThumbsUp,
 } from 'lucide-react'
 import { DummyReport } from '@/data/dummyReports'
 import { useAdminData } from '@/context/AdminDataContext'
 import { useConfirm } from '@/components/admin/AdminConfirmDialog'
 
+type AccStatus = 'menunggu_acc' | 'publik' | 'privat'
+
 export default function AdminLaporanPage() {
   const confirmDialog = useConfirm()
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedVisibility, setSelectedVisibility] = useState<'semua' | 'publik' | 'privat'>('semua')
-  // Mengambil data terpusat dari AdminDataContext (0ms instant render, tersinkronisasi)
+  const [selectedTab, setSelectedTab] = useState<'semua' | 'menunggu_acc' | 'publik' | 'privat'>('menunggu_acc')
   const { reports: reportsList, isLoadingReports: isLoading, refreshReports } = useAdminData()
   const [chatCounts, setChatCounts] = useState<Record<string, number>>({})
+  const [localOverrides, setLocalOverrides] = useState<Record<string, { acc_status?: AccStatus; is_public?: boolean }>>({})
 
   // Format tanggal rapi
   const formatDate = (dateStr: string) => {
@@ -39,6 +43,123 @@ export default function AdminLaporanPage() {
     } catch {
       return dateStr
     }
+  }
+
+  // Muat status override lokal saat pertama kali dibuka
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = JSON.parse(localStorage.getItem('halo_jurnal_status_overrides') || '{}')
+        setLocalOverrides(saved)
+      } catch {}
+    }
+  }, [])
+
+  // Fungsi penentu status ACC & Hak Tayang
+  const getAccStatus = useCallback(
+    (r: DummyReport): AccStatus => {
+      const targetKey = r.id || r.nomor_tiket
+      const override = localOverrides[r.id] || (r.nomor_tiket ? localOverrides[r.nomor_tiket] : null)
+
+      if (override?.acc_status) {
+        return override.acc_status
+      }
+
+      if (override?.is_public !== undefined) {
+        return override.is_public ? 'publik' : 'privat'
+      }
+
+      if ((r as any).acc_status) {
+        return (r as any).acc_status
+      }
+
+      // Default data bawaan:
+      // Jika statusnya 'diterima' dan belum ada keputusan ACC eksplisit -> 'menunggu_acc'
+      if (r.status === 'diterima' && r.is_public !== true) {
+        return 'menunggu_acc'
+      }
+
+      // Jika laporan berstatus publik -> 'publik'
+      if (r.is_public === true || (r as any).visibilitas === 'publik') {
+        return 'publik'
+      }
+
+      // Sisanya -> 'privat'
+      return 'privat'
+    },
+    [localOverrides]
+  )
+
+  // Eksekusi penetapan ACC & Hak Tayang
+  const handleSetAccStatus = async (report: DummyReport, nextStatus: AccStatus) => {
+    const isPublic = nextStatus === 'publik'
+
+    // 1. Update optimistik instan
+    setLocalOverrides((prev) => ({
+      ...prev,
+      [report.id]: { acc_status: nextStatus, is_public: isPublic },
+      ...(report.nomor_tiket ? { [report.nomor_tiket]: { acc_status: nextStatus, is_public: isPublic } } : {}),
+    }))
+
+    // 2. Simpan ke localStorage
+    if (typeof window !== 'undefined') {
+      try {
+        const overrides = JSON.parse(localStorage.getItem('halo_jurnal_status_overrides') || '{}')
+        const key = report.nomor_tiket || report.id
+        const payload = {
+          ...(overrides[key] || {}),
+          acc_status: nextStatus,
+          is_public: isPublic,
+          isPublic: isPublic,
+          visibilitas: isPublic ? 'publik' : 'privat',
+        }
+        overrides[key] = payload
+        if (report.id) overrides[report.id] = payload
+        if (report.nomor_tiket) overrides[report.nomor_tiket] = payload
+        localStorage.setItem('halo_jurnal_status_overrides', JSON.stringify(overrides))
+
+        // Update laporan pengguna
+        const userReports = JSON.parse(localStorage.getItem('halo_jurnal_user_reports') || '[]')
+        const updated = userReports.map((r: any) => {
+          if (r.id === report.id || r.nomor_tiket === report.nomor_tiket) {
+            return {
+              ...r,
+              acc_status: nextStatus,
+              is_public: isPublic,
+              isPublic: isPublic,
+              visibilitas: isPublic ? 'publik' : 'privat',
+            }
+          }
+          return r
+        })
+        localStorage.setItem('halo_jurnal_user_reports', JSON.stringify(updated))
+        window.dispatchEvent(new Event('storage'))
+      } catch {}
+    }
+
+    // 3. Kirim ke API backend
+    try {
+      await fetch('/api/reports', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: report.id,
+          ticketNumber: report.nomor_tiket,
+          is_public: isPublic,
+          isPublic: isPublic,
+          catatan:
+            nextStatus === 'publik'
+              ? 'Laporan di-ACC dan ditayangkan ke Feed Publik oleh admin.'
+              : nextStatus === 'privat'
+              ? 'Laporan di-ACC sebagai aduan privat internal oleh admin.'
+              : 'Laporan dikembalikan ke meja antrean peninjauan admin.',
+        }),
+      })
+    } catch (err) {
+      console.warn('Gagal mengubah hak tayang via API:', err)
+    }
+
+    await refreshReports()
   }
 
   // Scan jumlah pesan chat warga aktif
@@ -84,10 +205,35 @@ export default function AdminLaporanPage() {
       const sp = new URLSearchParams(window.location.search)
       const q = sp.get('search')
       if (q) setSearchQuery(q)
+      const tabParam = sp.get('tab')
+      if (tabParam === 'menunggu_acc' || tabParam === 'publik' || tabParam === 'privat' || tabParam === 'semua') {
+        setSelectedTab(tabParam)
+      }
     }
   }, [])
 
-  // Filter aduan
+  // Hitungan kuota per kategori
+  const totalMenungguAcc = useMemo(
+    () => reportsList.filter((r) => getAccStatus(r) === 'menunggu_acc').length,
+    [reportsList, getAccStatus]
+  )
+  const totalPublik = useMemo(
+    () => reportsList.filter((r) => getAccStatus(r) === 'publik').length,
+    [reportsList, getAccStatus]
+  )
+  const totalPrivat = useMemo(
+    () => reportsList.filter((r) => getAccStatus(r) === 'privat').length,
+    [reportsList, getAccStatus]
+  )
+
+  // Otomatis arahkan ke tab 'menunggu_acc' jika ada laporan baru, atau 'semua' jika tidak ada
+  useEffect(() => {
+    if (totalMenungguAcc === 0 && selectedTab === 'menunggu_acc') {
+      // Biarkan tetap di tab yang dipilih atau default
+    }
+  }, [totalMenungguAcc, selectedTab])
+
+  // Filter aduan berdasarkan tab & search
   const filteredReports = useMemo(() => {
     return reportsList.filter((r) => {
       // 1. Pencarian
@@ -96,30 +242,26 @@ export default function AdminLaporanPage() {
         const matchTitle = r.judul?.toLowerCase().includes(q)
         const matchTicket = r.nomor_tiket?.toLowerCase().includes(q)
         const matchDesc = r.deskripsi?.toLowerCase().includes(q)
-        if (!matchTitle && !matchTicket && !matchDesc) return false
+        const matchPelapor = (r.nama_pelapor || (r as any).pelaporName || '').toLowerCase().includes(q)
+        if (!matchTitle && !matchTicket && !matchDesc && !matchPelapor) return false
       }
 
-      // 2. Visibilitas
-      const isPublic = r.is_public || (r as any).visibilitas === 'publik'
-      if (selectedVisibility === 'publik' && !isPublic) return false
-      if (selectedVisibility === 'privat' && isPublic) return false
+      // 2. Filter Tab
+      const st = getAccStatus(r)
+      if (selectedTab === 'menunggu_acc' && st !== 'menunggu_acc') return false
+      if (selectedTab === 'publik' && st !== 'publik') return false
+      if (selectedTab === 'privat' && st !== 'privat') return false
 
       return true
     })
-  }, [reportsList, searchQuery, selectedVisibility])
-
-  const totalPublik = useMemo(
-    () => reportsList.filter((r) => r.is_public || (r as any).visibilitas === 'publik').length,
-    [reportsList]
-  )
-  const totalPrivat = reportsList.length - totalPublik
+  }, [reportsList, searchQuery, selectedTab, getAccStatus])
 
   const PAGE_SIZE = 10
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE)
-  }, [searchQuery, selectedVisibility])
+  }, [searchQuery, selectedTab])
 
   const visibleReports = useMemo(() => {
     return filteredReports.slice(0, visibleCount)
@@ -128,14 +270,12 @@ export default function AdminLaporanPage() {
   const handleDeleteReport = async (id: string, ticketNumber?: string) => {
     const isConfirmed = await confirmDialog({
       title: 'Hapus Aduan?',
-      message: 'Yakin ingin menghapus aduan ini secara permanen?',
-      confirmText: 'Hapus',
+      message: 'Yakin ingin menghapus aduan ini secara permanen dari basis data?',
+      confirmText: 'Hapus Permanen',
       cancelText: 'Batal',
       variant: 'danger',
     })
-    if (!isConfirmed) {
-      return
-    }
+    if (!isConfirmed) return
 
     try {
       await fetch(`/api/reports?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
@@ -161,18 +301,19 @@ export default function AdminLaporanPage() {
 
   const handleResetFilter = () => {
     setSearchQuery('')
-    setSelectedVisibility('semua')
+    setSelectedTab('semua')
     setVisibleCount(PAGE_SIZE)
   }
 
-  // Ekspor CSV bersih
+  // Ekspor CSV
   const handleExportCSV = () => {
-    const headers = ['Nomor Tiket', 'Tanggal', 'Judul Pengaduan', 'Visibilitas', 'Dukungan']
+    const headers = ['Nomor Tiket', 'Tanggal', 'Judul Pengaduan', 'Status ACC / Hak Tayang', 'Pelapor', 'Dukungan']
     const rows = filteredReports.map((r) => [
       `"${r.nomor_tiket}"`,
       `"${formatDate(r.created_at)}"`,
       `"${r.judul.replace(/"/g, '""')}"`,
-      `"${r.is_public ? 'Publik' : 'Privat'}"`,
+      `"${getAccStatus(r)}"`,
+      `"${r.nama_pelapor || (r as any).pelaporName || 'Warga Sukabumi'}"`,
       r.dukungan_count || 0,
     ])
 
@@ -192,22 +333,22 @@ export default function AdminLaporanPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 max-w-7xl mx-auto pb-12 font-sans">
       {/* 1. Header Halaman */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
         <div>
-          <h1 className="text-xl font-heading font-bold text-slate-900 tracking-tight">
-            Buku Induk &amp; Arsip Pengaduan Warga
+          <h1 className="text-xl sm:text-2xl font-heading font-extrabold text-slate-900 tracking-tight">
+            Pengaduan Warga
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Database arsip lengkap seluruh riwayat pengaduan warga Sukabumi yang masuk ke redaksi.
+            Pusat moderasi, peninjauan (ACC), dan penetapan hak tayang aduan warga Sukabumi.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-start sm:self-auto">
           <button
             onClick={handleExportCSV}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition shadow-2xs cursor-pointer hover:border-[#c00015]/40 hover:text-[#c00015]"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition shadow-2xs cursor-pointer hover:border-[#c00015]/40 hover:text-[#c00015]"
             title="Unduh data aduan ke format CSV"
           >
             <Download className="w-3.5 h-3.5 text-slate-500" />
@@ -216,52 +357,77 @@ export default function AdminLaporanPage() {
         </div>
       </div>
 
-      {/* 2. Tab Filter Visibilitas Aduan */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-        {[
-          { key: 'semua' as const, label: 'Semua Aduan', count: reportsList.length },
-          { key: 'publik' as const, label: 'Feed Publik', count: totalPublik },
-          { key: 'privat' as const, label: 'Aduan Privat', count: totalPrivat },
-        ].map((tab) => (
+      {/* 2. Filter Tab Terpadu: Tempat ACC vs Status Hak Tayang */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-2xs p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {/* Tabs: Menunggu ACC, Tayang Publik, Privat, Semua */}
+        <div className="flex flex-wrap items-center gap-1.5">
           <button
-            key={tab.key}
-            onClick={() => setSelectedVisibility(tab.key)}
-            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-              selectedVisibility === tab.key
-                ? 'bg-[#c00015] text-white shadow-2xs'
-                : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-slate-200'
+            type="button"
+            onClick={() => setSelectedTab('menunggu_acc')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+              selectedTab === 'menunggu_acc'
+                ? 'bg-amber-500 text-white shadow-2xs'
+                : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200/80'
             }`}
           >
-            <span>{tab.label}</span>
-            <span
-              className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                selectedVisibility === tab.key
-                  ? 'bg-black/20 text-white'
-                  : 'bg-slate-100 text-slate-500'
-              }`}
-            >
-              {tab.count}
-            </span>
+            <Clock className="w-3.5 h-3.5" />
+            <span>Menunggu ACC ({totalMenungguAcc})</span>
           </button>
-        ))}
-      </div>
 
-      {/* 3. Panel Search Bar & Filter */}
-      <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
-        <div className="flex flex-col md:flex-row md:items-center gap-3">
-          <div className="relative flex-1">
+          <button
+            type="button"
+            onClick={() => setSelectedTab('publik')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+              selectedTab === 'publik'
+                ? 'bg-[#c00015] text-white shadow-2xs'
+                : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>Tayang Publik ({totalPublik})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedTab('privat')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+              selectedTab === 'privat'
+                ? 'bg-[#c00015] text-white shadow-2xs'
+                : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Lock className="w-3.5 h-3.5" />
+            <span>Privat ({totalPrivat})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedTab('semua')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+              selectedTab === 'semua'
+                ? 'bg-[#c00015] text-white shadow-2xs'
+                : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Semua ({reportsList.length})
+          </button>
+        </div>
+
+        {/* Search Bar */}
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative w-full sm:w-64 shrink-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari nomor tiket atau judul pengaduan..."
-              className="w-full pl-9 pr-8 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#c00015] transition"
+              placeholder="Cari nomor tiket, judul, pelapor..."
+              className="w-full pl-9 pr-7 py-1.5 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#c00015]"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition cursor-pointer"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
                 title="Hapus pencarian"
               >
                 <X className="w-3.5 h-3.5" />
@@ -269,29 +435,21 @@ export default function AdminLaporanPage() {
             )}
           </div>
 
-          {(searchQuery || selectedVisibility !== 'semua') && (
+          {(searchQuery || selectedTab !== 'semua') && (
             <button
               onClick={handleResetFilter}
-              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs text-slate-600 hover:text-[#c00015] hover:bg-slate-100 rounded-lg transition cursor-pointer border border-slate-200"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-600 hover:text-[#c00015] hover:bg-slate-100 rounded-lg transition cursor-pointer border border-slate-200 shrink-0"
               title="Reset Filter"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset Filter</span>
+              <span className="hidden sm:inline">Reset</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* 4. Tabel Tabular Aduan */}
+      {/* 3. Tabel Tabular Aduan */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
-        <div className="p-3 border-b border-slate-200 flex items-center justify-between text-xs text-slate-500">
-          <span>
-            Menampilkan <strong>{Math.min(visibleCount, filteredReports.length)}</strong> dari{' '}
-            <strong>{filteredReports.length}</strong> pengaduan
-          </span>
-          <span className="text-[11px]">Diurutkan berdasarkan tanggal terbaru</span>
-        </div>
-
         {isLoading && reportsList.length === 0 ? (
           <div className="p-6 space-y-4">
             {[1, 2, 3, 4, 5].map((i) => (
@@ -309,29 +467,36 @@ export default function AdminLaporanPage() {
             </div>
             <div className="space-y-1">
               <p className="text-sm font-semibold text-slate-800">
-                Tidak ada aduan yang sesuai
+                {selectedTab === 'menunggu_acc'
+                  ? 'Tidak ada aduan yang menunggu ACC redaksi'
+                  : 'Tidak ada aduan yang sesuai'}
               </p>
               <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                Coba ubah kata kunci pencarian atau reset filter untuk menampilkan semua data.
+                {selectedTab === 'menunggu_acc'
+                  ? 'Semua laporan baru yang masuk telah selesai ditinjau dan ditentukan hak tayangnya.'
+                  : 'Coba ubah kata kunci pencarian atau pilih tab filter lain.'}
               </p>
             </div>
-            <button
-              onClick={handleResetFilter}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset Filter</span>
-            </button>
+            {selectedTab !== 'semua' && (
+              <button
+                onClick={handleResetFilter}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Tampilkan Semua Laporan</span>
+              </button>
+            )}
           </div>
         ) : (
           <div className="w-full overflow-x-auto [scrollbar-width:thin]">
-            <table className="w-full min-w-[750px] table-fixed text-left text-xs">
+            <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 text-slate-600 font-semibold uppercase text-[10px] tracking-wider border-b border-slate-200">
                 <tr>
-                  <th className="py-3.5 px-4 whitespace-nowrap w-[200px]">No. Tiket &amp; Tanggal</th>
-                  <th className="py-3.5 px-4">Judul Pengaduan</th>
-                  <th className="py-3.5 px-4 whitespace-nowrap w-[110px] text-center">Dukungan</th>
-                  <th className="py-3.5 px-4 whitespace-nowrap w-[130px] text-center">Aksi</th>
+                  <th className="py-3 px-4 whitespace-nowrap w-[200px]">No. Tiket</th>
+                  <th className="py-3 px-4 min-w-[240px]">Judul Pengaduan</th>
+                  <th className="py-3 px-4 whitespace-nowrap w-[170px] text-center">Hak Tayang</th>
+                  <th className="py-3 px-4 whitespace-nowrap w-[100px] text-center">Dukungan</th>
+                  <th className="py-3 px-4 whitespace-nowrap w-[150px] text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -340,30 +505,27 @@ export default function AdminLaporanPage() {
                     chatCounts[report.id] ||
                     (report.nomor_tiket ? chatCounts[report.nomor_tiket] : 0) ||
                     0
-                  const isItemPublic = report.is_public || (report as any).visibilitas === 'publik'
+                  const status = getAccStatus(report)
 
                   return (
-                    <tr key={report.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-3.5 px-4 whitespace-nowrap align-middle">
-                        <div className="flex items-center gap-1.5 flex-wrap">
+                    <tr
+                      key={report.id}
+                      className={`hover:bg-slate-50/70 transition-colors ${
+                        status === 'privat' ? 'opacity-80' : ''
+                      }`}
+                    >
+                      {/* 1. No Tiket & Chat */}
+                      <td className="py-3 px-4 whitespace-nowrap align-middle">
+                        <div className="flex items-center gap-1.5">
                           <span className="font-mono text-xs font-bold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded-md">
                             {report.nomor_tiket}
                           </span>
-                          {isItemPublic ? (
-                            <span className="text-[10px] font-medium text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200">
-                              Publik
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-medium text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200">
-                              Privat
-                            </span>
-                          )}
                           {reportChatCount > 0 && (
                             <span
-                              className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary"
+                              className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#c00015]"
                               title={`${reportChatCount} pesan dari warga di tiket ini`}
                             >
-                              <MessageSquare className="w-3 h-3 text-primary" />
+                              <MessageSquare className="w-3 h-3 text-[#c00015]" />
                               <span>{reportChatCount}</span>
                             </span>
                           )}
@@ -373,7 +535,8 @@ export default function AdminLaporanPage() {
                         </p>
                       </td>
 
-                      <td className="py-3.5 px-4 align-middle min-w-0 overflow-hidden">
+                      {/* 2. Judul & Pelapor */}
+                      <td className="py-3 px-4 align-middle min-w-0">
                         <Link
                           href={`/halo-jurnal/admin/laporan/${report.id}`}
                           className="font-heading font-semibold text-slate-900 hover:text-[#c00015] transition-colors truncate block text-xs"
@@ -382,35 +545,67 @@ export default function AdminLaporanPage() {
                           {report.judul}
                         </Link>
                         <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                          {report.deskripsi}
+                          Pelapor: <span className="text-slate-600 font-medium">{report.nama_pelapor || (report as any).pelaporName || 'Warga Sukabumi'}</span>
                         </p>
                       </td>
 
-                      <td className="py-3.5 px-4 whitespace-nowrap align-middle text-center text-slate-700 font-semibold text-xs">
-                        {report.dukungan_count || 0} suara
+                      {/* 3. Tempat ACC / Status Hak Tayang */}
+                      <td className="py-3 px-4 whitespace-nowrap align-middle text-center">
+                        <select
+                          value={status}
+                          onChange={(e) => handleSetAccStatus(report, e.target.value as AccStatus)}
+                          className={`text-[11px] font-bold px-2.5 py-1 rounded-md border cursor-pointer focus:outline-none transition ${
+                            status === 'publik'
+                              ? 'bg-red-50 text-[#c00015] border-red-200'
+                              : status === 'menunggu_acc'
+                              ? 'bg-amber-50 text-amber-800 border-amber-200'
+                              : 'bg-slate-100 text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          {status === 'menunggu_acc' && (
+                            <option value="menunggu_acc" disabled>
+                              Menunggu ACC
+                            </option>
+                          )}
+                          <option value="publik">Tayang Publik</option>
+                          <option value="privat">Privat</option>
+                        </select>
                       </td>
 
-                      <td className="py-3.5 px-4 whitespace-nowrap text-center align-middle">
+                      {/* 4. Dukungan Suara Warga */}
+                      <td className="py-3 px-4 whitespace-nowrap align-middle text-center text-slate-700 font-semibold text-xs">
+                        <span className="inline-flex items-center gap-1">
+                          <ThumbsUp className="w-3 h-3 text-slate-400" />
+                          <span>{report.dukungan_count || 0}</span>
+                        </span>
+                      </td>
+
+                      {/* 5. Aksi: Chat, Portal/Detail, Hapus */}
+                      <td className="py-3 px-4 whitespace-nowrap text-center align-middle">
                         <div className="inline-flex items-center justify-center gap-1.5">
+                          {/* Chat Warga */}
                           <Link
-                            href={`/halo-jurnal/laporan/${report.id}`}
-                            target="_blank"
-                            className="p-1 rounded-md text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition"
-                            title="Lihat Tampilan Warga di Portal"
+                            href={`/halo-jurnal/admin/chat?ticket=${report.nomor_tiket || report.id}`}
+                            className="p-1.5 rounded-md text-slate-400 hover:text-[#c00015] hover:bg-red-50 transition cursor-pointer"
+                            title="Buka Chat dengan Pelapor"
                           >
-                            <Eye className="w-3.5 h-3.5" />
+                            <MessageSquare className="w-3.5 h-3.5" />
                           </Link>
+
+                          {/* Buka Detail Aduan */}
                           <Link
                             href={`/halo-jurnal/admin/laporan/${report.id}`}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white hover:bg-[#c00015] hover:text-white hover:border-[#c00015] text-slate-700 border border-slate-200 text-xs font-semibold transition shadow-2xs cursor-pointer group"
+                            className="p-1.5 rounded-md text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer"
+                            title="Buka Detail Aduan & Meja ACC"
                           >
-                            <span>Detail</span>
-                            <ChevronRight className="w-3 h-3 text-slate-400 group-hover:text-white transition-colors" />
+                            <ExternalLink className="w-3.5 h-3.5" />
                           </Link>
+
+                          {/* Hapus Permanen */}
                           <button
                             type="button"
                             onClick={() => handleDeleteReport(report.id, report.nomor_tiket)}
-                            className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition cursor-pointer"
+                            className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
                             title="Hapus Aduan Ini"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -422,17 +617,6 @@ export default function AdminLaporanPage() {
                 })}
               </tbody>
             </table>
-          </div>
-        )}
-
-        {visibleCount < filteredReports.length && (
-          <div className="p-3 border-t border-slate-100 text-center bg-slate-50/50">
-            <button
-              onClick={() => setVisibleCount((prev) => prev + PAGE_SIZE)}
-              className="px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition shadow-2xs cursor-pointer"
-            >
-              Muat Lebih Banyak ({filteredReports.length - visibleCount} lagi)
-            </button>
           </div>
         )}
       </div>

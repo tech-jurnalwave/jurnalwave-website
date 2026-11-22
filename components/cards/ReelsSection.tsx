@@ -9,41 +9,22 @@ interface ReelsSectionProps {
   reels?: Reel[];
   hideSeeAll?: boolean;
   hideHeader?: boolean;
-  showCategoryFilter?: boolean;
   isGalleryPage?: boolean;
   title?: string;
   subtitle?: string;
   limit?: number;
 }
 
-const BASE_CATEGORIES = [
-  'Semua',
-  'Berita',
-  'Pendidikan & Sekolah',
-  'Lifestyle',
-  'Kuliner',
-  'Wisata',
-  'Otomotif',
-  'Sport & E-Sport',
-  'Teknologi',
-  'Science',
-  'Health',
-  'Loker',
-  'Hiburan',
-];
-
 export const ReelsSection: React.FC<ReelsSectionProps> = ({
   reels = [],
   hideSeeAll = false,
   hideHeader = false,
-  showCategoryFilter = false,
   isGalleryPage = false,
   title = 'Wave Reels',
   subtitle,
   limit
 }) => {
   const [currentReels, setCurrentReels] = useState<Reel[]>(reels);
-  const [activeCategory, setActiveCategory] = useState<string>('Semua');
   const sliderRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -105,28 +86,13 @@ export const ReelsSection: React.FC<ReelsSectionProps> = ({
     };
   }, [reels]);
 
-  const availableCategories = useMemo(() => {
-    const set = new Set<string>(['Semua']);
-    currentReels.forEach(r => {
-      if (r.category && r.category.trim()) {
-        set.add(r.category.trim());
-      }
-    });
-    BASE_CATEGORIES.forEach(c => set.add(c));
-    return Array.from(set);
-  }, [currentReels]);
-
   const filteredReels = useMemo(() => {
-    let list = activeCategory === 'Semua'
-      ? currentReels
-      : currentReels.filter(
-          reel => reel.category?.toLowerCase() === activeCategory.toLowerCase()
-        );
+    let list = currentReels;
     if (limit && limit > 0) {
       list = list.slice(0, limit);
     }
     return list;
-  }, [currentReels, activeCategory, limit]);
+  }, [currentReels, limit]);
 
   const handleScrollRight = () => {
     if (sliderRef.current) {
@@ -174,28 +140,6 @@ export const ReelsSection: React.FC<ReelsSectionProps> = ({
               </Link>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Category Filter Pills (if enabled) */}
-      {showCategoryFilter && (
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 mb-4 sm:mb-5">
-          {availableCategories.map(cat => {
-            const isActive = activeCategory === cat;
-            return (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={`px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-[#c00015] text-white shadow-2xs'
-                    : 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-200 border border-slate-200/80 dark:border-zinc-700'
-                }`}
-              >
-                {cat}
-              </button>
-            );
-          })}
         </div>
       )}
 

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { hashPassword } from '@/lib/auth'
 
+// In-memory status overrides for persistent status toggles across DB & seed citizens
+const citizenStatusOverrides = new Map<string, boolean>()
+
 const DEFAULT_CITIZENS = [
   {
     id: 'cit-001',
@@ -118,6 +121,14 @@ export async function GET(request: NextRequest) {
       mapped = DEFAULT_CITIZENS
     }
 
+    // Terapkan override status jika ada
+    mapped = mapped.map((c) => {
+      if (citizenStatusOverrides.has(c.id)) {
+        return { ...c, isVerified: citizenStatusOverrides.get(c.id)! }
+      }
+      return c
+    })
+
     // Filter pencarian
     if (search) {
       mapped = mapped.filter(
@@ -157,9 +168,50 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const citizen = await prisma.citizenUser.findUnique({
-      where: { id: citizenId },
-    })
+    let citizen = null
+    try {
+      citizen = await prisma.citizenUser.findUnique({
+        where: { id: citizenId },
+      })
+    } catch (err) {
+      console.warn('Notice checking citizen in DB:', err)
+    }
+
+    // B. Ubah Status Verifikasi / Blokir (Dukungan penuh untuk DB & Akun Seed)
+    if (action === 'toggle_status') {
+      let nextStatus = false
+
+      if (citizen) {
+        try {
+          const updated = await prisma.citizenUser.update({
+            where: { id: citizenId },
+            data: { isVerified: !citizen.isVerified },
+          })
+          nextStatus = updated.isVerified
+        } catch {
+          nextStatus = !citizen.isVerified
+        }
+      } else {
+        const defCit = DEFAULT_CITIZENS.find((c) => c.id === citizenId)
+        const currentVerified = citizenStatusOverrides.has(citizenId)
+          ? citizenStatusOverrides.get(citizenId)!
+          : defCit
+          ? defCit.isVerified
+          : true
+        nextStatus = !currentVerified
+        if (defCit) {
+          defCit.isVerified = nextStatus
+        }
+      }
+
+      citizenStatusOverrides.set(citizenId, nextStatus)
+
+      return NextResponse.json({
+        success: true,
+        message: `Status akun warga berhasil diubah menjadi ${nextStatus ? 'Aktif' : 'Ditangguhkan'}.`,
+        isVerified: nextStatus,
+      })
+    }
 
     if (!citizen) {
       return NextResponse.json(

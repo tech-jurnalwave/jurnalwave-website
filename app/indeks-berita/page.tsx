@@ -1,13 +1,13 @@
-import React, { Suspense } from 'react';
+﻿import React, { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { IndeksBeritaClient } from './IndeksBeritaClient';
 
 export const metadata: Metadata = {
   title: 'Indeks Berita',
-  description: 'Telusuri arsip publikasi berita Jurnal Wave berdasarkan rentang tanggal dan kategori.',
+  description: 'Telusuri arsip publikasi berita JurnalWave berdasarkan rentang tanggal dan kategori.',
   openGraph: {
-    title: 'Indeks Berita | Jurnal Wave',
-    description: 'Telusuri arsip publikasi berita Jurnal Wave berdasarkan rentang tanggal dan kategori.',
+    title: 'Indeks Berita | JurnalWave',
+    description: 'Telusuri arsip publikasi berita JurnalWave berdasarkan rentang tanggal dan kategori.',
   },
 };
 

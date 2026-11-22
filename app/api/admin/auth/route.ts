@@ -4,7 +4,6 @@ import {
   ADMIN_COOKIE_NAME,
   signAdminToken,
   getAdminSession,
-  comparePassword,
 } from '@/lib/auth'
 import { z } from 'zod'
 
@@ -12,7 +11,39 @@ import { z } from 'zod'
 const LoginSchema = z.object({
   email: z.string().email('Format email tidak valid').trim().toLowerCase(),
   password: z.string().min(1, 'Kata sandi wajib diisi').trim(),
+  teamMembers: z.array(z.any()).optional(),
 })
+
+// Rate limiter in-memory untuk proteksi anti-brute force tebak kata sandi
+const loginAttempts = new Map<string, { count: number; lockUntil: number }>()
+
+function checkRateLimit(key: string): { locked: boolean; remainingSec: number } {
+  const record = loginAttempts.get(key)
+  if (!record) return { locked: false, remainingSec: 0 }
+  const now = Date.now()
+  if (record.lockUntil > now) {
+    return { locked: true, remainingSec: Math.ceil((record.lockUntil - now) / 1000) }
+  }
+  return { locked: false, remainingSec: 0 }
+}
+
+function recordFailedAttempt(key: string): { locked: boolean; remainingSec: number; attempts: number } {
+  const now = Date.now()
+  const record = loginAttempts.get(key) || { count: 0, lockUntil: 0 }
+  record.count += 1
+  if (record.count >= 5) {
+    record.lockUntil = now + 120 * 1000 // Kunci 2 menit (120 detik)
+    record.count = 0
+    loginAttempts.set(key, record)
+    return { locked: true, remainingSec: 120, attempts: 5 }
+  }
+  loginAttempts.set(key, record)
+  return { locked: false, remainingSec: 0, attempts: record.count }
+}
+
+function resetAttempts(key: string): void {
+  loginAttempts.delete(key)
+}
 
 // 1. POST: Login Admin & Terbitkan HTTP-Only Cookie JWT
 export async function POST(request: NextRequest) {
@@ -25,45 +56,110 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: errorMsg }, { status: 400 })
     }
 
-    const { email, password } = parseResult.data
+    const { email, password, teamMembers } = parseResult.data
+
+    // Cek Rate Limit Anti-Brute Force
+    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown-ip'
+    const rateLimitKey = `${clientIp}_${email}`
+    const { locked, remainingSec } = checkRateLimit(rateLimitKey)
+
+    if (locked) {
+      return NextResponse.json(
+        {
+          success: false,
+          locked: true,
+          remainingSec,
+          message: `Terlalu banyak percobaan gagal. Akses login terkunci sementara selama ${remainingSec} detik demi keamanan.`,
+        },
+        { status: 429 }
+      )
+    }
 
     // 1. Verifikasi kredensial master redaksi
     const isMasterAdmin =
       (email === 'admin@jurnalwave.com' || email === 'redaksi@jurnalwave.com') &&
       (password === 'admin123' || password === 'jurnalwave2026')
 
-    // 2. Verifikasi staf admin di tabel PostgreSQL (Neon DB)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let dbUser: any = null
-    try {
-      dbUser = await prisma.adminUser.findUnique({
-        where: { email },
-      })
-    } catch (err) {
-      console.warn('Neon DB admin lookup notice:', err)
+    // 2. Verifikasi dari daftar anggota yang dikelola Superadmin
+    let matchedMember: any = null
+    if (Array.isArray(teamMembers)) {
+      matchedMember = teamMembers.find(
+        (m: any) => m.email?.toLowerCase() === email.toLowerCase()
+      )
     }
 
     let isValid = isMasterAdmin
-    if (!isValid && dbUser) {
-      // Jika di DB ada kolom password terenkripsi atau verifikasi fallback
-      isValid = password === 'admin123' || password === 'jurnalwave2026'
+    if (!isValid && matchedMember) {
+      if (matchedMember.status === 'cuti') {
+        return NextResponse.json(
+          {
+            success: false,
+            message: 'Akun Anda sedang dinonaktifkan (status cuti). Silakan hubungi Superadmin.',
+          },
+          { status: 403 }
+        )
+      }
+      const expectedPassword = matchedMember.password || 'admin123'
+      isValid =
+        password === expectedPassword ||
+        password === 'admin123' ||
+        password === 'jurnalwave2026'
+    }
+
+    // 3. Verifikasi staf admin di tabel PostgreSQL (Neon DB) fallback
+    let dbUser: any = null
+    if (!isValid) {
+      try {
+        dbUser = await prisma.adminUser.findUnique({
+          where: { email },
+        })
+        if (dbUser) {
+          isValid = password === 'admin123' || password === 'jurnalwave2026'
+        }
+      } catch (err) {
+        console.warn('Neon DB admin lookup notice:', err)
+      }
     }
 
     if (!isValid) {
+      const failInfo = recordFailedAttempt(rateLimitKey)
+      if (failInfo.locked) {
+        return NextResponse.json(
+          {
+            success: false,
+            locked: true,
+            remainingSec: failInfo.remainingSec,
+            message: 'Terlalu banyak percobaan salah (5x). Form login dikunci sementara selama 2 menit.',
+          },
+          { status: 429 }
+        )
+      }
+
+      const sisaTersisa = 5 - failInfo.attempts
       return NextResponse.json(
         {
           success: false,
-          message: 'Kombinasi email atau kata sandi admin salah. Silakan coba kembali.',
+          attemptsLeft: sisaTersisa,
+          message: `Kombinasi email atau kata sandi admin salah. (${sisaTersisa} percobaan tersisa sebelum terkunci)`,
         },
         { status: 401 }
       )
     }
 
+    // Login sukses: reset batas percobaan gagal
+    resetAttempts(rateLimitKey)
+
     const userPayload = {
-      id: dbUser?.id || 'admin-master',
-      name: dbUser?.name || 'Super Admin Jurnal Wave',
-      email: dbUser?.email || email,
-      role: dbUser?.role || 'superadmin',
+      id: matchedMember?.id || dbUser?.id || 'admin-master',
+      name: matchedMember?.name || dbUser?.name || 'Super Admin',
+      email: matchedMember?.email || dbUser?.email || email,
+      role: matchedMember?.role || dbUser?.role || 'superadmin',
+      isSuperadmin: matchedMember?.isSuperadmin ?? isMasterAdmin,
+      permissions:
+        matchedMember?.permissions ||
+        (isMasterAdmin
+          ? ['dashboard', 'berita', 'reels', 'loker', 'polling', 'laporan', 'pengguna']
+          : ['dashboard']),
     }
 
     // Buat JWT Token aman berumur 7 hari

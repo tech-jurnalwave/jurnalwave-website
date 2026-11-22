@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -102,7 +102,7 @@ function generateSmartPolling(input: string, recentArticles: any[]) {
       };
     }
     return {
-      question: 'Di antara rubrik liputan Jurnal Wave berikut, mana yang paling kamu minati setiap hari?',
+      question: 'Di antara rubrik liputan JurnalWave berikut, mana yang paling kamu minati setiap hari?',
       category: 'Komunitas & Pembaca',
       options: [
         'Berita Utama & Isu Publik',
@@ -268,7 +268,7 @@ export async function POST(req: NextRequest) {
     // 2. Jika API key Google Gemini tersedia, jalankan Gemini AI dengan prompt presisi entitas
     if (apiKey && apiKey.trim() !== '') {
       try {
-        const promptText = `Kamu adalah redaktur senior media digital Jurnal Wave. 
+        const promptText = `Kamu adalah redaktur senior media digital JurnalWave. 
 Tugasmu adalah membuat 1 topik polling pembaca yang interaktif, sangat menarik, dan relevan sesuai topik yang diketik pengguna.
 
 SANGAT PENTING:

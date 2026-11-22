@@ -1,13 +1,13 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'Pedoman Media Siber',
-  description: 'Pedoman pemberitaan media siber Jurnal Wave sesuai Kode Etik Jurnalistik dan UU Pers.',
+  description: 'Pedoman pemberitaan media siber JurnalWave sesuai Kode Etik Jurnalistik dan UU Pers.',
   openGraph: {
-    title: 'Pedoman Media Siber | Jurnal Wave',
-    description: 'Pedoman pemberitaan media siber Jurnal Wave sesuai Kode Etik Jurnalistik dan UU Pers.',
+    title: 'Pedoman Media Siber | JurnalWave',
+    description: 'Pedoman pemberitaan media siber JurnalWave sesuai Kode Etik Jurnalistik dan UU Pers.',
   },
 };
 

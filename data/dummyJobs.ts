@@ -1,7 +1,7 @@
-import { Job } from '@/types';
+﻿import { Job } from '@/types';
 
 /**
- * Data Lowongan Kerja Sukabumi (Jurnal Wave).
+ * Data Lowongan Kerja Sukabumi (JurnalWave).
  * Digunakan sebagai basis data pratinjau dan fallback ketika data di cloud masih kosong.
  */
 export const DUMMY_JOBS: Job[] = [
@@ -9,6 +9,7 @@ export const DUMMY_JOBS: Job[] = [
     id: 'job-001',
     title: 'Quality Control Staff (QC)',
     company: 'PT Yakult Indonesia Persada',
+    logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Yakult_logo.svg/512px-Yakult_logo.svg.png',
     location: 'Kawasan Industri Cicurug, Sukabumi',
     region: 'Cicurug',
     salaryRange: 'Rp 4.200.000 - Rp 5.500.000',
@@ -36,6 +37,7 @@ export const DUMMY_JOBS: Job[] = [
     id: 'job-002',
     title: 'Production Operator',
     company: 'PT Amerta Indah Otsuka',
+    logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/Otsuka_Pharmaceutical_logo.svg/512px-Otsuka_Pharmaceutical_logo.svg.png',
     location: 'Jl. Raya Siliwangi KM 28, Cicurug',
     region: 'Cicurug',
     salaryRange: 'UMK Sukabumi + Lembur',
@@ -61,6 +63,7 @@ export const DUMMY_JOBS: Job[] = [
     id: 'job-003',
     title: 'Perawat Rawat Inap (Staff Nurse)',
     company: 'RS Hermina Sukabumi',
+    logo: 'https://herminahospitals.com/assets/hermina_logo_2022-776101966a3d130c00efaa0ca57df4ee9ad58129df4c062c31aa96d88ffbf315.png',
     location: 'Jl. Raya Sukaraja, Sukabumi',
     region: 'Kota Sukabumi',
     salaryRange: 'Rp 3.800.000 - Rp 5.000.000',
@@ -86,6 +89,7 @@ export const DUMMY_JOBS: Job[] = [
     id: 'job-004',
     title: 'Barista & Cashier',
     company: 'Kopi Titik Koma Sukabumi',
+    logo: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=200&q=80',
     location: 'Jl. Surya Kencana, Cikole',
     region: 'Kota Sukabumi',
     salaryRange: 'Rp 1.800.000 - Rp 2.500.000',
@@ -109,7 +113,8 @@ export const DUMMY_JOBS: Job[] = [
   {
     id: 'job-005',
     title: 'Video Creator & Motion Graphic Designer',
-    company: 'Jurnal Wave Media Studio',
+    company: 'JurnalWave Media Studio',
+    logo: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80',
     location: 'Kawasan Kota Sukabumi',
     region: 'Kota Sukabumi',
     salaryRange: 'Rp 3.500.000 - Rp 5.000.000',

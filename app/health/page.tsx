@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import { CategoryTemplate } from '@/components/layout/CategoryTemplate';
 import { fetchArticles } from '@/lib/wordpress';
 
@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   title: 'Health',
   description: 'Tips kesehatan harian, medis, pola hidup seimbang, dan kebugaran.',
   openGraph: {
-    title: 'Health | Jurnal Wave',
+    title: 'Health | JurnalWave',
     description: 'Tips kesehatan harian, medis, pola hidup seimbang, dan kebugaran.',
   },
 };

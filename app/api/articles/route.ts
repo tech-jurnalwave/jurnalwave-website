@@ -1,7 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
-import { writeFile } from 'fs/promises'
-import { join } from 'path'
 import { prisma } from '@/lib/prisma'
 import { getAdminSession } from '@/lib/auth'
 import { clearServerArticlesCache } from '@/lib/wordpress'
@@ -79,7 +77,7 @@ function mapArticleFromDb(item: any) {
     imageAlt: item.imageAlt || item.title,
     imageCaption: item.imageAlt || undefined,
     author: item.author || 'Tim Redaksi',
-    reporter: item.reporter || 'Redaksi Jurnal Wave',
+    reporter: item.reporter || 'Redaksi JurnalWave',
     redaktur: item.redaktur || 'Redaksi Pelaksana',
     readTime: item.readTime || '5 min read',
     isHero: Boolean(item.isHero),
@@ -460,7 +458,7 @@ export async function POST(request: NextRequest) {
         imageUrl: safeImageUrl,
         imageAlt: body.imageCaption?.trim() || body.imageAlt?.trim() || body.title.trim(),
         author: body.author || 'Tim Redaksi',
-        reporter: body.reporter?.trim() || 'Redaksi Jurnal Wave',
+        reporter: body.reporter?.trim() || 'Redaksi JurnalWave',
         redaktur: body.redaktur?.trim() || 'Redaksi Pelaksana',
         readTime: body.readTime || '3 min read',
         isHero: Boolean(body.isHero),

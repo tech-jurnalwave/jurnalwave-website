@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
@@ -317,7 +317,7 @@ export default function HaloJurnalBerandaPage() {
           <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
             <Image
               src="/hero-banner.webp"
-              alt="Hallo Jurnal Wave Banner"
+              alt="Hallo JurnalWave Banner"
               fill
               className="object-cover object-bottom"
               priority
@@ -333,7 +333,7 @@ export default function HaloJurnalBerandaPage() {
             </h2>
 
             <p className="text-white/90 text-xs sm:text-sm md:text-base leading-relaxed mb-5 sm:mb-6 max-w-2xl mx-auto font-medium">
-              Sampaikan aduan Anda secara langsung kepada tim redaksi Jurnal Wave.
+              Sampaikan aduan Anda secara langsung kepada tim redaksi JurnalWave.
             </p>
 
             {/* 2 Tombol Aksi (Photo 2) */}

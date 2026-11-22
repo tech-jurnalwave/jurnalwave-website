@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React from 'react'
 import { usePathname } from 'next/navigation'
@@ -14,7 +14,7 @@ export default function HaloJurnalShell({
   const pathname = usePathname()
   const isAdmin = pathname?.startsWith('/halo-jurnal/admin')
 
-  // Jika di halaman admin, tampilkan dengan latar surface bersih khas Jurnal Wave
+  // Jika di halaman admin, tampilkan dengan latar surface bersih khas JurnalWave
   if (isAdmin) {
     return <div className="min-h-screen w-full bg-[#fbf9f9] text-slate-900 antialiased">{children}</div>
   }

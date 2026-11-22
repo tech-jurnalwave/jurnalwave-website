@@ -51,7 +51,7 @@ export async function getAdminSession(request: NextRequest): Promise<AdminJWTPay
       return {
         id: 'dev-admin',
         email: 'admin@jurnalwave.com',
-        name: 'Admin Redaksi',
+        name: 'Super Admin',
         role: 'superadmin',
       }
     }
@@ -73,4 +73,19 @@ export async function hashPassword(password: string): Promise<string> {
  */
 export async function comparePassword(password: string, hash: string): Promise<boolean> {
   return await bcrypt.compare(password, hash)
+}
+
+/**
+ * Helper terpusat untuk membaca data profil warga yang tersimpan di browser
+ */
+export function getStoredCitizenUser(): Record<string, any> | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = localStorage.getItem('halo_jurnal_current_user')
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? parsed : null
+  } catch {
+    return null
+  }
 }

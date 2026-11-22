@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import { CategoryTemplate } from '@/components/layout/CategoryTemplate';
 import { fetchArticles } from '@/lib/wordpress';
 
@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   title: 'Wisata',
   description: 'Spot wisata alam, pantai, curug, camping ground, dan destinasi healing terbaik di Sukabumi.',
   openGraph: {
-    title: 'Wisata | Jurnal Wave',
+    title: 'Wisata | JurnalWave',
     description: 'Spot wisata alam, pantai, curug, camping ground, dan destinasi healing terbaik di Sukabumi.',
   },
 };

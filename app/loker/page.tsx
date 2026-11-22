@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import { LokerClient } from './LokerClient';
 import { fetchArticles } from '@/lib/wordpress';
 import { fetchJobs } from '@/lib/jobs';
@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   title: 'Lowongan Kerja Sukabumi',
   description: 'Temukan peluang karir dan pekerjaan terkini di Kota & Kabupaten Sukabumi.',
   openGraph: {
-    title: 'Lowongan Kerja Sukabumi | Jurnal Wave',
+    title: 'Lowongan Kerja Sukabumi | JurnalWave',
     description: 'Temukan peluang karir dan pekerjaan terkini di Kota & Kabupaten Sukabumi.',
   },
 };

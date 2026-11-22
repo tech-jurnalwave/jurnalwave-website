@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import {
   MessageSquare,
@@ -355,7 +355,11 @@ export default function FloatingAdminChat() {
     (r) => r.id === selectedTicketId || r.nomor_tiket === selectedTicketId
   )
 
-  const unreadTotal = counts.unreadChat || 0
+  const calculatedUnread = useMemo(() => {
+    return Object.values(ticketMeta).reduce((acc: number, cur: any) => acc + (cur.unreadCount || 0), 0)
+  }, [ticketMeta])
+
+  const unreadTotal = counts.unreadChat || calculatedUnread || 0
 
   return (
     <>
@@ -375,12 +379,12 @@ export default function FloatingAdminChat() {
           title="Buka Pusat Chat Warga Hallo Jurnal"
         >
           <MessageSquare className="w-5 h-5 transition-transform group-hover:scale-110" />
-          <span className="text-xs font-bold tracking-wide hidden sm:inline">
+          <span className="text-xs font-bold tracking-wide">
             Chat Warga
           </span>
 
           {unreadTotal > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px] font-extrabold ring-2 ring-white animate-bounce">
+            <span className="absolute -top-1.5 -right-1.5 flex h-5.5 min-w-5.5 px-1.5 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px] font-extrabold ring-2 ring-white shadow-md">
               {unreadTotal > 9 ? '9+' : unreadTotal}
             </span>
           )}
@@ -406,8 +410,8 @@ export default function FloatingAdminChat() {
             }`}
           >
             {/* Header Utama Popup Bar */}
-            <div className="px-4 py-2.5 bg-[#c00015] text-white flex items-center justify-between shrink-0 select-none">
-              <h3 className="text-xs sm:text-sm font-bold font-heading leading-tight truncate">
+            <div className="px-4 py-2.5 bg-white text-slate-800 border-b border-slate-200 flex items-center justify-between shrink-0 select-none">
+              <h3 className="text-xs sm:text-sm font-bold font-heading text-slate-900 leading-tight truncate">
                 Pusat Chat Warga
               </h3>
 
@@ -419,7 +423,7 @@ export default function FloatingAdminChat() {
                     loadActiveMessages()
                     refreshReports()
                   }}
-                  className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition cursor-pointer"
+                  className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer"
                   title="Segarkan Chat"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
@@ -427,7 +431,7 @@ export default function FloatingAdminChat() {
                 <button
                   type="button"
                   onClick={() => setIsMaximized((prev) => !prev)}
-                  className="hidden sm:inline-flex p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition cursor-pointer"
+                  className="hidden sm:inline-flex p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer"
                   title={isMaximized ? 'Perkecil Tampilan' : 'Perluas ke Layar Penuh'}
                 >
                   {isMaximized ? (
@@ -442,7 +446,7 @@ export default function FloatingAdminChat() {
                     setIsOpen(false)
                     setIsMaximized(false)
                   }}
-                  className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition cursor-pointer"
+                  className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer"
                   title="Tutup Chat"
                 >
                   <X className="w-4 h-4" />

@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 
@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: 'Tentang Kami',
   description: 'Profil media, susunan redaksi, dan legalitas badan hukum PT Media Jurnal Sukabumi.',
   openGraph: {
-    title: 'Tentang Kami | Jurnal Wave',
+    title: 'Tentang Kami | JurnalWave',
     description: 'Profil media, susunan redaksi, dan legalitas badan hukum PT Media Jurnal Sukabumi.',
   },
 };
@@ -15,7 +15,7 @@ export default function TentangKamiPage() {
   const redaksi = [
     { jabatan: 'Chief Executive Officer (CEO)', nama: 'Eman Sulaeman, S.IP' },
     { jabatan: 'Pemimpin Redaksi', nama: 'Ujang Herlan, S.Pd' },
-    { jabatan: 'Redaksi & Kreatif Digital', nama: 'Tim Jurnal Wave' },
+    { jabatan: 'Redaksi & Kreatif Digital', nama: 'Tim JurnalWave' },
   ];
 
   const legalitas = [
@@ -41,26 +41,26 @@ export default function TentangKamiPage() {
         {/* Header Artikel */}
         <header className="border-b border-outline-variant dark:border-slate-800 pb-3 sm:pb-4">
           <h1 className="font-headline-xl text-lg sm:text-xl md:text-2xl font-bold text-on-surface dark:text-white leading-tight">
-            Tentang Jurnal Wave
+            Tentang JurnalWave
           </h1>
           <p className="text-xs sm:text-sm text-primary font-semibold mt-1.5">
-            Jurnal Wave — Suara Baru, Informasi Terkini
+            JurnalWave — Suara Baru, Informasi Terkini
           </p>
         </header>
 
         {/* Konten Redaksional */}
         <article className="prose prose-sm md:prose-base dark:prose-invert max-w-none text-on-surface/90 dark:text-gray-300 leading-relaxed space-y-4">
           <p className="leading-relaxed">
-            <strong>Jurnal Wave</strong> merupakan portal media digital yang berada di bawah naungan perusahaan pers resmi <strong>PT Media Jurnal Sukabumi</strong>. Hadir sebagai wajah baru media informasi, Jurnal Wave berkomitmen menyajikan berita aktual, inspiratif, independen, dan berimbang dengan perspektif yang segar serta relevan dengan perkembangan zaman.
+            <strong>JurnalWave</strong> merupakan portal media digital yang berada di bawah naungan perusahaan pers resmi <strong>PT Media Jurnal Sukabumi</strong>. Hadir sebagai wajah baru media informasi, JurnalWave berkomitmen menyajikan berita aktual, inspiratif, independen, dan berimbang dengan perspektif yang segar serta relevan dengan perkembangan zaman.
           </p>
           <p className="leading-relaxed">
-            Mengusung semangat jurnalisme modern, Jurnal Wave hadir untuk menangkap berbagai dinamika kehidupan masyarakat, mulai dari isu sosial, pendidikan, budaya, komunitas, kreativitas, hingga perkembangan generasi muda di Kota dan Kabupaten Sukabumi khususnya.
+            Mengusung semangat jurnalisme modern, JurnalWave hadir untuk menangkap berbagai dinamika kehidupan masyarakat, mulai dari isu sosial, pendidikan, budaya, komunitas, kreativitas, hingga perkembangan generasi muda di Kota dan Kabupaten Sukabumi khususnya.
           </p>
           <p className="leading-relaxed">
-            Kami percaya bahwa setiap suara memiliki arti dan setiap peristiwa layak mendapatkan ruang pemberitaan. Karena itu, Jurnal Wave tidak hanya menjadi sumber informasi, tetapi juga ruang ekspresi, inspirasi, dan partisipasi publik dengan berpegang teguh pada Kode Etik Jurnalistik dan Undang-Undang Pers.
+            Kami percaya bahwa setiap suara memiliki arti dan setiap peristiwa layak mendapatkan ruang pemberitaan. Karena itu, JurnalWave tidak hanya menjadi sumber informasi, tetapi juga ruang ekspresi, inspirasi, dan partisipasi publik dengan berpegang teguh pada Kode Etik Jurnalistik dan Undang-Undang Pers.
           </p>
           <p className="leading-relaxed">
-            Sebagai bagian dari komitmen terhadap keterbukaan informasi, Jurnal Wave juga menghadirkan <strong>Hallo Jurnal</strong>, kanal interaktif yang menjadi ruang aspirasi, pengaduan, dan penyampaian informasi masyarakat guna membangun jembatan komunikasi antara warga, media, dan para pemangku kepentingan.
+            Sebagai bagian dari komitmen terhadap keterbukaan informasi, JurnalWave juga menghadirkan <strong>Hallo Jurnal</strong>, kanal interaktif yang menjadi ruang aspirasi, pengaduan, dan penyampaian informasi masyarakat guna membangun jembatan komunikasi antara warga, media, dan para pemangku kepentingan.
           </p>
           <div className="pt-2">
             <Link

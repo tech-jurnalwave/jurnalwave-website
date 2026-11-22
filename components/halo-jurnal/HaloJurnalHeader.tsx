@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
@@ -203,10 +203,10 @@ export default function HaloJurnalHeader() {
           <Link
             href="/"
             className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-outline-variant/60 hover:border-primary/40 bg-surface-container-low hover:bg-surface-variant/80 text-on-surface text-xs font-semibold tracking-tight transition-all duration-200 cursor-pointer shadow-2xs group"
-            title="Kembali ke Portal Jurnal Wave"
+            title="Kembali ke Portal JurnalWave"
           >
             <ArrowLeft className="w-3.5 h-3.5 text-primary group-hover:-translate-x-0.5 transition-transform" />
-            <span>Portal Jurnal Wave</span>
+            <span>Portal JurnalWave</span>
           </Link>
 
           {/* Auth Button / Profile (Desktop Only) */}
@@ -298,7 +298,7 @@ export default function HaloJurnalHeader() {
             className="flex items-center gap-2 p-3 rounded-2xl bg-surface-container-low border border-outline-variant text-xs font-bold text-primary mb-2 transition-colors hover:bg-surface-container"
           >
             <ArrowLeft className="w-4 h-4 shrink-0" />
-            <span>Kembali ke Portal Jurnal Wave</span>
+            <span>Kembali ke Portal JurnalWave</span>
           </Link>
 
           {/* Main nav - hanya teks tanpa icon & tanpa wadah kotak */}
@@ -356,7 +356,7 @@ export default function HaloJurnalHeader() {
             )
           )}
           <p className="text-[10px] text-center text-secondary/60 mt-3 select-none">
-            &copy; {new Date().getFullYear()} Jurnal Wave. All rights reserved.
+            &copy; {new Date().getFullYear()} JurnalWave. All rights reserved.
           </p>
         </div>
       </div>

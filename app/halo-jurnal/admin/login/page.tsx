@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -24,6 +24,34 @@ export default function AdminLoginPage() {
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
+  const [lockCountdown, setLockCountdown] = useState<number>(0)
+
+  // Hitung mundur penguncian otomatis (Rate Limiting)
+  useEffect(() => {
+    if (lockCountdown <= 0) return
+    const timer = setInterval(() => {
+      setLockCountdown((prev) => {
+        if (prev <= 1) {
+          setErrorMsg(null)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [lockCountdown])
+
+  // Deteksi pesan pemutusan sesi atau akun dibekukan dari URL query
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const reason = params.get('reason')
+    if (reason === 'frozen') {
+      setErrorMsg('Akses akun Anda telah dinonaktifkan (dibekukan) oleh Superadmin. Silakan hubungi Superadmin.')
+    } else if (reason === 'revoked') {
+      setErrorMsg('Sesi login Anda telah diputus oleh Superadmin. Silakan login kembali dengan kredensial yang sah.')
+    }
+  }, [])
 
   // Jika sudah terautentikasi di server, langsung arahkan ke dashboard
   useEffect(() => {
@@ -56,21 +84,35 @@ export default function AdminLoginPage() {
     setErrorMsg(null)
 
     try {
+      let teamMembers: any[] = []
+      if (typeof window !== 'undefined') {
+        try {
+          const savedTeam = localStorage.getItem('jurnal_wave_team_members')
+          if (savedTeam) {
+            teamMembers = JSON.parse(savedTeam)
+          }
+        } catch {}
+      }
+
       const res = await fetch('/api/admin/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, teamMembers }),
       })
 
       const json = await res.json()
 
       if (res.ok && json.success) {
+        setLockCountdown(0)
         setSuccessMsg(json.message || 'Login berhasil! Mengalihkan ke dashboard...')
         if (typeof window !== 'undefined') {
           sessionStorage.setItem('admin_session_valid', 'true')
           localStorage.setItem(
             'jurnal_wave_admin_user',
-            JSON.stringify(json.user || { name: 'Admin', email })
+            JSON.stringify({
+              ...(json.user || { name: 'Admin', email }),
+              loginTime: Date.now(),
+            })
           )
         }
         setTimeout(() => {
@@ -78,6 +120,9 @@ export default function AdminLoginPage() {
           router.refresh()
         }, 500)
       } else {
+        if (json.locked && json.remainingSec) {
+          setLockCountdown(json.remainingSec)
+        }
         setErrorMsg(json.message || 'Email atau kata sandi admin salah.')
       }
     } catch (err: any) {
@@ -138,7 +183,7 @@ export default function AdminLoginPage() {
             Masuk Meja Redaksi
           </h1>
           <p className="text-xs text-slate-500 leading-relaxed">
-            Akses khusus Redaksi <strong className="text-slate-800">Jurnal Wave</strong> &amp; Pusat Kendali <strong className="text-slate-800">Hallo Jurnal</strong>.
+            Akses khusus Redaksi <strong className="text-slate-800">JurnalWave</strong> &amp; Pusat Kendali <strong className="text-slate-800">Hallo Jurnal</strong>.
           </p>
         </div>
 
@@ -207,7 +252,7 @@ export default function AdminLoginPage() {
           {/* Tombol Masuk */}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || lockCountdown > 0}
             className="w-full py-2.5 px-4 rounded-lg bg-[#c00015] hover:bg-[#a00012] text-white text-xs sm:text-sm font-semibold transition shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
           >
             {loading ? (
@@ -215,6 +260,8 @@ export default function AdminLoginPage() {
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>Memverifikasi Akun...</span>
               </span>
+            ) : lockCountdown > 0 ? (
+              <span>Terkunci Sementara ({lockCountdown}s)</span>
             ) : (
               <>
                 <span>Masuk ke Dashboard</span>
@@ -234,8 +281,8 @@ export default function AdminLoginPage() {
 
       {/* Footer Bawah */}
       <footer className="text-center text-xs text-slate-400 py-4">
-        © 2026 <strong className="text-slate-600 font-semibold">Jurnal Wave</strong> — Meja Redaksi &amp;
-        Pusat Kendali Jurnal Wave &amp; Hallo Jurnal.
+        © 2026 <strong className="text-slate-600 font-semibold">JurnalWave</strong> — Meja Redaksi &amp;
+        Pusat Kendali JurnalWave &amp; Hallo Jurnal.
       </footer>
     </div>
   )

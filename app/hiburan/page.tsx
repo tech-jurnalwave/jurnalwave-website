@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import { CategoryTemplate } from '@/components/layout/CategoryTemplate';
 import { fetchArticles } from '@/lib/wordpress';
 
@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   title: 'Hiburan',
   description: 'Kabar musik, jadwal dan review film bioskop, konser, dan pop culture anak muda terkini.',
   openGraph: {
-    title: 'Hiburan | Jurnal Wave',
+    title: 'Hiburan | JurnalWave',
     description: 'Kabar musik, jadwal dan review film bioskop, konser, dan pop culture anak muda terkini.',
   },
 };

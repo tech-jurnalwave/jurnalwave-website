@@ -15,20 +15,30 @@ export function parseStringArray(input?: string | null): string[] {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function formatJobFromDb(item: any): Job {
+  let logo = item.logo || '';
+  let description = item.description || '';
+  const logoMatch = description.match(/<!--\s*LOGO:(.*?)\s*-->/);
+  if (logoMatch) {
+    if (!logo) logo = logoMatch[1].trim();
+    description = description.replace(/<!--\s*LOGO:.*?\s*-->\r?\n?/, '');
+  }
+
   return {
     id: item.id,
     title: item.title,
     company: item.company,
+    logo: logo || undefined,
     location: item.location,
     region: item.region || 'Kota Sukabumi',
     salaryRange: item.salaryRange || 'Kompetitif',
     type: item.type || 'Full-Time',
     education: item.education || undefined,
-    description: item.description || '',
+    description: description,
     requirements: parseStringArray(item.requirements),
     benefits: parseStringArray(item.benefits),
     applyEmail: item.applyEmail || '',
     applyUrl: item.applyUrl || item.applyEmail || '',
+    isActive: item.isActive !== false,
     createdAt: item.createdAt ? new Date(item.createdAt).toISOString() : new Date().toISOString(),
     updatedAt: item.updatedAt ? new Date(item.updatedAt).toISOString() : undefined,
   };

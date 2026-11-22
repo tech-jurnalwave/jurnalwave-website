@@ -6,24 +6,21 @@ import Link from 'next/link'
 import {
   ArrowLeft,
   Calendar,
-  MapPin,
-  ShieldCheck,
   ExternalLink,
-  Eye,
-  Globe,
   User,
   FileText,
   X,
   Check,
   MessageSquare,
   Trash2,
-  ChevronDown,
-  ChevronUp,
-  Phone,
   Loader2,
+  Globe,
+  Lock,
+  Clock,
 } from 'lucide-react'
 import { DummyReport } from '@/data/dummyReports'
 import { useConfirm } from '@/components/admin/AdminConfirmDialog'
+import AdminToast from '@/components/admin/AdminToast'
 
 export default function AdminDetailLaporanPage() {
   const confirmDialog = useConfirm()
@@ -35,13 +32,10 @@ export default function AdminDetailLaporanPage() {
   const [report, setReport] = useState<DummyReport | null>(null)
   const [currentStatus, setCurrentStatus] = useState<DummyReport['status'] | 'ditolak'>('diterima')
   const [isPublic, setIsPublic] = useState<boolean>(true)
+  const [accStatus, setAccStatus] = useState<'menunggu_acc' | 'publik' | 'privat'>('menunggu_acc')
   const [editorialNote, setEditorialNote] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [actionSuccess, setActionSuccess] = useState<{
-    status: string
-    isPublic: boolean
-    message: string
-  } | null>(null)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [activePhoto, setActivePhoto] = useState<string | null>(null)
 
   // Chat message counter
@@ -117,7 +111,25 @@ export default function AdminDetailLaporanPage() {
         if (found) {
           setReport(found)
           setCurrentStatus(found.status || 'diterima')
-          setIsPublic(found.is_public !== undefined ? found.is_public : true)
+
+          // Tentukan status ACC awal
+          let initialAcc: 'menunggu_acc' | 'publik' | 'privat' = 'menunggu_acc'
+          const savedOverride = typeof window !== 'undefined'
+            ? JSON.parse(localStorage.getItem('halo_jurnal_status_overrides') || '{}')[found.id || found.nomor_tiket]
+            : null
+
+          if (savedOverride?.acc_status) {
+            initialAcc = savedOverride.acc_status
+          } else if (found.is_public === true || (found as any).visibilitas === 'publik') {
+            initialAcc = 'publik'
+          } else if (found.status === 'diterima') {
+            initialAcc = 'menunggu_acc'
+          } else {
+            initialAcc = 'privat'
+          }
+
+          setAccStatus(initialAcc)
+          setIsPublic(initialAcc === 'publik')
           if (found.status_log && found.status_log.length > 0) {
             setStatusLogs(found.status_log)
           } else {
@@ -397,15 +409,87 @@ export default function AdminDetailLaporanPage() {
       }
     }
 
-    setActionSuccess({
-      status: currentStatus,
-      isPublic: isPublic,
-      message: `Keputusan redaksi berhasil diperbarui.`,
-    })
+    setToastMessage('Keputusan redaksi berhasil disimpan.')
     setIsSubmitting(false)
     setTimeout(() => {
-      setActionSuccess(null)
-    }, 3500)
+      setToastMessage(null)
+    }, 3000)
+  }
+
+  // Update status ACC & Hak Tayang secara instan
+  const handleUpdateAccStatus = async (nextStatus: 'menunggu_acc' | 'publik' | 'privat') => {
+    const isPub = nextStatus === 'publik'
+    setAccStatus(nextStatus)
+    setIsPublic(isPub)
+    if (report) {
+      setReport({ ...report, is_public: isPub, ...(report as any), acc_status: nextStatus })
+    }
+
+    if (typeof window !== 'undefined' && report) {
+      try {
+        const overrides = JSON.parse(
+          localStorage.getItem('halo_jurnal_status_overrides') || '{}'
+        )
+        const payload = {
+          status: report.status || 'diterima',
+          acc_status: nextStatus,
+          is_public: isPub,
+          isPublic: isPub,
+          visibilitas: isPub ? 'publik' : 'privat',
+        }
+        overrides[report.id] = { ...(overrides[report.id] || {}), ...payload }
+        if (report.nomor_tiket) {
+          overrides[report.nomor_tiket] = { ...(overrides[report.nomor_tiket] || {}), ...payload }
+        }
+        localStorage.setItem('halo_jurnal_status_overrides', JSON.stringify(overrides))
+
+        const userReports = JSON.parse(
+          localStorage.getItem('halo_jurnal_user_reports') || '[]'
+        )
+        const updatedUserReports = userReports.map((r: any) =>
+          r.id === report.id || r.ticket_number === report.id || r.nomor_tiket === report.id
+            ? { ...r, acc_status: nextStatus, is_public: isPub, isPublic: isPub, visibilitas: isPub ? 'publik' : 'privat' }
+            : r
+        )
+        localStorage.setItem('halo_jurnal_user_reports', JSON.stringify(updatedUserReports))
+        window.dispatchEvent(new Event('storage'))
+      } catch (err) {
+        console.error('Error saving status override:', err)
+      }
+    }
+
+    try {
+      await fetch('/api/reports', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: report?.id,
+          ticketNumber: report?.nomor_tiket,
+          is_public: isPub,
+          isPublic: isPub,
+          catatan:
+            nextStatus === 'publik'
+              ? 'Laporan di-ACC dan ditayangkan ke Feed Publik oleh admin.'
+              : nextStatus === 'privat'
+              ? 'Laporan di-ACC sebagai aduan privat internal oleh admin.'
+              : 'Laporan dikembalikan ke antrean peninjauan redaksi.',
+        }),
+      })
+    } catch (err) {
+      console.warn('Gagal mengubah hak tayang via API:', err)
+    }
+
+    const statusLabel =
+      nextStatus === 'publik'
+        ? 'Tayang di Feed Publik'
+        : nextStatus === 'privat'
+        ? 'Arsip Privat Redaksi'
+        : 'Menunggu ACC'
+
+    setToastMessage(`Hak tayang diubah: ${statusLabel}`)
+    setTimeout(() => {
+      setToastMessage(null)
+    }, 2500)
   }
 
   const handleDeleteReport = async () => {
@@ -545,90 +629,48 @@ export default function AdminDetailLaporanPage() {
   const visibleLogs = showAllLogs ? cleanedLogs : cleanedLogs.slice(0, 3)
 
   return (
-    <div className="space-y-5 sm:space-y-6">
-      {/* 1. Header & Navigasi Eksekutif (Responsif Mobile & Desktop) */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 pb-4 border-b border-slate-200">
-        <div className="flex items-start sm:items-center gap-3">
+    <div className="space-y-5 max-w-7xl mx-auto pb-12 font-sans">
+      {/* 1. Header Halaman */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+        <div className="flex items-center gap-3">
           <Link
             href="/halo-jurnal/admin/laporan"
-            className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition mt-0.5 sm:mt-0"
-            title="Kembali ke Daftar Laporan"
+            className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition shadow-2xs cursor-pointer"
+            title="Kembali ke Daftar Aduan"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
-            <div className="flex flex-wrap items-center gap-2 mb-1.5">
-              <span className="font-mono text-xs font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded-md">
-                {report.nomor_tiket}
-              </span>
-              
-              {report.is_public ? (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-                  Tayang Publik
-                </span>
-              ) : (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                  Privat
-                </span>
-              )}
-            </div>
-            <h1 className="text-xl font-heading font-extrabold text-slate-900 tracking-tight">
-              Tinjauan Pengaduan Warga
+            <h1 className="text-xl sm:text-2xl font-heading font-extrabold text-slate-900 tracking-tight">
+              Detail Pengaduan Warga
             </h1>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-2 self-start sm:self-auto">
           <Link
             href={`/halo-jurnal/laporan/${report.id}`}
             target="_blank"
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition shadow-2xs"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition shadow-2xs hover:border-[#c00015]/40 hover:text-[#c00015]"
+            title="Lihat Tampilan Warga di Portal"
           >
-            <Eye className="w-3.5 h-3.5 text-slate-500" />
-            <span>Tampilan Warga</span>
-            <ExternalLink className="w-3 h-3 text-slate-400" />
-          </Link>
-
-          <Link
-            href={
-              report.is_public
-                ? `/halo-jurnal/feed-publik?search=${encodeURIComponent(report.nomor_tiket)}`
-                : `/halo-jurnal/feed-publik`
-            }
-            target="_blank"
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition shadow-2xs"
-          >
-            <Globe className="w-3.5 h-3.5 text-slate-500" />
-            <span>Feed Publik</span>
-            <ExternalLink className="w-3 h-3 text-slate-400" />
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span>Lihat di Portal</span>
           </Link>
         </div>
       </div>
 
-      {/* 2. Grid Dua Kolom: Kiri (Dokumen Aduan Warga) & Kanan (Meja Eksekusi Redaksi) */}
+      {/* 2. Grid Dua Kolom: Kiri (Dokumen Aduan Warga) & Kanan (Pengaturan Hak Tayang) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* ================= KOLOM KIRI (7 Col): DOKUMEN ADUAN WARGA ================= */}
-        <div className="lg:col-span-7 space-y-6">
+        <div className="lg:col-span-7 space-y-5">
           <div className="bg-white rounded-xl border border-slate-200 shadow-2xs p-4 sm:p-6 space-y-5">
-            {/* Meta Header Dokumen */}
-            <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100 text-xs">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-slate-700 bg-slate-100 px-2.5 py-0.5 rounded-md text-xs">
-                  Pengaduan Warga
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 text-slate-400">
-                <Calendar className="w-3.5 h-3.5" />
-                <span>{formatDate(report.created_at)}</span>
-              </div>
-            </div>
-
-            {/* Judul & Teks Aduan Warga (Tipografi Editorial Bersih) */}
-            <div className="space-y-3">
+            {/* Judul & Teks Aduan Warga */}
+            <div className="space-y-2.5">
               <h2 className="text-lg font-heading font-bold text-slate-900 leading-snug">
                 {report.judul}
               </h2>
-              <div className="space-y-3 text-sm text-slate-700 leading-relaxed text-justify [text-align-last:left] py-0.5">
+              <div className="space-y-2.5 text-sm text-slate-700 leading-relaxed text-justify [text-align-last:left] py-0.5">
                 {report.deskripsi
                   ? report.deskripsi
                       .split(/\n+/)
@@ -643,54 +685,152 @@ export default function AdminDetailLaporanPage() {
               </div>
             </div>
 
-            
-
-            {/* Identitas Pelapor Terintegrasi */}
+            {/* Identitas Pelapor & Akses Chat */}
             {(() => {
-              const rawPhone = (report as any)?.phone || (report as any)?.pelaporPhone || (report as any)?.telepon || '081234567890'
-              const pelaporNama = (report as any)?.pelaporName || (report as any)?.nama_pelapor || 'Warga Sukabumi'
+              const rawPhone =
+                (report as any)?.phone ||
+                (report as any)?.pelaporPhone ||
+                (report as any)?.telepon ||
+                '081234567890'
+              const pelaporNama =
+                (report as any)?.pelaporName ||
+                (report as any)?.nama_pelapor ||
+                'Warga Sukabumi'
+              const isAnonim = Boolean((report as any).is_anonim || (report as any).is_anonymous)
 
               return (
-                <div className="pt-3 border-t border-slate-100 space-y-3 text-xs">
-                  {/* Info Identitas Pelapor */}
-                  <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold shrink-0 border border-slate-200 mt-0.5">
+                <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold shrink-0 border border-slate-200">
                       <User className="w-4 h-4 text-slate-600" />
                     </div>
-                    <div className="flex-1 min-w-0 space-y-1">
+                    <div className="min-w-0 space-y-0.5">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-slate-900 text-sm">
                           {pelaporNama}
                         </span>
-                        
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                          Identitas Otomatis Dirahasiakan di Publik
-                        </span>
+                        {isAnonim && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                            Anonim
+                          </span>
+                        )}
                       </div>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-500">
-                        <span>Kontak Telepon: <strong>{rawPhone}</strong></span>
-                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Kontak Telepon: <strong className="text-slate-700">{rawPhone}</strong>
+                      </p>
                     </div>
                   </div>
 
-                  {/* Tombol Aksi Komunikasi Redaksi: Chat Web Resmi */}
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
                     <Link
                       href={`/halo-jurnal/admin/chat?ticket=${report.nomor_tiket || report.id}`}
-                      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[#c00015] hover:bg-[#a80012] text-white font-bold text-xs whitespace-nowrap transition shadow-2xs active:scale-95 cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#c00015] hover:bg-[#a00012] text-white text-xs font-semibold transition shadow-2xs cursor-pointer shrink-0"
                       title="Buka Ruang Obrolan Web Resmi Hallo Jurnal"
                     >
-                      <MessageSquare className="w-4 h-4" />
-                      <span>Buka Chat dengan Pelapor</span>
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>Buka Chat</span>
+                      {chatMessages.length > 0 && (
+                        <span className="ml-0.5 px-1.5 py-0.2 bg-black/20 text-white rounded text-[10px] font-bold">
+                          {chatMessages.length}
+                        </span>
+                      )}
                     </Link>
-                  </div>
 
-                  {/* Status Pernyataan Hukum */}
-                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-2.5 text-[11px] text-amber-900 flex items-start gap-2">
-                    <Check className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                    <span>
-                      <strong>Pernyataan Pertanggungjawaban Hukum Sah:</strong> Pelapor telah menyetujui pernyataan siap hadir dan bertanggung jawab secara hukum atas kebenaran aduan ini.
-                    </span>
+                    {/* Tombol Tangguhkan / Aktifkan Akun Pelapor */}
+                    {(() => {
+                      const cId = (report as any)?.user_id || (report as any)?.userId || report?.nomor_tiket
+                      const cPhone = (report as any)?.phone || (report as any)?.pelaporPhone || (report as any)?.telepon || rawPhone
+                      const cEmail = (report as any)?.email || (report as any)?.pelaporEmail || ''
+
+                      // Cek status penangguhan di localStorage overrides
+                      let isSuspended = false
+                      if (typeof window !== 'undefined') {
+                        try {
+                          const overrides = JSON.parse(
+                            localStorage.getItem('halo_jurnal_citizen_status_overrides') || '{}'
+                          )
+                          if (
+                            overrides[cId] === false ||
+                            (cPhone && overrides[cPhone] === false) ||
+                            (cEmail && overrides[cEmail] === false)
+                          ) {
+                            isSuspended = true
+                          }
+                        } catch {}
+                      }
+
+                      const handleToggleSuspend = async () => {
+                        const nextSuspended = !isSuspended
+                        const actionName = nextSuspended ? 'Tangguhkan Akun Pelapor?' : 'Aktifkan Akun Pelapor?'
+                        const actionDesc = nextSuspended
+                          ? `Yakin ingin menangguhkan akun pelapor ${pelaporNama} (${cPhone})? Pelapor tidak akan bisa login dan tidak dapat mengirim aduan baru.`
+                          : `Aktifkan kembali akun pelapor ${pelaporNama}? Warga akan dapat login dan mengakses layanan kembali.`
+
+                        const isConfirmed = await confirmDialog({
+                          title: actionName,
+                          message: actionDesc,
+                          confirmText: nextSuspended ? 'Tangguhkan' : 'Aktifkan',
+                          cancelText: 'Batal',
+                          variant: nextSuspended ? 'warning' : 'success',
+                        })
+                        if (!isConfirmed) return
+
+                        if (typeof window !== 'undefined') {
+                          try {
+                            const overrides = JSON.parse(
+                              localStorage.getItem('halo_jurnal_citizen_status_overrides') || '{}'
+                            )
+                            overrides[cId] = !nextSuspended
+                            if (cPhone) overrides[cPhone] = !nextSuspended
+                            if (cEmail) overrides[cEmail] = !nextSuspended
+                            localStorage.setItem('halo_jurnal_citizen_status_overrides', JSON.stringify(overrides))
+
+                            const cached = JSON.parse(localStorage.getItem('halo_jurnal_all_citizens') || '[]')
+                            if (Array.isArray(cached) && cached.length > 0) {
+                              const updated = cached.map((c: any) =>
+                                c.id === cId || c.phone === cPhone || (cEmail && c.email === cEmail)
+                                  ? { ...c, isVerified: !nextSuspended }
+                                  : c
+                              )
+                              localStorage.setItem('halo_jurnal_all_citizens', JSON.stringify(updated))
+                            }
+                            window.dispatchEvent(new Event('storage'))
+                          } catch {}
+                        }
+
+                        // Sinkronisasi API backend
+                        try {
+                          await fetch('/api/admin/citizens', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              citizenId: cId,
+                              action: 'toggle_status',
+                            }),
+                          })
+                        } catch {}
+                      }
+
+                      return isSuspended ? (
+                        <button
+                          type="button"
+                          onClick={handleToggleSuspend}
+                          className="px-2.5 py-1.5 rounded-lg bg-red-50 border border-red-200 text-[#c00015] hover:bg-red-100 text-xs font-semibold transition cursor-pointer shrink-0"
+                          title="Akun warga ini sedang ditangguhkan. Klik untuk mengaktifkan kembali."
+                        >
+                          <span>Akun Ditangguhkan (Aktifkan)</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleToggleSuspend}
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition cursor-pointer shrink-0"
+                          title="Tangguhkan akun pelapor ini agar tidak bisa lapor dan login"
+                        >
+                          <span>Tangguhkan Akun</span>
+                        </button>
+                      )
+                    })()}
                   </div>
                 </div>
               )
@@ -702,7 +842,7 @@ export default function AdminDetailLaporanPage() {
                 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
                   Berkas Bukti Lampiran ({report.laporan_lampiran?.length || 0})
                 </h3>
-                <span className="text-[11px] text-slate-400">Foto & Video Bukti</span>
+                <span className="text-[11px] text-slate-400">Foto &amp; Video Bukti</span>
               </div>
 
               {report.laporan_lampiran && report.laporan_lampiran.length > 0 ? (
@@ -751,89 +891,93 @@ export default function AdminDetailLaporanPage() {
                 </p>
               )}
             </div>
-
-            {/* Bar Akses Chat Warga Bersih & Terarah */}
-            <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-              <div className="flex items-center gap-2 text-xs text-slate-600">
-                <MessageSquare className="w-4 h-4 text-slate-400" />
-                <span>Dialog dengan Pelapor:</span>
-                {chatMessages.length > 0 ? (
-                  <span className="font-semibold text-slate-900">{chatMessages.length} pesan terarsip</span>
-                ) : (
-                  <span className="text-slate-400 italic">Belum ada pesan</span>
-                )}
-              </div>
-              <Link
-                href={`/halo-jurnal/admin/chat?ticket=${report.nomor_tiket || report.id}`}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#c00015] hover:bg-[#a00012] text-white text-xs font-semibold transition shadow-2xs self-start sm:self-auto"
-              >
-                <span>Buka di Pusat Chat Warga</span>
-                <ExternalLink className="w-3 h-3 ml-0.5 opacity-70" />
-              </Link>
-            </div>
           </div>
         </div>
 
         {/* ================= KOLOM KANAN (5 Col): MEJA EKSEKUSI REDAKSI ================= */}
-        <div className="lg:col-span-5 space-y-6">
-          {/* Panel Hak Tayang Aduan Warga */}
+        <div className="lg:col-span-5 space-y-5">
+          {/* Panel Meja ACC & Hak Tayang Aduan */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-2xs p-4 sm:p-5 space-y-4">
-            <h3 className="text-xs font-heading font-bold text-slate-900 uppercase tracking-wider pb-3 border-b border-slate-100">
-              Moderasi Hak Tayang
-            </h3>
-
-            <form onSubmit={handleSaveAction} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-800">
-                  Visibilitas Feed Warga
-                </label>
-                <p className="text-[11px] text-slate-500">
-                  Tentukan apakah aduan ini dapat diakses secara terbuka di Feed Publik atau disimpan sebagai arsip privat.
-                </p>
-
-                <div className="grid grid-cols-2 gap-1.5 p-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setIsPublic(true)}
-                    className={`py-2 px-2 rounded-lg font-semibold text-xs transition cursor-pointer text-center whitespace-nowrap ${
-                      isPublic
-                        ? 'bg-[#c00015] text-white shadow-2xs'
-                        : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/80 shadow-2xs'
-                    }`}
-                  >
-                    Tayang di Feed Publik
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setIsPublic(false)}
-                    className={`py-2 px-2 rounded-lg font-semibold text-xs transition cursor-pointer text-center whitespace-nowrap ${
-                      !isPublic
-                        ? 'bg-[#c00015] text-white shadow-2xs'
-                        : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/80 shadow-2xs'
-                    }`}
-                  >
-                    Privat (Arsip Redaksi)
-                  </button>
-                </div>
-              </div>
-
-              {/* Tombol Simpan Hak Tayang */}
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className={`w-full py-2.5 rounded-lg text-xs font-bold tracking-wide transition shadow-2xs cursor-pointer text-center ${
-                  actionSuccess
-                    ? 'bg-emerald-700 text-white'
-                    : 'bg-[#c00015] hover:bg-[#a00012] disabled:opacity-50 text-white'
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-xs font-heading font-extrabold text-slate-900 uppercase tracking-wider">
+                Keputusan ACC &amp; Hak Tayang
+              </h3>
+              <span
+                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                  accStatus === 'publik'
+                    ? 'bg-red-50 text-[#c00015] border border-red-200'
+                    : accStatus === 'menunggu_acc'
+                    ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                    : 'bg-slate-100 text-slate-700 border border-slate-200'
                 }`}
               >
-                {actionSuccess ? '✓ Hak Tayang Berhasil Disimpan' : 'Simpan Pengaturan Hak Tayang'}
+                {accStatus === 'publik'
+                  ? 'Tayang Publik'
+                  : accStatus === 'menunggu_acc'
+                  ? 'Menunggu ACC'
+                  : 'Privat'}
+              </span>
+            </div>
+
+            {/* Opsi Pilihan Meja ACC: Publik & Privat */}
+            <div className="space-y-1.5">
+              {/* Opsi 1: Tayang Publik */}
+              <button
+                type="button"
+                onClick={() => handleUpdateAccStatus('publik')}
+                className={`w-full text-left px-3.5 py-2.5 rounded-lg border transition cursor-pointer flex items-center justify-between text-xs font-semibold ${
+                  accStatus === 'publik'
+                    ? 'bg-red-50/60 border-[#c00015] text-[#c00015]'
+                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <span>Tayang di Feed Publik</span>
+                {accStatus === 'publik' && (
+                  <span className="w-2 h-2 rounded-full bg-[#c00015]" />
+                )}
               </button>
-            </form>
+
+              {/* Opsi 2: Arsip Privat */}
+              <button
+                type="button"
+                onClick={() => handleUpdateAccStatus('privat')}
+                className={`w-full text-left px-3.5 py-2.5 rounded-lg border transition cursor-pointer flex items-center justify-between text-xs font-semibold ${
+                  accStatus === 'privat'
+                    ? 'bg-slate-100 border-slate-700 text-slate-900'
+                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <span>Arsip Privat Redaksi</span>
+                {accStatus === 'privat' && (
+                  <span className="w-2 h-2 rounded-full bg-slate-800" />
+                )}
+              </button>
+            </div>
+
+            {/* Ringkasan Metadata Aduan */}
+            <div className="space-y-2 pt-2 border-t border-slate-100 text-xs">
+              <div className="flex items-center justify-between text-slate-500 py-1 border-b border-slate-100/60">
+                <span>Nomor Tiket</span>
+                <span className="font-mono font-bold text-slate-800">{report.nomor_tiket}</span>
+              </div>
+              <div className="flex items-center justify-between text-slate-500 py-1 border-b border-slate-100/60">
+                <span>Tanggal Lapor</span>
+                <span className="font-semibold text-slate-700">{formatDate(report.created_at)}</span>
+              </div>
+              <div className="flex items-center justify-between text-slate-500 py-1 border-b border-slate-100/60">
+                <span>Dukungan Warga</span>
+                <span className="font-bold text-slate-800">{report.dukungan_count || 0} suara</span>
+              </div>
+              <div className="flex items-center justify-between text-slate-500 py-1">
+                <span>Lokasi Kejadian</span>
+                <span className="font-semibold text-slate-700 truncate max-w-[180px]">
+                  {report.lokasi || (report as any).address || 'Sukabumi'}
+                </span>
+              </div>
+            </div>
 
             {/* Tombol Hapus Aduan */}
-            <div className="pt-3 border-t border-slate-100">
+            <div className="pt-2 border-t border-slate-100">
               <button
                 type="button"
                 onClick={handleDeleteReport}
@@ -878,22 +1022,12 @@ export default function AdminDetailLaporanPage() {
           </div>
         </div>
       )}
-      {/* Floating Feedback Toast (Zero Layout Shift, Pure Enterprise Standard) */}
-      {actionSuccess && (
-        <div className="fixed bottom-5 right-5 z-50 animate-in fade-in slide-in-from-bottom-3 duration-200">
-          <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-slate-900 text-white shadow-xl border border-slate-800 text-xs font-medium">
-            <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span>{actionSuccess.message}</span>
-            <button
-              onClick={() => setActionSuccess(null)}
-              className="ml-2 text-slate-400 hover:text-white transition cursor-pointer"
-              title="Tutup"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Toast Notifikasi Standar Meja Redaksi */}
+      <AdminToast
+        message={toastMessage}
+        type="success"
+        onClose={() => setToastMessage(null)}
+      />
     </div>
   )
 }

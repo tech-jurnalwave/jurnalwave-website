@@ -11,6 +11,11 @@ import {
   CloudLightning,
   Calendar
 } from 'lucide-react';
+import {
+  getLatestSyncedWeather,
+  syncWeatherToGlobal,
+  onWeatherSync,
+} from '@/lib/weatherSync';
 
 interface WeatherWidgetProps {
   date?: string;
@@ -54,17 +59,55 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({
       // fallback date
     }
 
-    // 2. Ambil cuaca nyata Sukabumi dari API
+    // 2. Baca cuaca tersinkronisasi terbaru jika sudah ada
+    const synced = getLatestSyncedWeather();
+    if (synced && typeof synced.temperature === 'number') {
+      setCurrentTemp(`${synced.temperature}°C`);
+      if (synced.condition) setCurrentCondition(synced.condition);
+      if (synced.iconName) setIconName(synced.iconName);
+    }
+
+    // 3. Berlangganan event sinkronisasi realtime dari CuacaView
+    const unsubscribe = onWeatherSync((weather) => {
+      if (weather && typeof weather.temperature === 'number') {
+        setCurrentTemp(`${weather.temperature}°C`);
+        if (weather.condition) setCurrentCondition(weather.condition);
+        if (weather.iconName) setIconName(weather.iconName);
+      }
+    });
+
+    // 4. Ambil cuaca nyata Sukabumi dari API jika belum ada data atau data usang (> 5 menit)
+    // Jangan fetch ganda jika sedang berada di halaman /cuaca (halaman cuaca adalah sumber otoritatif)
     let isMounted = true;
     async function loadWeather() {
       try {
-        const res = await fetch('/api/weather?loc=kota');
+        if (typeof window !== 'undefined' && window.location.pathname.startsWith('/cuaca')) {
+          return;
+        }
+
+        const latest = getLatestSyncedWeather();
+        if (latest && latest.updatedAt && Date.now() - latest.updatedAt < 5 * 60 * 1000) {
+          // Data masih sangat baru (< 5 menit), gunakan data yang sinkron
+          return;
+        }
+
+        const res = await fetch(`/api/weather?loc=kota&_t=${Date.now()}`);
         if (!res.ok) return;
         const data = await res.json();
         if (isMounted && data.temperature !== undefined) {
+          if (typeof window !== 'undefined' && window.location.pathname.startsWith('/cuaca')) {
+            return;
+          }
           setCurrentTemp(`${data.temperature}°C`);
           setCurrentCondition(data.condition || 'Berawan');
           setIconName(data.iconName || 'CloudSun');
+          syncWeatherToGlobal({
+            temperature: data.temperature,
+            condition: data.condition,
+            iconName: data.iconName,
+            locationName: data.locationName,
+            locationId: data.locationId,
+          });
         }
       } catch (err) {
         console.warn('Gagal memuat cuaca realtime:', err);
@@ -74,6 +117,7 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({
     loadWeather();
     return () => {
       isMounted = false;
+      unsubscribe();
     };
   }, []);
 

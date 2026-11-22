@@ -78,6 +78,63 @@ export default function AdminLayout({
     }
   }, [pathname, isLoginPage, router])
 
+  // Pemantauan real-time pemutusan sesi & pembekuan akun darurat dari Superadmin
+  useEffect(() => {
+    if (isLoginPage) return
+
+    const checkRevocation = async () => {
+      try {
+        if (typeof window === 'undefined') return
+        const savedUser = localStorage.getItem('jurnal_wave_admin_user')
+        if (!savedUser) return
+        const user = JSON.parse(savedUser)
+        const email = user.email?.toLowerCase()
+        if (!email) return
+
+        // Superadmin master tidak terpengaruh oleh revokasi sesi staf
+        if (email === 'admin@jurnalwave.com' && (user.isSuperadmin || user.role === 'superadmin')) {
+          return
+        }
+
+        const revokedAt = localStorage.getItem(`admin_revoked_${email}`)
+        const loginTime = user.loginTime || 0
+        const isSessionRevoked = Boolean(revokedAt && Number(revokedAt) > Number(loginTime))
+
+        let isAccountFrozen = false
+        const teamSaved = localStorage.getItem('jurnal_wave_team_members')
+        if (teamSaved) {
+          try {
+            const team = JSON.parse(teamSaved)
+            const found = team.find((m: any) => m.email?.toLowerCase() === email)
+            if (found && found.status === 'cuti') {
+              isAccountFrozen = true
+            }
+          } catch {}
+        }
+
+        if (isSessionRevoked || isAccountFrozen) {
+          try {
+            await fetch('/api/admin/auth', { method: 'DELETE' })
+          } catch {}
+          sessionStorage.removeItem('admin_session_valid')
+          localStorage.removeItem('jurnal_wave_admin_user')
+          setIsAuthenticated(false)
+          router.replace(
+            `/halo-jurnal/admin/login?reason=${isAccountFrozen ? 'frozen' : 'revoked'}`
+          )
+        }
+      } catch {}
+    }
+
+    const interval = setInterval(checkRevocation, 3000)
+    window.addEventListener('storage', checkRevocation)
+
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('storage', checkRevocation)
+    }
+  }, [isLoginPage, router])
+
   // Jika di halaman login, tampilkan halaman login utuh
   if (isLoginPage) {
     return <>{children}</>
@@ -86,24 +143,8 @@ export default function AdminLayout({
   // Tampilan transisi saat verifikasi keamanan berlangsung
   if (isAuthenticated === null || isAuthenticated === false) {
     return (
-      <div className="min-h-screen bg-[#fbf9f9] text-[#1b1c1c] flex flex-col items-center justify-center p-4 font-sans antialiased">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/halo-jurnal-icon.webp?v=original"
-              alt="Hallo Jurnal Logo"
-              className="w-7 h-7 object-contain"
-            />
-          </div>
-          <div className="flex items-center gap-2 text-slate-700 font-semibold text-xs tracking-wide">
-            <Loader2 className="w-4 h-4 animate-spin text-[#c00015]" />
-            <span>Memverifikasi Hak Akses Redaksi...</span>
-          </div>
-          <p className="text-[11px] text-slate-400">
-            JurnalCentral — Pusat Kendali Jurnal Wave &amp; Hallo Jurnal
-          </p>
-        </div>
+      <div className="min-h-screen bg-[#fbf9f9] flex items-center justify-center p-4">
+        <Loader2 className="w-6 h-6 animate-spin text-[#c00015]" />
       </div>
     )
   }

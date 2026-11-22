@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import { CategoryTemplate } from '@/components/layout/CategoryTemplate';
 import { fetchArticles } from '@/lib/wordpress';
 
@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   title: 'Tech & Game',
   description: 'Kabar dunia teknologi, game, E-Sport, AI, gadget terbaru, dan tren digital anak muda.',
   openGraph: {
-    title: 'Tech & Game | Jurnal Wave',
+    title: 'Tech & Game | JurnalWave',
     description: 'Kabar dunia teknologi, game, E-Sport, AI, gadget terbaru, dan tren digital anak muda.',
   },
 };

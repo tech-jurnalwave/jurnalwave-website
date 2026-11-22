@@ -4,8 +4,8 @@ import nodemailer from 'nodemailer'
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: process.env.SMTP_USER || 'jurnalvibes2@gmail.com',
-    pass: (process.env.SMTP_PASS || 'tfztbfaawstyqdby').replace(/\s+/g, ''),
+    user: process.env.SMTP_USER || 'redaksi.jurnalwave@gmail.com',
+    pass: (process.env.SMTP_PASS || '').replace(/\s+/g, ''),
   },
 })
 
@@ -13,7 +13,7 @@ const transporter = nodemailer.createTransport({
  * Mengirimkan email OTP resmi untuk reset kata sandi warga
  */
 export async function sendResetPasswordOtp(toEmail: string, otpCode: string, residentName?: string) {
-  const senderAddress = process.env.SMTP_FROM || 'Hallo Jurnal Sukabumi <jurnalvibes2@gmail.com>'
+  const senderAddress = process.env.SMTP_FROM || 'Hallo Jurnal Sukabumi <redaksi.jurnalwave@gmail.com>'
   const displayName = residentName || 'Warga Sukabumi'
 
   const htmlContent = `
@@ -115,7 +115,7 @@ export async function sendResetPasswordOtp(toEmail: string, otpCode: string, res
  * Mengirimkan email OTP resmi untuk pendaftaran akun warga baru
  */
 export async function sendRegisterOtp(toEmail: string, otpCode: string, residentName?: string) {
-  const senderAddress = process.env.SMTP_FROM || 'Hallo Jurnal Sukabumi <jurnalvibes2@gmail.com>'
+  const senderAddress = process.env.SMTP_FROM || 'Hallo Jurnal Sukabumi <redaksi.jurnalwave@gmail.com>'
   const displayName = residentName || 'Warga Sukabumi'
 
   const htmlContent = `

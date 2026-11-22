@@ -12,8 +12,8 @@ export async function generateMetadata({ params }: TagPageProps): Promise<Metada
     decoded = decodeURIComponent(tag).replace(/[-_]+/g, ' ');
   } catch {}
 
-  const title = `Tagar #${decoded} - Jurnal Wave`;
-  const description = `Kumpulan liputan berita terkini dan terhangat dengan tagar #${decoded} di Jurnal Wave.`;
+  const title = `Tagar #${decoded} - JurnalWave`;
+  const description = `Kumpulan liputan berita terkini dan terhangat dengan tagar #${decoded} di JurnalWave.`;
 
   return {
     title,

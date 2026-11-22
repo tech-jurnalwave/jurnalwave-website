@@ -8,12 +8,7 @@ import {
   Banknote,
   GraduationCap,
   Share2,
-  Coffee,
-  Calculator,
-  Megaphone,
-  Package,
-  Laptop,
-  Briefcase,
+  Building2,
 } from 'lucide-react';
 import { Job } from '@/types';
 import { isJobSaved, toggleJobBookmark } from '@/lib/bookmarks';
@@ -21,57 +16,6 @@ import { isJobSaved, toggleJobBookmark } from '@/lib/bookmarks';
 interface JobCardProps {
   job: Job;
 }
-
-// Ikon Tematik Sesuai Profesi Lowongan Kerja
-export const getJobRoleIcon = (title: string = '', company: string = '') => {
-  const text = `${title} ${company}`.toLowerCase();
-  if (
-    text.includes('barista') ||
-    text.includes('kopi') ||
-    text.includes('cafe') ||
-    text.includes('f&b') ||
-    text.includes('restoran')
-  ) {
-    return Coffee;
-  }
-  if (
-    text.includes('keuangan') ||
-    text.includes('administrasi') ||
-    text.includes('akuntansi') ||
-    text.includes('finance') ||
-    text.includes('kasir')
-  ) {
-    return Calculator;
-  }
-  if (
-    text.includes('social media') ||
-    text.includes('content') ||
-    text.includes('kreatif') ||
-    text.includes('marketing') ||
-    text.includes('media')
-  ) {
-    return Megaphone;
-  }
-  if (
-    text.includes('logistik') ||
-    text.includes('gudang') ||
-    text.includes('kurir') ||
-    text.includes('operasional') ||
-    text.includes('pengiriman')
-  ) {
-    return Package;
-  }
-  if (
-    text.includes('it') ||
-    text.includes('web') ||
-    text.includes('developer') ||
-    text.includes('software') ||
-    text.includes('komputer')
-  ) {
-    return Laptop;
-  }
-  return Briefcase;
-};
 
 // Format tanggal natural Indonesia (bervariasi dan natural)
 export const formatJobDate = (dateStr?: string) => {
@@ -94,7 +38,6 @@ export const formatJobDate = (dateStr?: string) => {
 
 export const JobCard: React.FC<JobCardProps> = ({ job }) => {
   const [isSaved, setIsSaved] = useState<boolean>(false);
-  const RoleIcon = getJobRoleIcon(job.title, job.company);
 
   useEffect(() => {
     if (!job?.id) return;
@@ -139,14 +82,31 @@ export const JobCard: React.FC<JobCardProps> = ({ job }) => {
       className="bg-white dark:bg-zinc-900 border border-slate-200/90 dark:border-zinc-800 hover:border-[#c00015]/60 dark:hover:border-[#c00015]/60 rounded-xl sm:rounded-2xl p-3 sm:p-5 transition-all duration-200 shadow-2xs hover:shadow-xs flex flex-col justify-between h-full group cursor-pointer"
     >
       <div className="flex flex-col gap-2.5 sm:gap-3.5">
-        {/* Header: Ikon Profesi Pekerjaan + Posisi & Nama Perusahaan */}
+        {/* Header: Logo Perusahaan + Posisi & Nama Perusahaan */}
         <div className="flex items-start gap-2.5 sm:gap-3.5">
-          <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 border border-slate-200/80 dark:border-zinc-700 flex items-center justify-center shrink-0 shadow-2xs group-hover:bg-[#c00015] group-hover:text-white group-hover:border-[#c00015] transition-all duration-200">
-            <RoleIcon className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
+          <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-slate-50 dark:bg-zinc-800/80 border border-slate-200/90 dark:border-zinc-700/60 flex items-center justify-center shrink-0 shadow-2xs overflow-hidden p-1 group-hover:border-[#c00015]/40 transition-all duration-200">
+            {job.logo ? (
+              <img
+                src={job.logo}
+                alt={job.company}
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = 'none';
+                  const parent = e.currentTarget.parentElement;
+                  if (parent) {
+                    const fallback = parent.querySelector('.logo-fallback');
+                    if (fallback) fallback.classList.remove('hidden');
+                  }
+                }}
+              />
+            ) : null}
+            <div className={`logo-fallback ${job.logo ? 'hidden' : 'flex'} items-center justify-center w-full h-full text-slate-400 dark:text-zinc-500 group-hover:text-[#c00015] transition-colors`}>
+              <Building2 className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.8]" />
+            </div>
           </div>
 
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm sm:text-lg font-bold text-slate-900 dark:text-zinc-100 group-hover:text-[#c00015] transition-colors leading-snug line-clamp-2 sm:line-clamp-1">
+            <h3 className="text-sm sm:text-base md:text-lg font-bold text-slate-900 dark:text-zinc-100 group-hover:text-[#c00015] transition-colors leading-snug line-clamp-2 sm:line-clamp-1">
               {job.title}
             </h3>
             <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-zinc-400 mt-0.5 truncate">

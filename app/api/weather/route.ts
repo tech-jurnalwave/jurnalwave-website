@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(weatherData, {
       headers: {
-        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+        'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate',
       },
     })
   } catch (error: any) {

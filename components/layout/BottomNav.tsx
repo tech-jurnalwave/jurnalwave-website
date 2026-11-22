@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React from 'react';
 import Link from 'next/link';
@@ -25,7 +25,7 @@ export const BottomNav: React.FC = () => {
               ? 'text-primary font-bold'
               : 'text-on-surface-variant/75 hover:text-on-surface font-medium'
           }`}
-          title="Beranda Jurnal Wave"
+          title="Beranda JurnalWave"
         >
           <Home className={`w-5 h-5 ${pathname === '/' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
           <span className="text-[10px] mt-0.5 tracking-tight">Beranda</span>
@@ -58,7 +58,7 @@ export const BottomNav: React.FC = () => {
           </span>
         </Link>
 
-        {/* 4. Vibes Reels */}
+        {/* 4. Wave Reels */}
         <Link
           href="/reels"
           className={`flex flex-col items-center justify-center py-1 transition-all duration-200 active:scale-90 ${

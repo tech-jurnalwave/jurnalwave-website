@@ -16,9 +16,9 @@ export async function uploadToCloudinary(options: {
   const cloudName =
     process.env.CLOUDINARY_CLOUD_NAME ||
     process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ||
-    'kiq4ox5q';
-  const apiKey = process.env.CLOUDINARY_API_KEY || '531944874518224';
-  const apiSecret = process.env.CLOUDINARY_API_SECRET || '4KZlYWgaR_bkbNyIBjKIrTWihYE';
+    '';
+  const apiKey = process.env.CLOUDINARY_API_KEY || '';
+  const apiSecret = process.env.CLOUDINARY_API_SECRET || '';
 
   if (!cloudName || !apiKey || !apiSecret) {
     return {

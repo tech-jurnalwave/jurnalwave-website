@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -162,7 +162,7 @@ export function BeritaClient({ initialArticles = [] }: BeritaClientProps) {
             Belum ada artikel untuk kategori ini
           </h3>
           <p className="text-xs text-on-surface-variant max-w-sm mx-auto">
-            Artikel baru untuk rubrik ini akan segera diterbitkan oleh redaksi Jurnal Wave.
+            Artikel baru untuk rubrik ini akan segera diterbitkan oleh redaksi JurnalWave.
           </p>
           {sub && (
             <div className="pt-2">

@@ -1,4 +1,4 @@
-import Link from 'next/link'
+﻿import Link from 'next/link'
 import CategoryCards from '@/components/halo-jurnal/CategoryCards'
 import { Search, Calendar, MapPin, ArrowRight, ShieldCheck, Clock, CheckCircle2 } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
@@ -48,7 +48,7 @@ export default async function HaloJurnalLandingPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             className="w-full h-full object-cover object-center"
-            alt="Hallo Jurnal Wave Banner"
+            alt="Hallo JurnalWave Banner"
             src="/hero-banner.webp"
           />
         </div>
@@ -59,7 +59,7 @@ export default async function HaloJurnalLandingPage() {
           </h1>
 
           <p className="text-white/90 text-xs sm:text-base md:text-lg leading-relaxed mb-5 sm:mb-6 max-w-2xl mx-auto drop-shadow-sm font-medium">
-            Sampaikan aduan pelayanan publik Anda secara langsung dan transparan kepada redaksi Jurnal Wave.
+            Sampaikan aduan pelayanan publik Anda secara langsung dan transparan kepada redaksi JurnalWave.
           </p>
 
           {/* 2 Tombol Aksi (Photo 2) */}

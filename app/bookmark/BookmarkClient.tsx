@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { Bookmark, Trash2, ArrowRight, Briefcase, MapPin, Banknote } from 'lucide-react';
+import { Bookmark, Trash2, ArrowRight, Briefcase, MapPin, Banknote, Building2 } from 'lucide-react';
 import { Article, Job } from '@/types';
 import { formatIndoDate } from '@/lib/utils';
 import {
@@ -11,7 +11,6 @@ import {
   getSavedJobIds,
   toggleJobBookmark
 } from '@/lib/bookmarks';
-import { getJobRoleIcon } from '@/components/cards/JobCard';
 
 interface BookmarkClientProps {
   initialArticles?: Article[];
@@ -266,7 +265,6 @@ export function BookmarkClient({ initialArticles = [], initialJobs = [] }: Bookm
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                   {savedJobs.map(job => {
-                    const RoleIcon = getJobRoleIcon(job.title, job.company);
                     return (
                       <div
                         key={job.id}
@@ -274,8 +272,25 @@ export function BookmarkClient({ initialArticles = [], initialJobs = [] }: Bookm
                       >
                         <div className="flex items-start justify-between gap-3 mb-2">
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-zinc-800 flex items-center justify-center text-slate-700 dark:text-zinc-300 shrink-0 group-hover:scale-105 transition-transform">
-                              <RoleIcon className="w-5 h-5 text-[#c00015]" />
+                            <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-zinc-800/80 border border-slate-200/90 dark:border-zinc-700/60 flex items-center justify-center shrink-0 overflow-hidden p-1 shadow-2xs group-hover:scale-105 transition-transform">
+                              {job.logo ? (
+                                <img
+                                  src={job.logo}
+                                  alt={job.company}
+                                  className="w-full h-full object-contain"
+                                  onError={(e) => {
+                                    (e.currentTarget as HTMLElement).style.display = 'none';
+                                    const parent = e.currentTarget.parentElement;
+                                    if (parent) {
+                                      const fallback = parent.querySelector('.bookmark-logo-fallback');
+                                      if (fallback) fallback.classList.remove('hidden');
+                                    }
+                                  }}
+                                />
+                              ) : null}
+                              <div className={`bookmark-logo-fallback ${job.logo ? 'hidden' : 'flex'} items-center justify-center w-full h-full text-slate-400 dark:text-zinc-500`}>
+                                <Building2 className="w-5 h-5 text-[#c00015]" />
+                              </div>
                             </div>
                             <div className="flex flex-col min-w-0">
                               <Link href={`/loker/${job.id}`}>

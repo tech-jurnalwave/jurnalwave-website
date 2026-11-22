@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
@@ -18,7 +18,7 @@ export const ChatbotButton: React.FC = () => {
     {
       id: '1',
       sender: 'ai',
-      text: 'Halo! Selamat datang di Jurnal Wave 👋\nMau cari info apa hari ini? Tanyakan apa saja, saya siap membantu!'
+      text: 'Halo! Selamat datang di JurnalWave 👋\nMau cari info apa hari ini? Tanyakan apa saja, saya siap membantu!'
     }
   ]);
 
@@ -99,7 +99,7 @@ export const ChatbotButton: React.FC = () => {
       const data = await response.json();
       const aiReply =
         data.reply ||
-        'Terima kasih! Ada hal lain seputar Sukabumi atau Jurnal Wave yang ingin kamu tanyakan?';
+        'Terima kasih! Ada hal lain seputar Sukabumi atau JurnalWave yang ingin kamu tanyakan?';
 
       setMessages(prev => [
         ...prev,
@@ -129,7 +129,7 @@ export const ChatbotButton: React.FC = () => {
       {
         id: '1',
         sender: 'ai',
-        text: 'Halo! Selamat datang di Jurnal Wave 👋\nMau cari info apa hari ini? Tanyakan apa saja, saya siap membantu!'
+        text: 'Halo! Selamat datang di JurnalWave 👋\nMau cari info apa hari ini? Tanyakan apa saja, saya siap membantu!'
       }
     ]);
     setInputText('');
@@ -241,13 +241,13 @@ export const ChatbotButton: React.FC = () => {
                 <div className="flex items-center justify-center shrink-0">
                   <img
                     src="/chatbot-full-logo.webp"
-                    alt="Jurnal Wave"
+                    alt="JurnalWave"
                     className="h-9 sm:h-10 w-auto object-contain drop-shadow-sm"
                   />
                 </div>
                 <div className="flex flex-col">
                   <h3 className="font-button text-sm font-bold leading-tight flex items-center gap-1.5 text-slate-900 dark:text-white">
-                    Jurnal Wave
+                    JurnalWave
                   </h3>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20 animate-pulse shrink-0" />
@@ -385,14 +385,14 @@ export const ChatbotButton: React.FC = () => {
             }`}
         >
           <button
-            aria-label="Tanya Jurnal Wave"
+            aria-label="Tanya JurnalWave"
             onClick={() => setIsChatOpen(true)}
             className="relative transition-all duration-300 hover:scale-110 active:scale-95 group cursor-pointer focus:outline-none"
-            title="Tanya Jurnal Wave"
+            title="Tanya JurnalWave"
           >
             <img
               src="/chatbot-full-logo.webp"
-              alt="Jurnal Wave"
+              alt="JurnalWave"
               className="h-12 sm:h-14 w-auto object-contain drop-shadow-xl"
             />
           </button>

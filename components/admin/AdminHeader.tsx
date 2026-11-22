@@ -1,18 +1,18 @@
-'use client'
+﻿'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import {
   Menu,
   Search,
   Bell,
-  MessageSquare,
+  FileText,
   X,
   ExternalLink,
-  AlertCircle,
   CheckCircle2,
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { useAdminData } from '@/context/AdminDataContext'
 
 interface AdminHeaderProps {
   onToggleSidebar: () => void
@@ -21,147 +21,54 @@ interface AdminHeaderProps {
 export default function AdminHeader({ onToggleSidebar }: AdminHeaderProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const { reports, refreshReports } = useAdminData()
   const [showNotifications, setShowNotifications] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [unreadChatCount, setUnreadChatCount] = useState(0)
-  const [chatNotifications, setChatNotifications] = useState<any[]>([])
-  const [toastNotification, setToastNotification] = useState<{
-    id: string
-    nomor_tiket: string
-    laporan_id: string
-    message: string
-    sender_name: string
-  } | null>(null)
+  const [readReportIds, setReadReportIds] = useState<string[]>([])
 
-  // Track message IDs that have already triggered a live pop-up toast in this session
-  const seenMessageIds = useRef<Set<string>>(new Set())
-
-  // Web Audio synthetic pleasant chime for notification alert
-  const playNotificationChime = () => {
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
-      if (!AudioCtx) return
-      const ctx = new AudioCtx()
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      osc.type = 'sine'
-      osc.frequency.setValueAtTime(587.33, ctx.currentTime) // D5
-      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1) // A5
-      gain.gain.setValueAtTime(0.12, ctx.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35)
-      osc.start()
-      osc.stop(ctx.currentTime + 0.35)
-    } catch {}
-  }
-
-  // Scan localStorage for citizen chat messages
-  const checkChatNotifications = (isInitial = false) => {
-    if (typeof window === 'undefined') return
-    try {
-      const readChats: string[] = JSON.parse(
-        localStorage.getItem('halo_jurnal_read_chats') || '[]'
-      )
-      const readSet = new Set(readChats)
-
-      // Collect all chat keys
-      const incomingChats: any[] = []
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i)
-        if (key && key.startsWith('halo_jurnal_chat_')) {
-          try {
-            const raw = localStorage.getItem(key)
-            if (!raw) continue
-            const messages = JSON.parse(raw)
-            if (Array.isArray(messages)) {
-              // Find report info from ticket key
-              const ticketOrId = key.replace('halo_jurnal_chat_', '')
-              const reportId = ticketOrId
-              const reportTicket = ticketOrId
-
-              messages.forEach((msg: any) => {
-                const isWarga =
-                  msg.sender_id !== 'admin-redaksi' &&
-                  msg.profiles?.role !== 'admin' &&
-                  msg.role !== 'admin'
-                if (isWarga) {
-                  incomingChats.push({
-                    ...msg,
-                    laporan_id: reportId,
-                    nomor_tiket: reportTicket,
-                  })
-                }
-              })
-            }
-          } catch {}
-        }
-      }
-
-      // Deduplicate by message id
-      const uniqueMap = new Map<string, any>()
-      incomingChats.forEach((c) => {
-        if (!uniqueMap.has(c.id)) uniqueMap.set(c.id, c)
-      })
-      const sorted = Array.from(uniqueMap.values()).sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      )
-
-      // Unread count
-      const unreadList = sorted.filter((c) => !readSet.has(c.id))
-      setUnreadChatCount(unreadList.length)
-      setChatNotifications(sorted.slice(0, 5))
-
-      // Trigger pop-up toast if there is a new unread message not yet toasted
-      if (unreadList.length > 0) {
-        const newest = unreadList[0]
-        if (!seenMessageIds.current.has(newest.id)) {
-          seenMessageIds.current.add(newest.id)
-          if (!isInitial) {
-            setToastNotification({
-              id: newest.id,
-              nomor_tiket: newest.nomor_tiket,
-              laporan_id: newest.laporan_id,
-              message: newest.message,
-              sender_name: newest.profiles?.full_name || 'Warga Pelapor',
-            })
-            playNotificationChime()
-            document.title = `🔴 (${unreadList.length}) Pesan Baru - Hallo Jurnal Admin`
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Error scanning chat notifications:', err)
-    }
-  }
-
+  // Muat status laporan yang sudah ditandai dibaca
   useEffect(() => {
-    checkChatNotifications(true)
-    const handleStorage = () => checkChatNotifications(false)
-    window.addEventListener('storage', handleStorage)
-    window.addEventListener('focus', () => checkChatNotifications(false))
-    return () => {
-      window.removeEventListener('storage', handleStorage)
-      window.removeEventListener('focus', () => checkChatNotifications(false))
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = JSON.parse(localStorage.getItem('halo_jurnal_read_reports') || '[]')
+        if (Array.isArray(saved)) {
+          setReadReportIds(saved)
+        }
+      } catch {}
     }
   }, [])
 
-  // Auto dismiss toast after 8 seconds
-  useEffect(() => {
-    if (toastNotification) {
-      const timer = setTimeout(() => setToastNotification(null), 8000)
-      return () => clearTimeout(timer)
-    }
-  }, [toastNotification])
+  // Filter laporan baru berstatus 'diterima' (perlu ditinjau redaksi)
+  const pendingReports = useMemo(() => {
+    return [...reports]
+      .filter((r) => r.status === 'diterima')
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }, [reports])
 
-  const markAllAsRead = () => {
+  // Laporan baru yang belum dibaca
+  const unreadReports = useMemo(() => {
+    return pendingReports.filter((r) => !readReportIds.includes(r.id))
+  }, [pendingReports, readReportIds])
+
+  const unreadCount = unreadReports.length
+
+  const markAllReportsAsRead = () => {
     if (typeof window !== 'undefined') {
       try {
-        const allIds = chatNotifications.map((c) => c.id)
-        localStorage.setItem('halo_jurnal_read_chats', JSON.stringify(allIds))
-        setUnreadChatCount(0)
-        setToastNotification(null)
-        document.title = 'Hallo Jurnal Admin — Ruang Kerja Redaksi'
+        const allIds = pendingReports.map((r) => r.id)
+        const merged = Array.from(new Set([...readReportIds, ...allIds]))
+        localStorage.setItem('halo_jurnal_read_reports', JSON.stringify(merged))
+        setReadReportIds(merged)
+      } catch {}
+    }
+  }
+
+  const markReportAsRead = (id: string) => {
+    if (typeof window !== 'undefined') {
+      try {
+        const merged = Array.from(new Set([...readReportIds, id]))
+        localStorage.setItem('halo_jurnal_read_reports', JSON.stringify(merged))
+        setReadReportIds(merged)
       } catch {}
     }
   }
@@ -192,20 +99,17 @@ export default function AdminHeader({ onToggleSidebar }: AdminHeaderProps) {
     if (pathname === '/halo-jurnal/admin/chat') {
       return { section: 'Hallo Jurnal', page: 'Pusat Chat Warga', sectionHref: '/halo-jurnal/admin/chat' }
     }
-    if (pathname === '/halo-jurnal/admin/feed-publik') {
-      return { section: 'Hallo Jurnal', page: 'Moderasi Feed Publik', sectionHref: '/halo-jurnal/admin/feed-publik' }
-    }
     if (pathname === '/halo-jurnal/admin/berita') {
-      return { section: 'Jurnal Wave', page: 'Manajemen Konten', sectionHref: '/halo-jurnal/admin/berita' }
+      return { section: 'JurnalWave', page: 'Manajemen Konten', sectionHref: '/halo-jurnal/admin/berita' }
     }
     if (pathname === '/halo-jurnal/admin/reels') {
-      return { section: 'Jurnal Wave', page: 'Wave Reels', sectionHref: '/halo-jurnal/admin/reels' }
+      return { section: 'JurnalWave', page: 'Wave Reels', sectionHref: '/halo-jurnal/admin/reels' }
     }
     if (pathname === '/halo-jurnal/admin/loker') {
-      return { section: 'Jurnal Wave', page: 'Lowongan Kerja', sectionHref: '/halo-jurnal/admin/loker' }
+      return { section: 'JurnalWave', page: 'Lowongan Kerja', sectionHref: '/halo-jurnal/admin/loker' }
     }
     if (pathname === '/halo-jurnal/admin/kategori') {
-      return { section: 'Jurnal Wave', page: 'Kategori & Headline', sectionHref: '/halo-jurnal/admin/kategori' }
+      return { section: 'JurnalWave', page: 'Kategori & Headline', sectionHref: '/halo-jurnal/admin/kategori' }
     }
     if (pathname === '/halo-jurnal/admin/pengguna') {
       return { section: 'Sistem', page: 'Kelola Pengguna', sectionHref: '/halo-jurnal/admin/pengguna' }
@@ -217,54 +121,6 @@ export default function AdminHeader({ onToggleSidebar }: AdminHeaderProps) {
 
   return (
     <>
-      {/* Toast Alert Melayang Real-Time Saat Ada Pesan Baru Masuk */}
-      {toastNotification && (
-        <div className="fixed top-20 right-4 sm:right-6 left-4 sm:left-auto z-[100] max-w-sm sm:w-full bg-white rounded-xl shadow-2xl border-l-4 border-l-[#c00015] border border-slate-200/90 p-4 space-y-2 animate-in fade-in slide-in-from-top-4 duration-300">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-[#c00015] shrink-0" />
-              <span className="text-xs font-heading font-bold text-slate-900">
-                Pesan Baru dari Warga!
-              </span>
-            </div>
-            <button
-              onClick={() => setToastNotification(null)}
-              className="text-slate-400 hover:text-slate-700 p-0.5 rounded transition cursor-pointer"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <div className="space-y-1 text-xs">
-            <div className="flex items-center gap-1.5 text-slate-500 text-[11px]">
-              <span className="font-semibold text-slate-700">{toastNotification.sender_name}</span>
-              <span>•</span>
-              <span className="font-mono text-slate-700 font-semibold">
-                {toastNotification.nomor_tiket}
-              </span>
-            </div>
-            <p className="text-slate-800 font-medium line-clamp-2 bg-slate-50 p-2 rounded border border-slate-100 text-[11px] leading-relaxed">
-              &ldquo;{toastNotification.message}&rdquo;
-            </p>
-          </div>
-
-          <div className="flex items-center justify-between pt-1">
-            <span className="text-[10px] text-slate-400">Baru saja masuk</span>
-            <Link
-              href={`/halo-jurnal/admin/laporan/${toastNotification.laporan_id}`}
-              onClick={() => {
-                setToastNotification(null)
-                markAllAsRead()
-              }}
-              className="inline-flex items-center gap-1 text-xs font-bold text-[#c00015] hover:underline"
-            >
-              <span>Buka &amp; Balas Chat</span>
-              <ExternalLink className="w-3 h-3" />
-            </Link>
-          </div>
-        </div>
-      )}
-
       <header className="sticky top-0 z-30 h-16 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between gap-4">
         {/* Kiri: Toggle Sidebar Mobile & Breadcrumb Dinamis */}
         <div className="flex items-center gap-3">
@@ -309,17 +165,18 @@ export default function AdminHeader({ onToggleSidebar }: AdminHeaderProps) {
 
         {/* Kanan: Notifikasi */}
         <div className="flex items-center gap-2.5">
-          {/* Lonceng Notifikasi Terpadu (Live Chat & Status) */}
+          {/* Lonceng Notifikasi Aduan Warga Baru */}
           <div className="relative">
             <button
               onClick={() => setShowNotifications(!showNotifications)}
               className="relative p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/80 transition cursor-pointer"
-              aria-label="Notifikasi"
+              aria-label="Notifikasi Aduan Warga"
+              title="Notifikasi Aduan Warga Baru"
             >
               <Bell className="w-4 h-4" />
-              {unreadChatCount > 0 && (
-                <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-[#c00015] text-white shadow-2xs animate-pulse">
-                  {unreadChatCount}
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-[#c00015] text-white shadow-2xs">
+                  {unreadCount}
                 </span>
               )}
             </button>
@@ -335,61 +192,72 @@ export default function AdminHeader({ onToggleSidebar }: AdminHeaderProps) {
                   <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs font-bold text-slate-900">
-                        Notifikasi Masuk
+                        Notifikasi
                       </span>
-                      {unreadChatCount > 0 && (
+                      {unreadCount > 0 && (
                         <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-red-500/10 text-[#c00015]">
-                          {unreadChatCount} chat baru
+                          {unreadCount} Baru
                         </span>
                       )}
                     </div>
-                    <button
-                      onClick={markAllAsRead}
-                      className="text-[11px] text-[#c00015] hover:underline font-semibold cursor-pointer"
-                    >
-                      Tandai dibaca
-                    </button>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={markAllReportsAsRead}
+                        className="text-[11px] text-[#c00015] hover:underline font-semibold cursor-pointer"
+                      >
+                        Tandai dibaca
+                      </button>
+                    )}
                   </div>
 
                   <div className="space-y-1.5 max-h-72 overflow-y-auto pr-0.5">
-                    {/* Pesan Chat Warga Terbaru */}
-                    {chatNotifications.map((c) => (
-                      <Link
-                        key={c.id}
-                        href={`/halo-jurnal/admin/laporan/${c.laporan_id}`}
-                        onClick={() => {
-                          setShowNotifications(false)
-                          markAllAsRead()
-                        }}
-                        className="block p-2.5 rounded-lg bg-red-50/50 hover:bg-red-50 border border-red-100 hover:border-red-200 transition space-y-1"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                            <MessageSquare className="w-3 h-3 text-[#c00015]" />
-                            <span>{c.profiles?.full_name || 'Warga Pelapor'}</span>
-                          </span>
-                          <span className="font-mono text-[10px] text-slate-500">
-                            {c.nomor_tiket}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-700 line-clamp-1">
-                          &ldquo;{c.message}&rdquo;
-                        </p>
-                        <span className="text-[10px] text-slate-400 block text-right">
-                          {new Date(c.created_at).toLocaleTimeString('id-ID', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
-                      </Link>
-                    ))}
+                    {/* Daftar Notifikasi Laporan Terbaru */}
+                    {pendingReports.slice(0, 5).map((r) => {
+                      const isUnread = !readReportIds.includes(r.id)
+                      return (
+                        <Link
+                          key={r.id}
+                          href={`/halo-jurnal/admin/laporan/${r.id}`}
+                          onClick={() => {
+                            setShowNotifications(false)
+                            markReportAsRead(r.id)
+                          }}
+                          className={`block p-2.5 rounded-lg border transition space-y-1 ${
+                            isUnread
+                              ? 'bg-red-50/40 hover:bg-red-50 border-red-100'
+                              : 'bg-white hover:bg-slate-50 border-slate-100'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5 truncate">
+                              <FileText className="w-3.5 h-3.5 text-[#c00015] shrink-0" />
+                              <span className="truncate">{r.judul}</span>
+                            </span>
+                            <span className="font-mono text-[10px] text-slate-500 shrink-0 ml-1">
+                              {r.nomor_tiket}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
+                            <span className="truncate">
+                              Pelapor: <strong className="text-slate-700">{r.nama_pelapor || r.pelaporName || 'Warga'}</strong>
+                            </span>
+                            <span className="text-[10px] text-slate-400 shrink-0 ml-1">
+                              {new Date(r.created_at).toLocaleDateString('id-ID', {
+                                day: 'numeric',
+                                month: 'short',
+                              })}
+                            </span>
+                          </div>
+                        </Link>
+                      )
+                    })}
 
-                    {/* Notifikasi Kosong jika belum ada */}
-                    {chatNotifications.length === 0 && (
+                    {/* Notifikasi Kosong jika tidak ada laporan baru */}
+                    {pendingReports.length === 0 && (
                       <div className="text-center py-6 text-slate-400 space-y-1">
                         <CheckCircle2 className="w-6 h-6 text-emerald-500 mx-auto" />
-                        <p className="text-xs font-semibold text-slate-700">Belum ada notifikasi baru</p>
-                        <p className="text-[10px] text-slate-400">Pemberitahuan laporan atau chat masuk akan tampil di sini.</p>
+                        <p className="text-xs font-semibold text-slate-700">Tidak ada notifikasi baru</p>
+                        <p className="text-[10px] text-slate-400">Pemberitahuan aktivitas sistem akan muncul di sini.</p>
                       </div>
                     )}
                   </div>
@@ -399,7 +267,7 @@ export default function AdminHeader({ onToggleSidebar }: AdminHeaderProps) {
                     onClick={() => setShowNotifications(false)}
                     className="block text-center w-full py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-800 transition"
                   >
-                    Buka Semua Laporan Warga &rarr;
+                    Lihat Semua Laporan &rarr;
                   </Link>
                 </div>
               </>

@@ -1,7 +1,7 @@
-import { Article } from '@/types';
+﻿import { Article } from '@/types';
 
 /**
- * Data Berita Awal Jurnal Wave (Sample Dummy & Fallback).
+ * Data Berita Awal JurnalWave (Sample Dummy & Fallback).
  * Melengkapi pratinjau redaksi di dashboard dan admin berita.
  */
 export const INITIAL_ARTICLES: Article[] = [
@@ -18,7 +18,7 @@ export const INITIAL_ARTICLES: Article[] = [
     imageCaption: 'Dokumentasi pantauan udara proyek seksi 3 Tol Bocimi',
     createdAt: '2026-11-17T08:00:00.000Z',
     publishedDate: '17 Nov 2026',
-    author: 'Redaksi Jurnal Wave',
+    author: 'Redaksi JurnalWave',
     reporter: 'Rangga Maulana',
     redaktur: 'Dimas Prasetyo',
     readTime: '3 min read',
@@ -39,7 +39,7 @@ export const INITIAL_ARTICLES: Article[] = [
     imageCaption: 'Keindahan alam Curug Cimarinjung di Geopark Ciletuh',
     createdAt: '2026-11-16T08:00:00.000Z',
     publishedDate: '16 Nov 2026',
-    author: 'Redaksi Jurnal Wave',
+    author: 'Redaksi JurnalWave',
     reporter: 'Siti Nurhaliza',
     redaktur: 'Dimas Prasetyo',
     readTime: '4 min read',
@@ -60,7 +60,7 @@ export const INITIAL_ARTICLES: Article[] = [
     imageCaption: 'Diskusi komunitas kreatif di salah satu creative hub Sukabumi',
     createdAt: '2026-11-15T08:00:00.000Z',
     publishedDate: '15 Nov 2026',
-    author: 'Redaksi Jurnal Wave',
+    author: 'Redaksi JurnalWave',
     reporter: 'Nadia Safitri',
     redaktur: 'Siti Nurhaliza',
     readTime: '3 min read',
@@ -81,7 +81,7 @@ export const INITIAL_ARTICLES: Article[] = [
     imageCaption: 'Sensasi melintasi jembatan gantung di tengah kabut pegunungan',
     createdAt: '2026-11-14T08:00:00.000Z',
     publishedDate: '14 Nov 2026',
-    author: 'Redaksi Jurnal Wave',
+    author: 'Redaksi JurnalWave',
     reporter: 'Rangga Maulana',
     redaktur: 'Dimas Prasetyo',
     readTime: '4 min read',

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React from 'react'
 import Link from 'next/link'
@@ -11,7 +11,7 @@ export default function HaloJurnalFooter() {
           {/* Sisi Kiri: Copyright */}
           <div className="text-left">
             <p className="text-xs text-slate-400 dark:text-slate-500">
-              &copy; {new Date().getFullYear()} Jurnal Wave. All rights reserved.
+              &copy; {new Date().getFullYear()} JurnalWave. All rights reserved.
             </p>
           </div>
 

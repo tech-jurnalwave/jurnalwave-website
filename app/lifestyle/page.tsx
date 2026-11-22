@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import { LifestyleClient } from './LifestyleClient';
 import { fetchArticles } from '@/lib/wordpress';
 
@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   title: 'Lifestyle & Culture',
   description: 'Gaya hidup, tempat nongkrong, kuliner, dan tren terbaru pemuda Sukabumi.',
   openGraph: {
-    title: 'Lifestyle & Culture Sukabumi | Jurnal Wave',
+    title: 'Lifestyle & Culture Sukabumi | JurnalWave',
     description: 'Gaya hidup, tempat nongkrong, kuliner, dan tren terbaru pemuda Sukabumi.',
   },
 };

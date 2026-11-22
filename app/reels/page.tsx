@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import { ReelsSection } from '@/components/cards/ReelsSection';
 import { fetchReels } from '@/lib/reels';
 
@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   title: 'Wave Reels Sukabumi',
   description: 'Kumpulan video pendek seputar kuliner, wisata, dan sudut menarik Kota & Kabupaten Sukabumi.',
   openGraph: {
-    title: 'Wave Reels Sukabumi | Jurnal Wave',
+    title: 'Wave Reels Sukabumi | JurnalWave',
     description: 'Kumpulan video pendek seputar kuliner, wisata, dan sudut menarik Kota & Kabupaten Sukabumi.',
   },
 };
@@ -32,7 +32,6 @@ export default async function ReelsPage() {
       <ReelsSection
         reels={initialReels}
         hideHeader={true}
-        showCategoryFilter={false}
         isGalleryPage={true}
       />
     </div>

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React from 'react';
 import Link from 'next/link';
@@ -27,7 +27,7 @@ export function NewsArticleSidebar({
   // 2. Video Populer (Dikosongkan dari mock dummy)
   const popularVideos: any[] = [];
 
-  // 3. Tag / Topik Populer Jurnal Wave
+  // 3. Tag / Topik Populer JurnalWave
   const popularTags = [
     '#KulinerSukabumi',
     '#WisataSukabumi',

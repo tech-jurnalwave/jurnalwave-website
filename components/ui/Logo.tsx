@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React from 'react';
 
@@ -20,8 +20,8 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', className = '', imgClas
     <div className={`flex items-center shrink-0 ${className}`}>
       {/* eslint-disable-next-img-element */}
       <img
-        src="/logo_jurnal_wave.webp"
-        alt="Jurnal Wave"
+        src="/logo-jurnal-wave.webp"
+        alt="JurnalWave"
         className={`${heights[size]} w-auto object-contain transition-transform duration-200 group-hover:scale-102 shrink-0 ${imgClassName}`}
       />
     </div>

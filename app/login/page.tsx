@@ -8,7 +8,7 @@ import {
   EyeOff,
   Loader2,
   Lock,
-  User,
+  Phone,
   ArrowLeft,
   AlertCircle,
   CheckCircle2,
@@ -30,14 +30,14 @@ function LoginPageContent() {
   )
   const [successMsg] = useState(
     searchParams.get('success') === 'confirmed'
-      ? 'Email berhasil dikonfirmasi! Silakan masuk dengan akun Anda.'
+      ? 'Nomor berhasil dikonfirmasi! Silakan masuk dengan akun Anda.'
       : ''
   )
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!identifier || !password) {
-      setError('Mohon masukkan email atau nomor WhatsApp dan kata sandi Anda.')
+      setError('Mohon masukkan nomor HP dan kata sandi Anda.')
       return
     }
     if (password.length < 6) {
@@ -51,7 +51,13 @@ function LoginPageContent() {
       const res = await fetch('/api/auth/citizen', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'login', email: identifier.trim(), password }),
+        body: JSON.stringify({
+          action: 'login',
+          phone: identifier.trim(),
+          email: identifier.trim(),
+          identifier: identifier.trim(),
+          password,
+        }),
       })
 
       const data = await res.json()
@@ -188,13 +194,13 @@ function LoginPageContent() {
               <div className="flex flex-col">
                 <span className="font-semibold text-primary">Akun Uji Coba Warga:</span>
                 <span className="text-secondary text-[11px] font-mono mt-0.5">
-                  warga@jurnalwave.com / warga123
+                  081234567890 / warga123
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => {
-                  setIdentifier('warga@jurnalwave.com')
+                  setIdentifier('081234567890')
                   setPassword('warga123')
                 }}
                 className="px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary font-semibold text-[11px] transition-colors cursor-pointer shrink-0"
@@ -205,18 +211,19 @@ function LoginPageContent() {
 
             {/* Form Login Manual */}
             <form onSubmit={handleLogin} className="space-y-4">
-              {/* Identitas (Email atau No HP) */}
+              {/* Nomor Handphone */}
               <div>
                 <label className="block text-xs font-semibold text-on-surface mb-1.5">
-                  Email atau Nomor HP
+                  Nomor HP
                 </label>
                 <div className="relative">
-                  <User className="w-4 h-4 text-secondary absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <Phone className="w-4 h-4 text-secondary absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
-                    type="text"
+                    type="tel"
+                    inputMode="numeric"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="Masukkan email atau nomor HP"
+                    placeholder="Masukkan nomor HP"
                     required
                     className="w-full pl-10 pr-3.5 py-2.5 text-xs sm:text-sm bg-surface-container-low border border-outline-variant/80 rounded-lg text-on-surface placeholder:text-secondary focus:bg-surface-container-lowest focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                   />

@@ -12,8 +12,8 @@ export async function generateMetadata({ params }: TopikPageProps): Promise<Meta
     decoded = decodeURIComponent(tag).replace(/[-_]+/g, ' ');
   } catch {}
 
-  const title = `Topik: ${decoded.toUpperCase()} - Jurnal Wave`;
-  const description = `Kumpulan liputan berita terkini dan terhangat seputar topik ${decoded} di Jurnal Wave.`;
+  const title = `Topik: ${decoded.toUpperCase()} - JurnalWave`;
+  const description = `Kumpulan liputan berita terkini dan terhangat seputar topik ${decoded} di JurnalWave.`;
 
   return {
     title,

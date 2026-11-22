@@ -154,7 +154,7 @@ export function TopikClient({ tag }: TopikClientProps) {
                 Belum ada liputan untuk topik ini
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-                Liputan berita seputar topik ini akan segera diperbarui oleh tim redaksi Jurnal Wave.
+                Liputan berita seputar topik ini akan segera diperbarui oleh tim redaksi JurnalWave.
               </p>
               <div className="pt-2">
                 <Link

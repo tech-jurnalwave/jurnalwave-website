@@ -50,14 +50,14 @@ export async function generateMetadata({ params }: ArticleDetailPageProps): Prom
 
   if (!article) {
     return {
-      title: 'Artikel Tidak Ditemukan - Jurnal Wave',
+      title: 'Artikel Tidak Ditemukan - JurnalWave',
       description: 'Artikel yang Anda cari tidak ditemukan atau telah dihapus.',
     };
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://jurnalwave.com';
   const articleUrl = `${siteUrl}/artikel/${article.slug || article.id}`;
-  const title = `${article.title} - Jurnal Wave`;
+  const title = `${article.title} - JurnalWave`;
   const cleanContentText = (article.excerpt || article.content || '')
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/\r?\n+/g, ' ')
@@ -66,10 +66,10 @@ export async function generateMetadata({ params }: ArticleDetailPageProps): Prom
   const safeImageUrl =
     article.imageUrl && !article.imageUrl.startsWith('data:')
       ? (article.imageUrl.startsWith('/') ? `${siteUrl}${article.imageUrl}` : article.imageUrl)
-      : `${siteUrl}/logo_jurnal_wave.webp`;
+      : `${siteUrl}/logo-jurnal-wave.webp`;
   const keywordsList = Array.isArray(article.tags) && article.tags.length > 0
     ? article.tags.map((t: string) => t.replace(/^#+/, ''))
-    : ['Jurnal Wave', 'Sukabumi', article.category, 'Berita Terkini'];
+    : ['JurnalWave', 'Sukabumi', article.category, 'Berita Terkini'];
 
   return {
     title,
@@ -166,7 +166,7 @@ export default async function ArticleDetailPage({ params }: ArticleDetailPagePro
   const safeJsonLdImage =
     article.imageUrl && !article.imageUrl.startsWith('data:')
       ? (article.imageUrl.startsWith('/') ? `${siteUrl}${article.imageUrl}` : article.imageUrl)
-      : `${siteUrl}/logo_jurnal_wave.webp`;
+      : `${siteUrl}/logo-jurnal-wave.webp`;
 
   const cleanJsonLdDescription = (article.excerpt || article.content || article.title)
     .replace(/<!--[\s\S]*?-->/g, '')
@@ -190,7 +190,7 @@ export default async function ArticleDetailPage({ params }: ArticleDetailPagePro
     author: [
       {
         '@type': 'Person',
-        name: article.reporter || article.author || 'Redaksi Jurnal Wave',
+        name: article.reporter || article.author || 'Redaksi JurnalWave',
       },
     ],
     editor: {
@@ -199,17 +199,17 @@ export default async function ArticleDetailPage({ params }: ArticleDetailPagePro
     },
     publisher: {
       '@type': 'Organization',
-      name: 'Jurnal Wave',
+      name: 'JurnalWave',
       url: siteUrl,
       logo: {
         '@type': 'ImageObject',
-        url: `${siteUrl}/logo_jurnal_wave.webp`,
+        url: `${siteUrl}/logo-jurnal-wave.webp`,
       },
     },
     articleSection: article.categoryLabel || article.category,
     keywords: Array.isArray(article.tags) && article.tags.length > 0
       ? article.tags.map((t: string) => t.replace(/^#+/, '')).join(', ')
-      : `${article.category}, Berita Sukabumi, Jurnal Wave`,
+      : `${article.category}, Berita Sukabumi, JurnalWave`,
   };
 
   return (

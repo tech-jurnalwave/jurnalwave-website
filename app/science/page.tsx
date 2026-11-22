@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import { CategoryTemplate } from '@/components/layout/CategoryTemplate';
 import { fetchArticles } from '@/lib/wordpress';
 
@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   title: 'Science',
   description: 'Riset ilmiah, sains populer, dan perkembangan teknologi seputar Sukabumi.',
   openGraph: {
-    title: 'Science | Jurnal Wave',
+    title: 'Science | JurnalWave',
     description: 'Riset ilmiah, sains populer, dan perkembangan teknologi seputar Sukabumi.',
   },
 };

@@ -17,6 +17,7 @@ import {
   type SukabumiWeatherData,
   type WeatherHourPoint
 } from '@/lib/weather';
+import { syncWeatherToGlobal, onWeatherSync } from '@/lib/weatherSync';
 
 interface CuacaViewProps {
   initialData: SukabumiWeatherData;
@@ -37,6 +38,39 @@ export function CuacaView({ initialData }: CuacaViewProps) {
   // Modal "Pilih area" Google Cuaca
   const [isAreaModalOpen, setIsAreaModalOpen] = useState<boolean>(false);
   const [isDetectingGps, setIsDetectingGps] = useState<boolean>(false);
+
+  // Sinkronisasi data cuaca halaman ini ke seluruh sistem (Header & Global)
+  useEffect(() => {
+    if (data && typeof data.temperature === 'number') {
+      syncWeatherToGlobal({
+        temperature: data.temperature,
+        condition: data.condition,
+        iconName: data.iconName,
+        locationName: data.locationName,
+        locationId: data.locationId,
+      });
+    }
+  }, [data]);
+
+  // Sinkronisasi dua arah: selalu selaras jika ada broadcast pembaruan
+  useEffect(() => {
+    const unsubscribe = onWeatherSync((weather) => {
+      if (weather && typeof weather.temperature === 'number') {
+        setData((prev) => {
+          if (prev.temperature === weather.temperature && prev.condition === weather.condition) {
+            return prev;
+          }
+          return {
+            ...prev,
+            temperature: weather.temperature,
+            condition: weather.condition || prev.condition,
+            iconName: (weather.iconName as any) || prev.iconName,
+          };
+        });
+      }
+    });
+    return unsubscribe;
+  }, []);
 
   // Ganti lokasi via modal
   const handleSelectLocation = async (locId: string) => {
