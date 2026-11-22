@@ -1,4 +1,4 @@
-﻿import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -6,10 +6,10 @@ import { fetchArticleById } from '@/lib/wordpress';
 import os from 'os';
 import { EdgeTTS } from '@andresaya/edge-tts';
 
-// Suara resmi presenter berita JurnalWave: Microsoft Azure/Edge Neural Voice (Pria Dewasa, Tegas, Berwibawa)
+// Suara resmi presenter berita JurnalWave: Microsoft Azure/Edge Neural Voice (Pria Tegas & Semangat Berita)
 const VOICE_NAME = 'id-ID-ArdiNeural';
-const VOICE_RATE = '-2%'; // Tempo stabil dan tenang khas pembaca berita TV
-const VOICE_PITCH = '+0Hz';
+const VOICE_RATE = '+6%'; // Tempo tegas, bersemangat dan lugas khas pembaca berita
+const VOICE_PITCH = '+0Hz'; // Nada alami pria tegas
 
 // Direktori cache audio yang aman baik di lokal maupun di serverless cloud Vercel (/tmp)
 const CACHE_DIR = process.env.VERCEL
@@ -145,7 +145,7 @@ export async function GET(request: Request) {
     let cacheKey = '';
 
     if (id) {
-      cacheKey = `article-${id}-ardi-v3`;
+      cacheKey = `article-${id}-ardi-v4`;
       if (!rawText) {
         const article = await fetchArticleById(id);
         if (article) {
@@ -164,7 +164,7 @@ export async function GET(request: Request) {
 
     if (!cacheKey) {
       const hash = crypto.createHash('md5').update(clean).digest('hex').slice(0, 12);
-      cacheKey = `text-${hash}-ardi-v3`;
+      cacheKey = `text-${hash}-ardi-v4`;
     }
 
     ensureCacheDir();
@@ -221,7 +221,7 @@ export async function POST(request: Request) {
 
     let cacheKey = '';
     if (id) {
-      cacheKey = `article-${id}-ardi-v3`;
+      cacheKey = `article-${id}-ardi-v4`;
       if (!rawText) {
         const article = await fetchArticleById(id);
         if (article) {
@@ -240,7 +240,7 @@ export async function POST(request: Request) {
 
     if (!cacheKey) {
       const hash = crypto.createHash('md5').update(clean).digest('hex').slice(0, 12);
-      cacheKey = `text-${hash}-ardi-v3`;
+      cacheKey = `text-${hash}-ardi-v4`;
     }
 
     ensureCacheDir();

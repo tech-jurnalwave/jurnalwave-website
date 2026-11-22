@@ -266,12 +266,15 @@ export function ArticleDetailView({
       }) || null;
     }
 
-    // Tidak ada voice pria? Tetap pakai voice Indonesia apapun yang ada — audio harus selalu berfungsi
+    // Tidak ada voice pria? Cari yang bukan wanita, atau atur pitch maskulin
     if (!selectedVoice && idVoices.length > 0) {
-      selectedVoice = idVoices[0];
+      selectedVoice = idVoices.find(v => !knownFemaleNames.some(f => v.name.toLowerCase().includes(f))) || idVoices[0];
     }
 
     if (selectedVoice) utterance.voice = selectedVoice;
+    // Set pitch maskulin rendah dan tempo semangat tegas khas berita
+    utterance.pitch = 0.82;
+    utterance.rate = playbackRate * 1.05;
 
     utterance.onstart = () => {
       usingSpeechSynthRef.current = true;
@@ -292,7 +295,7 @@ export function ArticleDetailView({
     window.speechSynthesis.speak(utterance);
   };
 
-  // Eksekusi pemutaran audio (Server TTS + Fallback Web Speech API)
+  // Eksekusi pemutaran audio (Server TTS Resmi ArdiNeural + Buffer Wait)
   const handlePlayToggle = async () => {
     // Jika sedang pakai Web Speech, toggle pause/resume
     if (usingSpeechSynthRef.current) {
@@ -334,14 +337,35 @@ export function ArticleDetailView({
       setIsPlaying(true);
       setIsLoadingAudio(false);
     } catch (err: any) {
-      console.warn('Audio play error:', err);
-      // Jangan trigger fallback jika hanya AbortError (misal klik berulang)
-      if (err?.name !== 'AbortError') {
+      console.warn('Audio play notice (buffering):', err);
+      if (err?.name === 'AbortError') {
         setIsLoadingAudio(false);
-        playWithWebSpeech();
-      } else {
-        setIsLoadingAudio(false);
+        return;
       }
+      // Tunggu hingga buffer audio pria siap dari server, jangan langsung fallback ke suara cewek!
+      const onCanPlay = () => {
+        audio.removeEventListener('canplay', onCanPlay);
+        audio.removeEventListener('error', onAudioErr);
+        audio.play().then(() => {
+          setIsPlaying(true);
+          setIsLoadingAudio(false);
+        }).catch((e) => {
+          console.warn('Play retry failed:', e);
+          setIsLoadingAudio(false);
+          setIsPlaying(false);
+        });
+      };
+
+      const onAudioErr = () => {
+        audio.removeEventListener('canplay', onCanPlay);
+        audio.removeEventListener('error', onAudioErr);
+        setIsLoadingAudio(false);
+        setIsPlaying(false);
+      };
+
+      audio.addEventListener('canplay', onCanPlay, { once: true });
+      audio.addEventListener('error', onAudioErr, { once: true });
+      audio.load();
     }
   };
 
