@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
@@ -15,6 +15,7 @@ import {
   Upload,
   Image as ImageIcon,
   Loader2,
+  Play,
 } from 'lucide-react'
 import { Reel } from '@/types'
 import AdminToast from '@/components/admin/AdminToast'
@@ -340,6 +341,49 @@ export default function AdminReelsPage() {
     }
   }
 
+  const renderPlatformBadge = (reel: Reel) => {
+    const url = (reel.socialUrl || reel.videoUrl || '').toLowerCase()
+    const platform = reel.platform?.toLowerCase()
+
+    if (platform === 'tiktok' || url.includes('tiktok.com')) {
+      return (
+        <span
+          title="Buka di TikTok"
+          className="w-6 h-6 rounded-md bg-black border border-white/20 flex items-center justify-center text-white shadow-xs"
+        >
+          <svg className="w-3 h-3 fill-current text-white" viewBox="0 0 24 24">
+            <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.82.56-1.36 1.52-1.36 2.53-.02 1.07.47 2.12 1.31 2.78.85.67 2.02.9 3.06.6 1.16-.31 2.11-1.25 2.45-2.39.12-.48.15-.99.14-1.49.01-4.87.01-9.74.01-14.61z" />
+          </svg>
+        </span>
+      )
+    }
+
+    if (platform === 'youtube' || url.includes('youtube.com') || url.includes('youtu.be')) {
+      return (
+        <span
+          title="Buka di YouTube Shorts"
+          className="w-6 h-6 rounded-md bg-[#FF0000] border border-white/20 flex items-center justify-center text-white shadow-xs"
+        >
+          <svg className="w-3.5 h-3.5 fill-current text-white" viewBox="0 0 24 24">
+            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+          </svg>
+        </span>
+      )
+    }
+
+    // Default: Instagram gradient
+    return (
+      <span
+        title="Buka di Instagram Reels"
+        className="w-6 h-6 rounded-md bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] border border-white/20 flex items-center justify-center text-white shadow-xs"
+      >
+        <svg className="w-3.5 h-3.5 fill-current text-white" viewBox="0 0 24 24">
+          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
+        </svg>
+      </span>
+    )
+  }
+
   // Filtered Reels berdasarkan pencarian judul
   const filteredReels = useMemo(() => {
     if (!searchQuery.trim()) return reels
@@ -448,7 +492,7 @@ export default function AdminReelsPage() {
             return (
               <div
                 key={reel.id}
-                className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col group transition hover:shadow-md"
+                className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col group transition hover:shadow-md"
               >
                 {/* Kartu Vertikal 9:16 */}
                 <div className="relative aspect-[9/16] bg-zinc-950 overflow-hidden">
@@ -462,11 +506,26 @@ export default function AdminReelsPage() {
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
                   />
 
-                  {/* Dark Gradient Overlay & Judul Simpel (Sesuai 100% dengan Beranda) */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/25 to-transparent flex flex-col justify-end p-2.5 sm:p-3 pointer-events-none">
-                    <p className="text-white font-heading font-semibold text-[11px] sm:text-xs leading-snug line-clamp-2 drop-shadow-xs">
-                      {reel.title}
-                    </p>
+                  {/* Dark Gradient Overlay & Konten Visual (Selaras 100% dengan Beranda) */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/25 to-black/40 flex flex-col justify-between p-2 sm:p-2.5">
+                    {/* Top Row: Badge Medsos di pojok kanan */}
+                    <div className="flex items-center justify-end w-full z-10">
+                      {renderPlatformBadge(reel)}
+                    </div>
+
+                    {/* Center Play Button */}
+                    <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                      <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md border border-white/40 flex items-center justify-center text-white shadow-lg group-hover:scale-110 group-hover:bg-[#c00015] group-hover:border-[#c00015] transition-all duration-300">
+                        <Play className="w-4 h-4 fill-white text-white ml-0.5" />
+                      </div>
+                    </div>
+
+                    {/* Bottom Content: Title */}
+                    <div className="flex flex-col gap-0.5 z-10 pointer-events-none">
+                      <p className="text-white font-bold text-[11px] sm:text-xs leading-snug line-clamp-2 drop-shadow-sm group-hover:text-red-200 transition-colors">
+                        {reel.title}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
