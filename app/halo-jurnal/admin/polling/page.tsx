@@ -58,7 +58,7 @@ export default function AdminPollingPage() {
       const res = await fetch('/api/polls?all=true', { cache: 'no-store' })
       if (res.ok) {
         const json = await res.json()
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+        if (json.success && Array.isArray(json.data)) {
           setPolls(json.data)
           if (typeof window !== 'undefined') {
             try {
@@ -66,6 +66,8 @@ export default function AdminPollingPage() {
               const active = json.data.find((p: Poll) => Boolean(p.isActive))
               if (active) {
                 localStorage.setItem('jurnal_wave_active_poll', JSON.stringify(active))
+              } else {
+                localStorage.removeItem('jurnal_wave_active_poll')
               }
             } catch {}
           }

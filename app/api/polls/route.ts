@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import {
   getActivePoll,
@@ -90,6 +91,10 @@ export async function POST(req: NextRequest) {
           },
         },
       });
+
+      try {
+        revalidatePath('/');
+      } catch {}
 
       return NextResponse.json({
         success: true,
@@ -190,6 +195,10 @@ export async function PUT(req: NextRequest) {
         },
       });
 
+      try {
+        revalidatePath('/');
+      } catch {}
+
       return NextResponse.json({
         success: true,
         message: 'Polling berhasil diperbarui.',
@@ -250,6 +259,10 @@ export async function DELETE(req: NextRequest) {
       console.warn('Prisma delete poll notice (using fallback store):', (dbErr as any)?.message || dbErr);
       deletePollFromFallback(id);
     }
+
+    try {
+      revalidatePath('/');
+    } catch {}
 
     return NextResponse.json({
       success: true,

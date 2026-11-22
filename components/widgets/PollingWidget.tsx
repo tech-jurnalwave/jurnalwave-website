@@ -100,15 +100,6 @@ export const PollingWidget: React.FC<PollingWidgetProps> = ({ poll: initialPoll 
         if (res.ok) {
           const json = await res.json();
           if (json.success && isMounted && json.data && json.data.isActive) {
-            // Jika di localStorage sudah ada polling kustom buatan admin (misal Persib vs Melbourne),
-            // jangan timpa dengan dummy lama (big match)
-            if (
-              hasLocal &&
-              (json.data.id === 'default-active-poll' || json.data.id === 'poll-big-match-archive')
-            ) {
-              return;
-            }
-
             setPoll(json.data);
             const counts: Record<string, number> = {};
             json.data.options.forEach((opt: any) => {
@@ -124,6 +115,15 @@ export const PollingWidget: React.FC<PollingWidgetProps> = ({ poll: initialPoll 
                 setHasVoted(true);
               }
             } catch {}
+          } else if (json.success && isMounted && (!json.data || !json.data.isActive)) {
+            // Jika tidak ada polling aktif dari server, reset tampilan polling beranda
+            setPoll(null);
+            setVoteCounts({});
+            setSelectedOption('');
+            setHasVoted(false);
+            try {
+              localStorage.removeItem('jurnal_wave_active_poll');
+            } catch {}
           }
         }
       } catch (err) {
@@ -135,7 +135,13 @@ export const PollingWidget: React.FC<PollingWidgetProps> = ({ poll: initialPoll 
 
     // Event listener untuk sinkronisasi realtime antar tab atau saat admin switch polling aktif
     const handleSyncEvent = () => {
-      syncFromLocalStorage();
+      const hasLocalActive = syncFromLocalStorage();
+      if (!hasLocalActive) {
+        setPoll(null);
+        setVoteCounts({});
+        setSelectedOption('');
+        setHasVoted(false);
+      }
     };
 
     window.addEventListener('poll-updated', handleSyncEvent);
