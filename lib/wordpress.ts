@@ -1,4 +1,4 @@
-﻿import { Article, ArticleCategory } from '@/types';
+import { Article, ArticleCategory } from '@/types';
 import { formatIndoDateTime } from '@/lib/utils';
 import { INITIAL_ARTICLES } from '@/lib/initialArticles';
 

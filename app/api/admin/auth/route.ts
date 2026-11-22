@@ -75,12 +75,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 1. Verifikasi kredensial master redaksi
-    const isMasterAdmin =
-      (email === 'admin@jurnalwave.com' || email === 'redaksi@jurnalwave.com') &&
-      (password === 'admin123' || password === 'jurnalwave2026')
+    // 1. Proteksi Khusus Superadmin: Wajib via Google SSO di /superadmin-auth
+    if (email === 'tech.jurnalwave@gmail.com') {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Akun Superadmin wajib masuk melalui Portal Superadmin khusus (/superadmin-auth) menggunakan Akun Google.',
+        },
+        { status: 403 }
+      )
+    }
 
-    // 2. Verifikasi dari daftar anggota yang dikelola Superadmin
+    // 2. Verifikasi dari daftar anggota staf yang dikelola Superadmin
     let matchedMember: any = null
     if (Array.isArray(teamMembers)) {
       matchedMember = teamMembers.find(
@@ -88,8 +94,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    let isValid = isMasterAdmin
-    if (!isValid && matchedMember) {
+    let isValid = false
+    if (matchedMember) {
       if (matchedMember.status === 'cuti') {
         return NextResponse.json(
           {
@@ -99,22 +105,19 @@ export async function POST(request: NextRequest) {
           { status: 403 }
         )
       }
-      const expectedPassword = matchedMember.password || 'admin123'
-      isValid =
-        password === expectedPassword ||
-        password === 'admin123' ||
-        password === 'jurnalwave2026'
+      isValid = matchedMember.password ? password === matchedMember.password : false
     }
 
-    // 3. Verifikasi staf admin di tabel PostgreSQL (Neon DB) fallback
+    // 3. Verifikasi staf admin di tabel database jika belum cocok
     let dbUser: any = null
     if (!isValid) {
       try {
         dbUser = await prisma.adminUser.findUnique({
           where: { email },
         })
-        if (dbUser) {
-          isValid = password === 'admin123' || password === 'jurnalwave2026'
+        if (dbUser && dbUser.passwordHash) {
+          const { comparePassword } = await import('@/lib/auth')
+          isValid = await comparePassword(password, dbUser.passwordHash)
         }
       } catch (err) {
         console.warn('Neon DB admin lookup notice:', err)
@@ -150,16 +153,13 @@ export async function POST(request: NextRequest) {
     resetAttempts(rateLimitKey)
 
     const userPayload = {
-      id: matchedMember?.id || dbUser?.id || 'admin-master',
-      name: matchedMember?.name || dbUser?.name || 'Super Admin',
+      id: matchedMember?.id || dbUser?.id || 'staff-member',
+      name: matchedMember?.name || dbUser?.name || 'Staf Redaksi',
       email: matchedMember?.email || dbUser?.email || email,
-      role: matchedMember?.role || dbUser?.role || 'superadmin',
-      isSuperadmin: matchedMember?.isSuperadmin ?? isMasterAdmin,
+      role: matchedMember?.role || dbUser?.role || 'staf',
+      isSuperadmin: false,
       permissions:
-        matchedMember?.permissions ||
-        (isMasterAdmin
-          ? ['dashboard', 'berita', 'reels', 'loker', 'polling', 'laporan', 'pengguna']
-          : ['dashboard']),
+        matchedMember?.permissions || ['dashboard'],
     }
 
     // Buat JWT Token aman berumur 7 hari

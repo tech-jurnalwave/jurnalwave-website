@@ -47,14 +47,6 @@ export async function verifyAdminToken(token: string): Promise<AdminJWTPayload |
 export async function getAdminSession(request: NextRequest): Promise<AdminJWTPayload | null> {
   const token = request.cookies.get(ADMIN_COOKIE_NAME)?.value
   if (!token) {
-    if (process.env.NODE_ENV !== 'production') {
-      return {
-        id: 'dev-admin',
-        email: 'admin@jurnalwave.com',
-        name: 'Super Admin',
-        role: 'superadmin',
-      }
-    }
     return null
   }
   return await verifyAdminToken(token)

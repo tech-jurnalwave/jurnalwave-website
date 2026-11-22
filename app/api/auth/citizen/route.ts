@@ -563,37 +563,6 @@ export async function POST(request: NextRequest) {
 
       const cleanPhone = identifier.replace(/[^0-9]/g, '')
 
-      // Akun Pengujian Resmi Hallo Jurnal (Langsung aktif & respons instan)
-      const isDemoCitizen =
-        (identifier === 'warga@jurnalwave.com' ||
-          identifier === 'ahmad.fauzi@gmail.com' ||
-          identifier === '081234567890' ||
-          cleanPhone === '081234567890') &&
-        (password === 'warga123' || password === 'sukabumi2026' || password === 'admin123')
-
-      if (isDemoCitizen) {
-        return NextResponse.json({
-          success: true,
-          message: 'Login berhasil!',
-          user: {
-            id: 'cit-001',
-            email: 'warga@jurnalwave.com',
-            full_name: 'Ahmad Fauzi',
-            name: 'Ahmad Fauzi',
-            phone: '081234567890',
-            phone_number: '081234567890',
-            kecamatan: 'Cisaat',
-            kelurahan: 'Cisaat',
-            rt_rw: '003/007',
-            detail_alamat: 'Jl. Raya Cisaat No. 45',
-            alamat_domisili: 'Jl. Raya Cisaat No. 45, RT/RW 003/007, Kel. Cisaat, Kec. Cisaat',
-            domisili: 'Jl. Raya Cisaat No. 45, RT/RW 003/007, Kel. Cisaat, Kec. Cisaat',
-            role: 'warga',
-            is_verified: true,
-          },
-        })
-      }
-
       const user = await prisma.citizenUser.findFirst({
         where: {
           OR: [

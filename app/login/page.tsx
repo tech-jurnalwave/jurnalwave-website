@@ -189,26 +189,6 @@ function LoginPageContent() {
               </div>
             )}
 
-            {/* Hint & Akun Uji Coba Cepat */}
-            <div className="mb-4 p-3 bg-primary/5 border border-primary/20 rounded-xl text-xs flex items-center justify-between gap-3">
-              <div className="flex flex-col">
-                <span className="font-semibold text-primary">Akun Uji Coba Warga:</span>
-                <span className="text-secondary text-[11px] font-mono mt-0.5">
-                  081234567890 / warga123
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setIdentifier('081234567890')
-                  setPassword('warga123')
-                }}
-                className="px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary font-semibold text-[11px] transition-colors cursor-pointer shrink-0"
-              >
-                Gunakan Akun
-              </button>
-            </div>
-
             {/* Form Login Manual */}
             <form onSubmit={handleLogin} className="space-y-4">
               {/* Nomor Handphone */}
