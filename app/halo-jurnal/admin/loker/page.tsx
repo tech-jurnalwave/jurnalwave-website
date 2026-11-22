@@ -64,14 +64,17 @@ export default function AdminLokerPage() {
   useEffect(() => {
     const loadJobs = async () => {
       try {
-        const res = await fetch('/api/jobs?all=true')
+        const res = await fetch('/api/jobs?all=true', { cache: 'no-store' })
         if (res.ok) {
           const json = await res.json()
-          if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          if (json.success && Array.isArray(json.data)) {
             setJobs(json.data)
-            try {
-              localStorage.setItem('jurnal_wave_jobs', JSON.stringify(json.data))
-            } catch {}
+            if (typeof window !== 'undefined') {
+              try {
+                const activeOnly = json.data.filter((j: Job) => j.isActive !== false)
+                localStorage.setItem('jurnal_wave_jobs', JSON.stringify(activeOnly))
+              } catch {}
+            }
             return
           }
         }
@@ -84,16 +87,12 @@ export default function AdminLokerPage() {
           const saved = localStorage.getItem('jurnal_wave_jobs')
           if (saved) {
             const parsed = JSON.parse(saved)
-            if (Array.isArray(parsed) && parsed.length > 0) {
+            if (Array.isArray(parsed)) {
               setJobs(parsed)
               return
             }
           }
-          localStorage.setItem('jurnal_wave_jobs', JSON.stringify(DUMMY_JOBS))
-          setJobs(DUMMY_JOBS)
-        } catch {
-          setJobs(DUMMY_JOBS)
-        }
+        } catch {}
       }
     }
     loadJobs()
@@ -103,7 +102,8 @@ export default function AdminLokerPage() {
     setJobs(updated)
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem('jurnal_wave_jobs', JSON.stringify(updated))
+        const activeOnly = updated.filter((j) => j.isActive !== false)
+        localStorage.setItem('jurnal_wave_jobs', JSON.stringify(activeOnly))
         window.dispatchEvent(new Event('storage'))
       } catch {}
     }

@@ -3,7 +3,8 @@ import { LokerClient } from './LokerClient';
 import { fetchArticles } from '@/lib/wordpress';
 import { fetchJobs } from '@/lib/jobs';
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export const metadata: Metadata = {
   title: 'Lowongan Kerja Sukabumi',

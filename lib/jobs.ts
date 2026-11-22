@@ -69,6 +69,7 @@ export async function fetchJobs(): Promise<Job[]> {
       serverJobsCache = { data: mapped, timestamp: now };
       return mapped;
     }
+    serverJobsCache = { data: [], timestamp: now };
     return [];
   } catch (err) {
     console.warn('Fetch jobs notice (using fallback):', (err as any)?.message || err);

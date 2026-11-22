@@ -8,12 +8,14 @@ import { DUMMY_JOBS } from '@/data/dummyJobs';
 
 export function LokerClient({
   articles = [],
-  initialJobs = DUMMY_JOBS,
+  initialJobs = [],
 }: {
   articles?: Article[];
   initialJobs?: Job[];
 }) {
-  const [jobs, setJobs] = useState<Job[]>(initialJobs && initialJobs.length > 0 ? initialJobs : DUMMY_JOBS);
+  const [jobs, setJobs] = useState<Job[]>(() =>
+    (initialJobs || []).filter((j) => j.isActive !== false)
+  );
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeType, setActiveType] = useState<string>('Semua');
 
@@ -23,16 +25,17 @@ export function LokerClient({
   React.useEffect(() => {
     // Sinkronisasi data lowongan kerja dari database server
     const fetchLatestJobs = () => {
-      fetch('/api/jobs')
+      fetch('/api/jobs', { cache: 'no-store' })
         .then((res) => {
           if (!res.ok) throw new Error('Failed to fetch jobs');
           return res.json();
         })
         .then((json) => {
-          if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-            setJobs(json.data);
+          if (json.success && Array.isArray(json.data)) {
+            const activeOnly = json.data.filter((j: Job) => j.isActive !== false);
+            setJobs(activeOnly);
             try {
-              localStorage.setItem('jurnal_wave_jobs', JSON.stringify(json.data));
+              localStorage.setItem('jurnal_wave_jobs', JSON.stringify(activeOnly));
             } catch {}
           }
         })
@@ -42,8 +45,8 @@ export function LokerClient({
             const saved = localStorage.getItem('jurnal_wave_jobs');
             if (saved) {
               const parsed = JSON.parse(saved);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                setJobs(parsed);
+              if (Array.isArray(parsed)) {
+                setJobs(parsed.filter((j: Job) => j.isActive !== false));
               }
             }
           } catch {}

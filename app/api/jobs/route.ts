@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { clearServerJobsCache, formatJobFromDb, fetchJobs } from '@/lib/jobs';
+import { deleteFromCloudinary } from '@/lib/cloudinary';
 import { DUMMY_JOBS } from '@/data/dummyJobs';
 
 export const dynamic = 'force-dynamic';
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
       { success: true, count: jobs.length, data: jobs },
       {
         headers: {
-          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+          'Cache-Control': 'no-store, must-revalidate',
         },
       }
     );
@@ -222,6 +223,12 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
+    // Ambil data lowongan sebelum dihapus untuk mendeteksi logo Cloudinary
+    const jobToDelete = await prisma.job.findUnique({
+      where: { id },
+      select: { description: true },
+    });
+
     await prisma.job.delete({
       where: { id },
     });
@@ -229,6 +236,18 @@ export async function DELETE(req: NextRequest) {
     clearServerJobsCache();
     revalidatePath('/loker');
     revalidatePath('/halo-jurnal/admin/loker');
+
+    // Bersihkan logo dari Cloudinary di background jika ada
+    let logoUrl: string | undefined = undefined;
+    if (jobToDelete?.description) {
+      const logoMatch = jobToDelete.description.match(/<!--\s*LOGO:(.*?)\s*-->/);
+      if (logoMatch) logoUrl = logoMatch[1].trim();
+    }
+    if (logoUrl && logoUrl.includes('res.cloudinary.com')) {
+      deleteFromCloudinary(logoUrl).catch((err) =>
+        console.warn('Gagal menghapus logo loker dari Cloudinary:', err)
+      );
+    }
 
     return NextResponse.json({
       success: true,
