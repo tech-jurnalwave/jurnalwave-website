@@ -20,7 +20,9 @@ export default function SuperadminAuthPage() {
   const [scriptLoaded, setScriptLoaded] = useState(false)
   const googleBtnRef = useRef<HTMLDivElement>(null)
 
-  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''
+  const googleClientId =
+    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
+    '573053429535-1fcs78pqomcj441j1c7898dhhttdqs28.apps.googleusercontent.com'
 
   // Handler respon dari Google Identity Services
   const handleCredentialResponse = async (response: any) => {
