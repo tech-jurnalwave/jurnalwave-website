@@ -30,8 +30,8 @@ export function LifestyleClient({ initialArticles = [] }: { initialArticles?: Ar
           const saved = localStorage.getItem('jurnal_wave_articles');
           if (saved) {
             const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              setArticles(prev => deduplicate([...parsed, ...prev]));
+            if (Array.isArray(parsed)) {
+              setArticles(parsed.filter((a: Article) => !a.status || a.status === 'published'));
             }
           }
         } catch {}
@@ -43,8 +43,12 @@ export function LifestyleClient({ initialArticles = [] }: { initialArticles?: Ar
     fetch('/api/articles')
       .then(res => res.json())
       .then(json => {
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          setArticles(prev => deduplicate([...json.data, ...prev]));
+        if (json.success && Array.isArray(json.data)) {
+          const published = json.data.filter((a: Article) => !a.status || a.status === 'published');
+          setArticles(published);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('jurnal_wave_articles', JSON.stringify(published));
+          }
         }
       })
       .catch(() => {});
@@ -58,6 +62,7 @@ export function LifestyleClient({ initialArticles = [] }: { initialArticles?: Ar
   }, []);
 
   const allLifestyleArticles = articles.filter(a => {
+    if (a.status && a.status !== 'published') return false;
     const cat = (a.category || '').toLowerCase().trim();
     const catLabel = (a.categoryLabel || '').toUpperCase().trim();
     const subCat = (a.subCategory || '').toLowerCase().trim();

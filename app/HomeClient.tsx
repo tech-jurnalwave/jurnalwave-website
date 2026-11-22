@@ -17,7 +17,9 @@ interface HomeClientProps {
 }
 
 export function HomeClient({ initialArticles = [], initialReels = [] }: HomeClientProps) {
-  const [articles, setArticles] = useState<Article[]>(initialArticles);
+  const [articles, setArticles] = useState<Article[]>(() =>
+    initialArticles.filter(a => !a.status || a.status === 'published')
+  );
   const [loading, setLoading] = useState(initialArticles.length === 0);
 
   useEffect(() => {
@@ -27,8 +29,9 @@ export function HomeClient({ initialArticles = [], initialReels = [] }: HomeClie
           const saved = localStorage.getItem('jurnal_wave_articles');
           if (saved) {
             const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              setArticles(parsed);
+            if (Array.isArray(parsed)) {
+              const published = parsed.filter((a: Article) => !a.status || a.status === 'published');
+              setArticles(published);
               setLoading(false);
             }
           }
@@ -36,7 +39,7 @@ export function HomeClient({ initialArticles = [], initialReels = [] }: HomeClie
       }
     };
 
-    // FIX BUG #2: Fungsi fetch terbaru dari server (bukan hanya baca localStorage)
+    // Fungsi fetch terbaru dari server (bukan hanya baca localStorage)
     const fetchLatestArticles = () => {
       fetch('/api/articles', { cache: 'no-store' })
         .then((res) => {
@@ -44,10 +47,11 @@ export function HomeClient({ initialArticles = [], initialReels = [] }: HomeClie
           return res.json();
         })
         .then((json) => {
-          if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-            setArticles(json.data);
+          if (json.success && Array.isArray(json.data)) {
+            const published = json.data.filter((a: Article) => !a.status || a.status === 'published');
+            setArticles(published);
             if (typeof window !== 'undefined') {
-              localStorage.setItem('jurnal_wave_articles', JSON.stringify(json.data));
+              localStorage.setItem('jurnal_wave_articles', JSON.stringify(published));
             }
             setLoading(false);
           }
@@ -62,9 +66,10 @@ export function HomeClient({ initialArticles = [], initialReels = [] }: HomeClie
 
     // 1. Instant render dari initialArticles (SSR data)
     if (initialArticles && initialArticles.length > 0) {
-      setArticles(initialArticles);
+      const published = initialArticles.filter((a: Article) => !a.status || a.status === 'published');
+      setArticles(published);
       try {
-        localStorage.setItem('jurnal_wave_articles', JSON.stringify(initialArticles));
+        localStorage.setItem('jurnal_wave_articles', JSON.stringify(published));
       } catch {}
       setLoading(false);
     } else {
@@ -75,7 +80,6 @@ export function HomeClient({ initialArticles = [], initialReels = [] }: HomeClie
     // 2. Background sync: selalu ambil data terbaru dari server
     fetchLatestArticles();
 
-    // FIX BUG #11: focus handler sekarang re-fetch dari API, bukan hanya baca localStorage
     const handleFocus = () => fetchLatestArticles();
     const handleStorage = () => syncFromLocalStorage();
 
@@ -88,53 +92,56 @@ export function HomeClient({ initialArticles = [], initialReels = [] }: HomeClie
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Filter ketat hanya artikel yang berstatus published untuk publik
+  const publishedArticles = articles.filter(a => !a.status || a.status === 'published');
+
   // Tampilkan seluruh artikel terkini sesuai urutan publikasi redaksi
-  const displayArticles = articles;
+  const displayArticles = publishedArticles;
 
   // Filter 7 Kategori Resmi JurnalWave (Murni dari Database & Sistem)
-  const beritaArticles = articles.filter(
+  const beritaArticles = publishedArticles.filter(
     a =>
       a.category === 'berita' ||
       (a.categoryLabel && a.categoryLabel.toUpperCase() === 'BERITA') ||
       ((a.subCategory || '').toUpperCase() === 'BERITA')
   );
 
-  const kulinerArticles = articles.filter(
+  const kulinerArticles = publishedArticles.filter(
     a =>
       a.category === 'kuliner' ||
       (a.categoryLabel && a.categoryLabel.toUpperCase() === 'KULINER') ||
       ((a.subCategory || '').toUpperCase() === 'KULINER')
   );
 
-  const wisataArticles = articles.filter(
+  const wisataArticles = publishedArticles.filter(
     a =>
       a.category === 'wisata' ||
       ['WISATA', 'TRAVELING'].includes((a.categoryLabel || '').toUpperCase()) ||
       ((a.subCategory || '').toUpperCase() === 'WISATA')
   );
 
-  const hiburanArticles = articles.filter(
+  const hiburanArticles = publishedArticles.filter(
     a =>
       a.category === 'hiburan' ||
       ['HIBURAN', 'ENTERTAINMENT'].includes((a.categoryLabel || '').toUpperCase()) ||
       ((a.subCategory || '').toUpperCase() === 'HIBURAN')
   );
 
-  const techArticles = articles.filter(
+  const techArticles = publishedArticles.filter(
     a =>
       a.category === 'tech' ||
       ['TECH', 'TECH & GAME', 'TEKNOLOGI', 'GAME'].includes((a.categoryLabel || '').toUpperCase()) ||
       ((a.subCategory || '').toUpperCase() === 'TECH')
   );
 
-  const sportArticles = articles.filter(
+  const sportArticles = publishedArticles.filter(
     a =>
       a.category === 'sport' ||
       ['SPORT', 'OLAHRAGA'].includes((a.categoryLabel || '').toUpperCase()) ||
       ((a.subCategory || '').toUpperCase() === 'SPORT')
   );
 
-  const inspirasiArticles = articles.filter(
+  const inspirasiArticles = publishedArticles.filter(
     a =>
       a.category === 'inspirasi' ||
       a.category === 'lifestyle' ||
@@ -146,7 +153,7 @@ export function HomeClient({ initialArticles = [], initialReels = [] }: HomeClie
     <div className="flex-grow w-full max-w-6xl mx-auto px-4 sm:px-6 md:px-8 pt-4 sm:pt-6 pb-12 flex flex-col relative">
       <main className="w-full flex flex-col gap-7 sm:gap-9">
         {/* 1. Hero / Headline Carousel */}
-        <HeroCarousel articles={articles} />
+        <HeroCarousel articles={publishedArticles} />
 
         {/* 2. Section: Artikel Terkini */}
         <div className="w-full flex flex-col">

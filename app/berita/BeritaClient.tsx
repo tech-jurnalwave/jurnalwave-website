@@ -28,8 +28,8 @@ export function BeritaClient({ initialArticles = [] }: BeritaClientProps) {
           const saved = localStorage.getItem('jurnal_wave_articles');
           if (saved) {
             const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              setArticles(parsed);
+            if (Array.isArray(parsed)) {
+              setArticles(parsed.filter((a: Article) => !a.status || a.status === 'published'));
             }
           }
         } catch {}
@@ -40,19 +40,17 @@ export function BeritaClient({ initialArticles = [] }: BeritaClientProps) {
     syncArticles();
 
     // 2. Background Sync: Ambil SEMUA artikel dari server (bukan filter berita saja)
-    // FIX BUG #3: Jangan filter ?category=berita — halaman ini tampilkan semua kategori
-    // FIX BUG #8: Gunakan key cache terpisah agar tidak polute data halaman home
     fetch('/api/articles', { cache: 'no-store' })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP error ${res.status}`);
         return res.json();
       })
       .then((json) => {
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          setArticles(json.data);
+        if (json.success && Array.isArray(json.data)) {
+          const published = json.data.filter((a: Article) => !a.status || a.status === 'published');
+          setArticles(published);
           if (typeof window !== 'undefined') {
-            // Simpan ke key yang sama agar halaman home juga ikut terupdate
-            localStorage.setItem('jurnal_wave_articles', JSON.stringify(json.data));
+            localStorage.setItem('jurnal_wave_articles', JSON.stringify(published));
           }
         }
       })
@@ -70,6 +68,7 @@ export function BeritaClient({ initialArticles = [] }: BeritaClientProps) {
 
   // Filter berdasarkan sub-kategori
   const filteredArticles = articles.filter(article => {
+    if (article.status && article.status !== 'published') return false;
     if (!sub || sub === 'semua') return true;
     if (sub === 'kampus') {
       return (

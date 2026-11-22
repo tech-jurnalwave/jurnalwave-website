@@ -138,7 +138,7 @@ export const CategoryTemplate: React.FC<CategoryTemplateProps> = ({
 
   useEffect(() => {
     const syncArticles = () => {
-      let combined: Article[] = [...initialArticles];
+      let combined: Article[] = initialArticles.filter(a => !a.status || a.status === 'published');
 
       // 1. Sync dari localStorage
       if (typeof window !== 'undefined') {
@@ -146,9 +146,10 @@ export const CategoryTemplate: React.FC<CategoryTemplateProps> = ({
           const saved = localStorage.getItem('jurnal_wave_articles');
           if (saved) {
             const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              const matchedFromLocal = parsed.filter(matchCategory);
-              combined = deduplicate([...matchedFromLocal, ...combined]);
+            if (Array.isArray(parsed)) {
+              const published = parsed.filter((a: Article) => !a.status || a.status === 'published');
+              const matchedFromLocal = published.filter(matchCategory);
+              combined = matchedFromLocal;
             }
           }
         } catch {}
@@ -162,12 +163,16 @@ export const CategoryTemplate: React.FC<CategoryTemplateProps> = ({
     // 2. Fetch fresh dari API articles
     const fetchLatest = async () => {
       try {
-        const res = await fetch('/api/articles');
+        const res = await fetch('/api/articles', { cache: 'no-store' });
         if (res.ok) {
           const json = await res.json();
-          if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-            const matched = json.data.filter(matchCategory);
-            setArticles(prev => deduplicate([...matched, ...prev]));
+          if (json.success && Array.isArray(json.data)) {
+            const published = json.data.filter((a: Article) => !a.status || a.status === 'published');
+            const matched = published.filter(matchCategory);
+            setArticles(matched);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('jurnal_wave_articles', JSON.stringify(published));
+            }
           }
         }
       } catch {}

@@ -649,7 +649,8 @@ export default function AdminBeritaPage() {
     setArticles(cleanUpdated)
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem('jurnal_wave_articles', JSON.stringify(cleanUpdated))
+        const publishedOnly = cleanUpdated.filter((a) => !a.status || a.status === 'published')
+        localStorage.setItem('jurnal_wave_articles', JSON.stringify(publishedOnly))
         // Kirim event realtime agar seluruh tab/halaman publik langsung tersinkron
         window.dispatchEvent(new Event('storage'))
       } catch (err) {

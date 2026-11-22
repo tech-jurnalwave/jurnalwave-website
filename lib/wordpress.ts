@@ -201,6 +201,7 @@ export async function fetchArticlesFromWordPress(): Promise<Article[]> {
         serverArticlesCache = { data: mapped, timestamp: now };
         return mapped;
       }
+      serverArticlesCache = { data: [], timestamp: now };
       return [];
     } catch (err) {
       lastDbFailureTimestamp = Date.now();
@@ -216,7 +217,7 @@ export async function fetchArticlesFromWordPress(): Promise<Article[]> {
       const res = await fetch('/api/articles');
       if (res.ok) {
         const json = await res.json();
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+        if (json.success && Array.isArray(json.data)) {
           const sanitized = json.data.map((item: Article) => {
             const { category, categoryLabel } = normalizeArticleCategory(item.category, item.categoryLabel);
             return {

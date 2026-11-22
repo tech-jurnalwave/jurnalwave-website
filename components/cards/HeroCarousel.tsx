@@ -13,8 +13,8 @@ interface HeroCarouselProps {
 }
 
 export const HeroCarousel: React.FC<HeroCarouselProps> = ({ articles }) => {
-  const heroes = articles.filter(a => a.isHero);
-  const heroArticles = heroes.length > 0 ? heroes.slice(0, 10) : articles.slice(0, 5);
+  const heroes = articles.filter(a => a.isHero && (!a.status || a.status === 'published'));
+  const heroArticles = heroes.slice(0, 10);
   const [currentSlide, setCurrentSlide] = useState<number>(0);
   const [savedArticles, setSavedArticles] = useState<Record<string, boolean>>({});
 
