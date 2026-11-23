@@ -49,8 +49,11 @@ export const HeaderNav: React.FC = () => {
     { value: 'inspirasi', label: 'Inspirasi' },
   ]);
 
+  const categoriesRef = useRef(categories);
+  categoriesRef.current = categories;
+
   useEffect(() => {
-    // 1. Muat seketika dari cache lokal (0ms)
+    // 1. Muat seketika dari cache lokal (0ms) tanpa memicu re-render jika data identik
     const syncCategories = () => {
       try {
         const saved =
@@ -59,7 +62,9 @@ export const HeaderNav: React.FC = () => {
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setCategories(parsed);
+            if (JSON.stringify(parsed) !== JSON.stringify(categoriesRef.current)) {
+              setCategories(parsed);
+            }
           }
         }
       } catch {}
@@ -67,16 +72,18 @@ export const HeaderNav: React.FC = () => {
 
     syncCategories();
 
-    // 2. Sinkronkan dengan data server global
+    // 2. Sinkronkan dengan data server global secara tenang di background
     fetch('/api/categories', { cache: 'no-store' })
       .then((res) => res.json())
       .then((json) => {
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          setCategories(json.data);
-          try {
-            localStorage.setItem('jurnal_wave_custom_categories', JSON.stringify(json.data));
-            localStorage.setItem('jurnal_wave_categories', JSON.stringify(json.data));
-          } catch {}
+          if (JSON.stringify(json.data) !== JSON.stringify(categoriesRef.current)) {
+            setCategories(json.data);
+            try {
+              localStorage.setItem('jurnal_wave_custom_categories', JSON.stringify(json.data));
+              localStorage.setItem('jurnal_wave_categories', JSON.stringify(json.data));
+            } catch {}
+          }
         }
       })
       .catch(() => {});

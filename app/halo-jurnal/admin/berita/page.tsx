@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import {
   Newspaper,
@@ -189,10 +189,37 @@ function formatPublishDateTime(createdAt?: string, publishedDate?: string) {
   return '26 Okt 2024 | 00:00 WIB';
 }
 
+// Helper deduplikasi artikel berdasarkan slug, title, atau id
+const dedupeArticles = (items: Article[]): Article[] => {
+  const seen = new Set<string>()
+  return items.filter((item) => {
+    const key = (item.slug || item.title || item.id || '').toLowerCase().trim()
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
 export default function AdminBeritaPage() {
   const confirmDialog = useConfirm()
-  const [articles, setArticles] = useState<Article[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [articles, setArticles] = useState<Article[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('jurnal_wave_articles')
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return dedupeArticles(parsed)
+          }
+        }
+      } catch {}
+    }
+    return []
+  })
+  const [isLoading, setIsLoading] = useState(() => articles.length === 0)
+  const articlesRef = useRef(articles)
+  articlesRef.current = articles
+
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('semua')
   const [selectedFilter, setSelectedFilter] = useState<string>('semua')
@@ -248,29 +275,33 @@ export default function AdminBeritaPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isTagsManuallyEdited, setIsTagsManuallyEdited] = useState(false)
 
-  // Manajemen Kategori Berita
-  const [categoriesList, setCategoriesList] = useState<CategoryItem[]>(DEFAULT_CATEGORIES)
+  // Manajemen Kategori Berita (Instan 0ms dari Cache)
+  const [categoriesList, setCategoriesList] = useState<CategoryItem[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved =
+          localStorage.getItem('jurnal_wave_custom_categories') ||
+          localStorage.getItem('jurnal_wave_categories')
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed
+          }
+        }
+      } catch {}
+    }
+    return DEFAULT_CATEGORIES
+  })
+  const categoriesListRef = useRef(categoriesList)
+  categoriesListRef.current = categoriesList
+
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
   const [newCatLabel, setNewCatLabel] = useState('')
   const [editingCatValue, setEditingCatValue] = useState<string | null>(null)
   const [editingCatLabel, setEditingCatLabel] = useState<string>('')
 
-  // Inisialisasi & Sinkronisasi Kategori Resmi JurnalWave dari Server & Cache
+  // Inisialisasi & Sinkronisasi Kategori Resmi JurnalWave dari Server & Cache secara tenang
   useEffect(() => {
-    // 1. Muat seketika dari cache lokal (0ms)
-    try {
-      const savedCats =
-        localStorage.getItem('jurnal_wave_custom_categories') ||
-        localStorage.getItem('jurnal_wave_categories')
-      if (savedCats) {
-        const parsed = JSON.parse(savedCats)
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setCategoriesList(parsed)
-        }
-      }
-    } catch {}
-
-    // 2. Sinkronkan dengan data server global (/api/categories)
     fetch('/api/categories', { cache: 'no-store' })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP error ${res.status}`)
@@ -278,11 +309,13 @@ export default function AdminBeritaPage() {
       })
       .then((json) => {
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          setCategoriesList(json.data)
-          try {
-            localStorage.setItem('jurnal_wave_custom_categories', JSON.stringify(json.data))
-            localStorage.setItem('jurnal_wave_categories', JSON.stringify(json.data))
-          } catch {}
+          if (JSON.stringify(json.data) !== JSON.stringify(categoriesListRef.current)) {
+            setCategoriesList(json.data)
+            try {
+              localStorage.setItem('jurnal_wave_custom_categories', JSON.stringify(json.data))
+              localStorage.setItem('jurnal_wave_categories', JSON.stringify(json.data))
+            } catch {}
+          }
         }
       })
       .catch((err) => {
@@ -299,6 +332,10 @@ export default function AdminBeritaPage() {
       window.dispatchEvent(new Event('storage'))
     } catch {}
 
+    if (successNotice) {
+      showToast(successNotice, 'success')
+    }
+
     // 2. Simpan secara permanen ke server agar berlaku ke semua akun admin dan publik
     try {
       const res = await fetch('/api/categories', {
@@ -310,20 +347,17 @@ export default function AdminBeritaPage() {
         throw new Error(`HTTP error ${res.status}`)
       }
       const json = await res.json()
-      if (json.success) {
-        if (successNotice) {
-          showToast(successNotice, 'success')
-        }
-      } else {
-        if (successNotice) {
-          showToast(successNotice, 'success')
+      if (json.success && Array.isArray(json.data)) {
+        if (JSON.stringify(json.data) !== JSON.stringify(categoriesListRef.current)) {
+          setCategoriesList(json.data)
+          try {
+            localStorage.setItem('jurnal_wave_custom_categories', JSON.stringify(json.data))
+            localStorage.setItem('jurnal_wave_categories', JSON.stringify(json.data))
+          } catch {}
         }
       }
     } catch (err) {
       console.warn('Sync kategori notice:', err)
-      if (successNotice) {
-        showToast(successNotice, 'success')
-      }
     }
   }
 
@@ -462,17 +496,6 @@ export default function AdminBeritaPage() {
     setNewTags(autoTags)
   }, [newTitle, newCategory, newContent, isTagsManuallyEdited])
 
-  // Helper deduplikasi artikel berdasarkan slug, title, atau id
-  const dedupeArticles = (items: Article[]): Article[] => {
-    const seen = new Set<string>()
-    return items.filter((item) => {
-      const key = (item.slug || item.title || item.id || '').toLowerCase().trim()
-      if (!key || seen.has(key)) return false
-      seen.add(key)
-      return true
-    })
-  }
-
   // Helper kompres dan konversi gambar ke Base64 optimal (Auto WebP)
   const compressImage = (file: File): Promise<string> => {
     return convertImageToWebP(file, { maxDimension: 1200, quality: 0.85 })
@@ -530,23 +553,8 @@ export default function AdminBeritaPage() {
     }
   }
 
-  // Muat artikel secara instan (0 ms) dari cache, lalu sinkronisasi database di latar belakang
+  // Sinkronisasi artikel terbaru dari server secara tenang di latar belakang (tanpa kedipan)
   useEffect(() => {
-    // 1. Instant Cache Load: Tampilkan seketika dari cache lokal tanpa jeda (0 ms)
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('jurnal_wave_articles')
-        if (saved) {
-          const parsed = JSON.parse(saved)
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setArticles(dedupeArticles(parsed))
-            setIsLoading(false)
-          }
-        }
-      } catch {}
-    }
-
-    // 2. Silent Background Sync: Cek pembaruan terbaru dari database PostgreSQL di latar belakang
     fetch('/api/articles?admin=true', { cache: 'no-store' })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -555,9 +563,15 @@ export default function AdminBeritaPage() {
       .then((json) => {
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {
           const cleanData = dedupeArticles(json.data)
-          setArticles(cleanData)
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('jurnal_wave_articles', JSON.stringify(cleanData))
+          // Hanya update jika data berbeda dengan yang tampil saat ini
+          if (
+            cleanData.length !== articlesRef.current.length ||
+            JSON.stringify(cleanData.map((a: Article) => a.id)) !== JSON.stringify(articlesRef.current.map((a: Article) => a.id))
+          ) {
+            setArticles(cleanData)
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('jurnal_wave_articles', JSON.stringify(cleanData))
+            }
           }
         }
       })
