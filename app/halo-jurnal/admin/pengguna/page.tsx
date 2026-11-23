@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import CitizenDirectoryTab from '@/components/admin/CitizenDirectoryTab'
 import AdminToast from '@/components/admin/AdminToast'
 import { useConfirm } from '@/components/admin/AdminConfirmDialog'
@@ -9,6 +10,7 @@ import {
   Users,
   UserPlus,
   ShieldCheck,
+  ShieldAlert,
   Search,
   Pencil,
   Trash2,
@@ -89,13 +91,6 @@ const AVAILABLE_PERMISSIONS: AdminMenuPermission[] = [
     description: 'Moderasi aduan & chat pelapor',
     icon: FileText,
   },
-  {
-    key: 'pengguna',
-    label: 'Kelola Pengguna',
-    href: '/halo-jurnal/admin/pengguna',
-    description: 'Hak akses staf & akun warga',
-    icon: Users,
-  },
 ]
 
 interface TeamMember {
@@ -124,7 +119,9 @@ const DEFAULT_TEAM: TeamMember[] = [
 ]
 
 export default function AdminTimRedaksiPage() {
+  const router = useRouter()
   const confirmDialog = useConfirm()
+  const [isSuperadmin, setIsSuperadmin] = useState<boolean | null>(null)
   const [activeTab, setActiveTab] = useState<'redaksi' | 'warga'>('redaksi')
   const [members, setMembers] = useState<TeamMember[]>([])
   const [citizenCount, setCitizenCount] = useState<number>(5)
@@ -214,6 +211,29 @@ export default function AdminTimRedaksiPage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      try {
+        const savedUser = localStorage.getItem('jurnal_wave_admin_user')
+        if (savedUser) {
+          const parsed = JSON.parse(savedUser)
+          const isSuper =
+            parsed.role?.toLowerCase() === 'superadmin' ||
+            parsed.email?.toLowerCase() === 'admin@jurnalwave.com' ||
+            parsed.email?.toLowerCase() === 'tech.jurnalwave@gmail.com' ||
+            parsed.isSuperadmin === true
+
+          if (!isSuper) {
+            setIsSuperadmin(false)
+            setTimeout(() => {
+              router.replace('/halo-jurnal/admin')
+            }, 800)
+            return
+          }
+        }
+        setIsSuperadmin(true)
+      } catch {
+        setIsSuperadmin(true)
+      }
+
       const params = new URLSearchParams(window.location.search)
       if (params.get('tab') === 'warga') {
         setActiveTab('warga')
@@ -228,7 +248,7 @@ export default function AdminTimRedaksiPage() {
             setCitizenCount(list.length)
           }
         }
-      } catch {}
+      } catch { }
 
       fetch('/api/admin/citizens', { cache: 'no-store' })
         .then((res) => res.json())
@@ -237,7 +257,7 @@ export default function AdminTimRedaksiPage() {
             setCitizenCount(json.data.length)
           }
         })
-        .catch(() => {})
+        .catch(() => { })
     }
   }, [])
 
@@ -283,20 +303,20 @@ export default function AdminTimRedaksiPage() {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(localM),
-                      }).catch(() => {})
+                      }).catch(() => { })
                       dbMembers.push(localM)
                     }
                   }
                 }
               }
-            } catch {}
+            } catch { }
           }
 
           setMembers(dbMembers)
           if (typeof window !== 'undefined') {
             try {
               localStorage.setItem('jurnal_wave_team_members', JSON.stringify(dbMembers))
-            } catch {}
+            } catch { }
           }
         }
       })
@@ -406,8 +426,8 @@ export default function AdminTimRedaksiPage() {
             permissions: m.isSuperadmin
               ? (AVAILABLE_PERMISSIONS.map((p) => p.key) as AdminMenuKey[])
               : formPermissions.length > 0
-              ? formPermissions
-              : (['dashboard'] as AdminMenuKey[]),
+                ? formPermissions
+                : (['dashboard'] as AdminMenuKey[]),
           }
           return targetMember
         }
@@ -533,6 +553,20 @@ export default function AdminTimRedaksiPage() {
     return true
   })
 
+  if (isSuperadmin === false) {
+    return (
+      <div className="min-h-[50vh] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-3">
+          <ShieldAlert className="w-7 h-7" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-800 mb-1">Akses Dibatasi: Khusus Super Admin</h2>
+        <p className="text-xs text-slate-500 max-w-sm">
+          Menu Kelola Pengguna hanya dapat diakses oleh akun Super Admin. Anda sedang dialihkan kembali ke Dashboard...
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* 1. Header Halaman */}
@@ -550,20 +584,18 @@ export default function AdminTimRedaksiPage() {
         <button
           type="button"
           onClick={() => setActiveTab('redaksi')}
-          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer ${
-            activeTab === 'redaksi'
-              ? 'bg-[#c00015] text-white shadow-2xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
+          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer ${activeTab === 'redaksi'
+            ? 'bg-[#c00015] text-white shadow-2xs'
+            : 'text-slate-600 hover:bg-slate-100'
+            }`}
         >
           <ShieldCheck className="w-4 h-4" />
           <span>Akun Tim Admin</span>
           <span
-            className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-              activeTab === 'redaksi'
-                ? 'bg-white/20 text-white'
-                : 'bg-slate-200 text-slate-700'
-            }`}
+            className={`px-1.5 py-0.5 rounded-full text-[10px] ${activeTab === 'redaksi'
+              ? 'bg-white/20 text-white'
+              : 'bg-slate-200 text-slate-700'
+              }`}
           >
             {members.length}
           </span>
@@ -571,20 +603,18 @@ export default function AdminTimRedaksiPage() {
         <button
           type="button"
           onClick={() => setActiveTab('warga')}
-          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer ${
-            activeTab === 'warga'
-              ? 'bg-[#c00015] text-white shadow-2xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
+          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer ${activeTab === 'warga'
+            ? 'bg-[#c00015] text-white shadow-2xs'
+            : 'text-slate-600 hover:bg-slate-100'
+            }`}
         >
           <Users className="w-4 h-4" />
           <span>Akun Warga</span>
           <span
-            className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-              activeTab === 'warga'
-                ? 'bg-white/20 text-white'
-                : 'bg-slate-200 text-slate-700'
-            }`}
+            className={`px-1.5 py-0.5 rounded-full text-[10px] ${activeTab === 'warga'
+              ? 'bg-white/20 text-white'
+              : 'bg-slate-200 text-slate-700'
+              }`}
           >
             {citizenCount}
           </span>
@@ -645,9 +675,8 @@ export default function AdminTimRedaksiPage() {
                     return (
                       <tr
                         key={member.id}
-                        className={`hover:bg-slate-50/70 transition-colors ${
-                          member.status !== 'aktif' ? 'bg-slate-50/60 opacity-60' : ''
-                        }`}
+                        className={`hover:bg-slate-50/70 transition-colors ${member.status !== 'aktif' ? 'bg-slate-50/60 opacity-60' : ''
+                          }`}
                       >
                         {/* Nama & Email */}
                         <td className="py-3.5 px-4">
@@ -700,8 +729,8 @@ export default function AdminTimRedaksiPage() {
                               title={
                                 member.permissions && member.permissions.length > 0
                                   ? member.permissions
-                                      .map((pKey) => AVAILABLE_PERMISSIONS.find((p) => p.key === pKey)?.label || pKey)
-                                      .join(', ')
+                                    .map((pKey) => AVAILABLE_PERMISSIONS.find((p) => p.key === pKey)?.label || pKey)
+                                    .join(', ')
                                   : 'Hanya Dashboard'
                               }
                             >
@@ -744,9 +773,8 @@ export default function AdminTimRedaksiPage() {
                                 />
                               </button>
                               <span
-                                className={`text-xs font-semibold ${
-                                  member.status === 'aktif' ? 'text-slate-800' : 'text-slate-400'
-                                }`}
+                                className={`text-xs font-semibold ${member.status === 'aktif' ? 'text-slate-800' : 'text-slate-400'
+                                  }`}
                               >
                                 {member.status === 'aktif' ? 'Aktif' : 'Cuti'}
                               </span>
@@ -921,9 +949,8 @@ export default function AdminTimRedaksiPage() {
                           <button
                             type="button"
                             onClick={handleCopyPassword}
-                            className={`p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition cursor-pointer ${
-                              isCopied ? 'text-emerald-600 hover:text-emerald-700' : ''
-                            }`}
+                            className={`p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition cursor-pointer ${isCopied ? 'text-emerald-600 hover:text-emerald-700' : ''
+                              }`}
                             title={isCopied ? 'Tersalin ke clipboard!' : 'Salin sandi ke clipboard'}
                           >
                             {isCopied ? (
@@ -986,9 +1013,8 @@ export default function AdminTimRedaksiPage() {
                         return (
                           <label
                             key={perm.key}
-                            className={`flex items-center gap-2 p-1.5 rounded cursor-pointer transition select-none ${
-                              isChecked ? 'text-slate-900 font-semibold' : 'text-slate-500'
-                            }`}
+                            className={`flex items-center gap-2 p-1.5 rounded cursor-pointer transition select-none ${isChecked ? 'text-slate-900 font-semibold' : 'text-slate-500'
+                              }`}
                           >
                             <input
                               type="checkbox"

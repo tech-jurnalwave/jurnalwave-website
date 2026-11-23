@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
         password: meta.password || '',
         isSuperadmin: false,
         permissions: Array.isArray(meta.permissions) && meta.permissions.length > 0
-          ? meta.permissions
+          ? meta.permissions.filter((p: string) => p !== 'pengguna')
           : ['dashboard'],
         status: meta.status === 'cuti' ? 'cuti' : 'aktif',
         joinedAt: meta.joinedAt || u.createdAt.toLocaleDateString('id-ID', {
@@ -88,7 +88,9 @@ export async function POST(request: NextRequest) {
 
     const metaPayload = {
       password: password || '',
-      permissions: Array.isArray(permissions) ? permissions : ['dashboard'],
+      permissions: Array.isArray(permissions)
+        ? permissions.filter((p: string) => p !== 'pengguna')
+        : ['dashboard'],
       status: status === 'cuti' ? 'cuti' : 'aktif',
       joinedAt: joinedAt || new Date().toLocaleDateString('id-ID', {
         day: 'numeric',
