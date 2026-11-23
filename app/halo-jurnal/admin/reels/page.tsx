@@ -665,29 +665,8 @@ export default function AdminReelsPage() {
               {/* 1. Link Video Medsos */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="font-bold text-slate-800 flex items-center gap-2">
-                    <span>Link Video Medsos <span className="text-[#c00015]">*</span></span>
-                    {formSocialUrl.trim() && (
-                      <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase transition-all shadow-2xs ${
-                          detectedPlatform === 'tiktok'
-                            ? 'bg-black text-white'
-                            : detectedPlatform === 'youtube'
-                            ? 'bg-[#FF0000] text-white'
-                            : detectedPlatform === 'facebook'
-                            ? 'bg-[#1877F2] text-white'
-                            : 'bg-gradient-to-r from-[#f09433] via-[#dc2743] to-[#bc1888] text-white'
-                        }`}
-                      >
-                        {detectedPlatform === 'youtube'
-                          ? 'YouTube Shorts'
-                          : detectedPlatform === 'tiktok'
-                          ? 'TikTok Video'
-                          : detectedPlatform === 'facebook'
-                          ? 'Facebook Watch'
-                          : 'Instagram Reels'}
-                      </span>
-                    )}
+                  <label className="font-bold text-slate-800">
+                    Link Video Medsos <span className="text-[#c00015]">*</span>
                   </label>
                   {isFetchingMetadata && (
                     <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
