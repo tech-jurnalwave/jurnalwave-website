@@ -25,7 +25,19 @@ interface JobDetailPageProps {
 export default function JobDetailPage({ params }: JobDetailPageProps) {
   const { id } = use(params);
   const [isSaved, setIsSaved] = useState<boolean>(false);
-  const [allJobs, setAllJobs] = useState<Job[]>(DUMMY_JOBS);
+  const [allJobs, setAllJobs] = useState<Job[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('jurnal_wave_jobs');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch {}
+    }
+    return DUMMY_JOBS;
+  });
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     if (!id) return;
@@ -42,24 +54,34 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
   }, [id]);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchJobDetail = async () => {
       try {
         const res = await fetch('/api/jobs');
         if (res.ok) {
           const json = await res.json();
           if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-            setAllJobs(json.data);
+            if (isMounted) setAllJobs(json.data);
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.setItem('jurnal_wave_jobs', JSON.stringify(json.data));
+              } catch {}
+            }
             return;
           }
         }
-      } catch {}
+      } catch (err) {
+        console.error('Error fetching jobs:', err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
 
       if (typeof window !== 'undefined') {
         try {
           const saved = localStorage.getItem('jurnal_wave_jobs');
           if (saved) {
             const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed) && parsed.length > 0) {
+            if (Array.isArray(parsed) && parsed.length > 0 && isMounted) {
               setAllJobs(parsed);
             }
           }
@@ -68,6 +90,9 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
     };
 
     fetchJobDetail();
+    return () => {
+      isMounted = false;
+    };
   }, [id]);
 
   const handleToggleBookmark = () => {
@@ -78,6 +103,56 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
 
   const job = allJobs.find(j => j.id === id) || DUMMY_JOBS.find(j => j.id === id);
 
+  // 1. Tampilan Loading Skeleton jika data masih dimuat dan belum ditemukan di cache
+  if (!job && isLoading) {
+    return (
+      <div className="flex-grow w-full max-w-4xl mx-auto px-4 sm:px-6 md:px-8 pt-5 pb-20 flex flex-col min-w-0">
+        <div className="mb-3.5">
+          <Link
+            href="/loker"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-[#c00015] transition-colors"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Kembali ke Lowongan Kerja</span>
+          </Link>
+        </div>
+
+        {/* Skeleton Header */}
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-2xl p-4 sm:p-6 shadow-2xs mb-4 flex flex-col gap-4 animate-pulse">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-slate-200 dark:bg-zinc-800 shrink-0" />
+            <div className="flex-1 space-y-2">
+              <div className="h-5 bg-slate-200 dark:bg-zinc-800 rounded w-3/4" />
+              <div className="h-4 bg-slate-100 dark:bg-zinc-800/60 rounded w-1/3" />
+            </div>
+          </div>
+          <div className="pt-3 border-t border-slate-100 dark:border-zinc-800 flex justify-between items-center">
+            <div className="space-y-1.5 w-1/2">
+              <div className="h-3.5 bg-slate-100 dark:bg-zinc-800 rounded w-1/3" />
+              <div className="h-3.5 bg-slate-100 dark:bg-zinc-800 rounded w-1/2" />
+            </div>
+            <div className="h-9 w-28 bg-slate-200 dark:bg-zinc-800 rounded-xl" />
+          </div>
+        </div>
+
+        {/* Skeleton Detail Konten */}
+        <div className="bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 rounded-2xl p-5 sm:p-7 shadow-2xs animate-pulse space-y-5">
+          <div className="space-y-2">
+            <div className="h-4 bg-slate-200 dark:bg-zinc-800 rounded w-1/4" />
+            <div className="h-3.5 bg-slate-100 dark:bg-zinc-800 rounded w-full" />
+            <div className="h-3.5 bg-slate-100 dark:bg-zinc-800 rounded w-5/6" />
+          </div>
+          <div className="pt-4 border-t border-slate-100 dark:border-zinc-800 space-y-2">
+            <div className="h-4 bg-slate-200 dark:bg-zinc-800 rounded w-1/3" />
+            <div className="h-3.5 bg-slate-100 dark:bg-zinc-800 rounded w-2/3" />
+            <div className="h-3.5 bg-slate-100 dark:bg-zinc-800 rounded w-1/2" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Tampilan Tidak Ditemukan hanya jika sudah selesai loading dan benar-benar tidak ada
   if (!job) {
     return (
       <div className="flex flex-1 mx-auto max-w-container-max w-full px-margin-mobile md:px-margin-desktop py-20 text-center">
