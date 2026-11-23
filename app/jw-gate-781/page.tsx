@@ -104,7 +104,7 @@ export default function AdminStaffSecretLoginPage() {
         <div className="flex justify-center mb-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/logo-jurnal-wave.webp"
+            src="/logo-jurnal-wave.webp?v=2"
             alt="JurnalWave"
             className="h-10 sm:h-12 w-auto object-contain"
           />
