@@ -160,6 +160,13 @@ export function ArticleDetailView({
   const [playbackRate, setPlaybackRate] = useState<number>(1);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
+    };
+  }, []);
 
   // Perkiraan durasi membaca / TTS (~125 kata per menit) jika durasi asli belum terload
   const cleanContentForSpeech = (article?.content || '').replace(/<!--[\s\S]*?-->/g, '').trim();
@@ -319,6 +326,8 @@ export function ArticleDetailView({
     if (isPlaying) {
       audio.pause();
       setIsPlaying(false);
+      setIsLoadingAudio(false);
+      if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
       return;
     }
 
@@ -326,47 +335,32 @@ export function ArticleDetailView({
 
     // Pastikan src terpasang jika belum ada
     const targetSrc = `/api/tts?id=${encodeURIComponent(article.id)}`;
-    if (!audio.getAttribute('src')) {
+    const currentSrc = audio.getAttribute('src') || '';
+    if (!currentSrc || !currentSrc.includes(`/api/tts?id=${encodeURIComponent(article.id)}`)) {
       audio.setAttribute('src', targetSrc);
     }
     audio.playbackRate = playbackRate;
 
-    try {
-      // Panggil audio.play() langsung murni dalam user click context
-      await audio.play();
-      setIsPlaying(true);
+    // Timeout keamanan maksimal 15 detik agar loading tidak menggantung selamanya
+    if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
+    playTimeoutRef.current = setTimeout(() => {
       setIsLoadingAudio(false);
-    } catch (err: any) {
-      console.warn('Audio play notice (buffering):', err);
-      if (err?.name === 'AbortError') {
-        setIsLoadingAudio(false);
-        return;
-      }
-      // Tunggu hingga buffer audio pria siap dari server, jangan langsung fallback ke suara cewek!
-      const onCanPlay = () => {
-        audio.removeEventListener('canplay', onCanPlay);
-        audio.removeEventListener('error', onAudioErr);
-        audio.play().then(() => {
-          setIsPlaying(true);
-          setIsLoadingAudio(false);
-        }).catch((e) => {
-          console.warn('Play retry failed:', e);
-          setIsLoadingAudio(false);
-          setIsPlaying(false);
-        });
-      };
+    }, 15000);
 
-      const onAudioErr = () => {
-        audio.removeEventListener('canplay', onCanPlay);
-        audio.removeEventListener('error', onAudioErr);
+    // Langsung trigger play dalam konteks gesture klik pengguna
+    audio.play()
+      .then(() => {
+        if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
+        setIsPlaying(true);
         setIsLoadingAudio(false);
-        setIsPlaying(false);
-      };
-
-      audio.addEventListener('canplay', onCanPlay, { once: true });
-      audio.addEventListener('error', onAudioErr, { once: true });
-      audio.load();
-    }
+      })
+      .catch((err: any) => {
+        console.warn('Audio play request status:', err?.name || err);
+        if (err?.name === 'AbortError') {
+          if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
+          setIsLoadingAudio(false);
+        }
+      });
   };
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -403,6 +397,7 @@ export function ArticleDetailView({
   };
 
   const handleCloseAudio = () => {
+    if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
     if (audioRef.current) {
       audioRef.current.pause();
     }
@@ -1258,7 +1253,7 @@ export function ArticleDetailView({
       <audio
         ref={audioRef}
         src={article?.id ? `/api/tts?id=${encodeURIComponent(article.id)}` : undefined}
-        preload="metadata"
+        preload="none"
         playsInline
         onTimeUpdate={(e) => {
           setCurrentTime(Math.round(e.currentTarget.currentTime));
@@ -1269,6 +1264,7 @@ export function ArticleDetailView({
           }
         }}
         onPlaying={() => {
+          if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
           setIsLoadingAudio(false);
           setIsPlaying(true);
         }}
@@ -1276,12 +1272,14 @@ export function ArticleDetailView({
           setIsLoadingAudio(true);
         }}
         onEnded={() => {
+          if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
           setIsPlaying(false);
           setIsLoadingAudio(false);
           setCurrentTime(0);
         }}
         onError={(e) => {
           console.warn('Audio tag error:', e);
+          if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
           setIsLoadingAudio(false);
           setIsPlaying(false);
         }}

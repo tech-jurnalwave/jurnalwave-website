@@ -329,8 +329,19 @@ export async function fetchArticleByIdFromWordPress(idOrSlug: string): Promise<A
       }
     } catch (err) {
       lastDbFailureTimestamp = Date.now();
-      console.warn('MySQL server-side single article lookup notice:', (err as any)?.message || err);
+      console.warn('Database server-side single article lookup notice:', (err as any)?.message || err);
     }
+
+    // Server fallback: Cek INITIAL_ARTICLES jika database kosong atau offline
+    const fallbackServerMatch = INITIAL_ARTICLES.find(
+      (a) =>
+        String(a.id) === cleanInput ||
+        a.slug === cleanInput ||
+        a.slug === decoded ||
+        a.slug.toLowerCase() === cleanInput.toLowerCase() ||
+        a.slug.toLowerCase() === decoded.toLowerCase()
+    );
+    if (fallbackServerMatch) return fallbackServerMatch;
   }
 
   // 2. Client-side fetch from /api/articles?slug=...
