@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React from 'react';
 
@@ -11,8 +11,8 @@ interface LogoProps {
 
 export const Logo: React.FC<LogoProps> = ({ size = 'md', className = '', imgClassName = '' }) => {
   const heights = {
-    sm: 'h-7 sm:h-8',
-    md: 'h-8 sm:h-9 md:h-11',
+    sm: 'h-8 sm:h-9',
+    md: 'h-9 sm:h-10 md:h-11',
     lg: 'h-11 sm:h-12 md:h-14'
   };
 

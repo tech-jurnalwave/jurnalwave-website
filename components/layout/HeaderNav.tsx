@@ -206,7 +206,7 @@ export const HeaderNav: React.FC = () => {
                 className="flex items-center shrink-0 cursor-pointer"
                 aria-label="Kembali ke Beranda atau Gulir ke Atas"
               >
-                <Logo variant="light" size="sm" />
+                <Logo variant="light" size="md" />
               </Link>
 
               {/* Pemisah Vertikal & Ikon Media Sosial (Duplikat dari Footer) */}
