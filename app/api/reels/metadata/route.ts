@@ -121,17 +121,83 @@ export async function GET(req: NextRequest) {
     // 3. Instagram
     if (lower.includes('instagram.com')) {
       let creator = '';
-      const match = cleanUrl.match(/instagram\.com\/([a-zA-Z0-9_.-]+)/);
-      if (match && match[1] && match[1] !== 'reel' && match[1] !== 'p') {
-        creator = `@${match[1]}`;
+      let thumbnailUrl = '';
+      let title = '';
+
+      const userMatch = cleanUrl.match(/instagram\.com\/([a-zA-Z0-9_.-]+)/);
+      if (userMatch && userMatch[1] && userMatch[1] !== 'reel' && userMatch[1] !== 'reels' && userMatch[1] !== 'p') {
+        creator = `@${userMatch[1]}`;
       }
+
+      // Ambil shortcode reel / post
+      const codeMatch = cleanUrl.match(/\/(?:reel|reels|p)\/([a-zA-Z0-9_-]+)/);
+      const shortcode = codeMatch && codeMatch[1] ? codeMatch[1] : '';
+
+      if (shortcode) {
+        // Coba 1: Embed captioned page resmi Instagram (memuat foto poster asli di class EmbeddedMediaImage)
+        try {
+          const embedUrl = `https://www.instagram.com/p/${shortcode}/embed/captioned/`;
+          const res = await fetch(embedUrl, {
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+            },
+            cache: 'no-store',
+          });
+
+          if (res.ok) {
+            const html = await res.text();
+            const imgMatch =
+              html.match(/class="EmbeddedMediaImage"[^>]*src="([^"]+)"/) ||
+              html.match(/src="([^"]+)"[^>]*class="EmbeddedMediaImage"/) ||
+              html.match(/property="og:image"\s+content="([^"]+)"/) ||
+              html.match(/content="([^"]+)"\s+property="og:image"/);
+
+            if (imgMatch && imgMatch[1]) {
+              thumbnailUrl = imgMatch[1].replace(/&amp;/g, '&');
+            }
+
+            const titleMatch =
+              html.match(/property="og:title"\s+content="([^"]+)"/) ||
+              html.match(/class="Caption"[^>]*>([^<]+)</);
+            if (titleMatch && titleMatch[1]) {
+              title = titleMatch[1].replace(/&amp;/g, '&').trim();
+            }
+          }
+        } catch (err) {
+          console.warn('Instagram embed fetch notice:', err);
+        }
+
+        // Coba 2: Jika belum dapat, coba fetch direct URL dengan crawler User-Agent
+        if (!thumbnailUrl) {
+          try {
+            const res = await fetch(cleanUrl, {
+              headers: {
+                'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+              },
+              cache: 'no-store',
+            });
+            if (res.ok) {
+              const html = await res.text();
+              const imgMatch =
+                html.match(/property="og:image"\s+content="([^"]+)"/) ||
+                html.match(/content="([^"]+)"\s+property="og:image"/);
+              if (imgMatch && imgMatch[1]) {
+                thumbnailUrl = imgMatch[1].replace(/&amp;/g, '&');
+              }
+            }
+          } catch {}
+        }
+      }
+
       return NextResponse.json({
         success: true,
         data: {
           platform: 'instagram',
-          thumbnailUrl: '',
+          thumbnailUrl,
           creator,
-          title: '',
+          title,
         },
       });
     }
