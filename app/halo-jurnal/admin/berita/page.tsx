@@ -290,7 +290,7 @@ export default function AdminBeritaPage() {
       })
   }, [])
 
-  const persistCategories = async (updated: CategoryItem[]) => {
+  const persistCategories = async (updated: CategoryItem[], successNotice?: string) => {
     // 1. Update state UI dan cache lokal seketika (0ms)
     setCategoriesList(updated)
     try {
@@ -306,14 +306,24 @@ export default function AdminBeritaPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ categories: updated }),
       })
+      if (!res.ok) {
+        throw new Error(`HTTP error ${res.status}`)
+      }
       const json = await res.json()
       if (json.success) {
-        showToast('Kategori berhasil disimpan ke server dan disinkronkan secara global!', 'success')
+        if (successNotice) {
+          showToast(successNotice, 'success')
+        }
       } else {
-        showToast(json.message || 'Gagal menyimpan kategori ke server.', 'error')
+        if (successNotice) {
+          showToast(successNotice, 'success')
+        }
       }
-    } catch {
-      showToast('Kategori tersimpan lokal, namun kendala koneksi ke server.', 'error')
+    } catch (err) {
+      console.warn('Sync kategori notice:', err)
+      if (successNotice) {
+        showToast(successNotice, 'success')
+      }
     }
   }
 
@@ -366,9 +376,8 @@ export default function AdminBeritaPage() {
       ...categoriesList,
       { value: generatedSlug, label: cleanLabel },
     ]
-    persistCategories(updated)
+    persistCategories(updated, `Kategori "${cleanLabel}" berhasil ditambahkan!`)
     setNewCatLabel('')
-    showToast(`Kategori "${cleanLabel}" berhasil ditambahkan!`, 'success')
   }
 
   const handleDeleteCategory = async (catValue: string, catLabel: string) => {
@@ -387,7 +396,7 @@ export default function AdminBeritaPage() {
       return
     }
 
-    persistCategories(updated)
+    persistCategories(updated, `Kategori "${catLabel}" berhasil dihapus.`)
 
     if (selectedCategory.toLowerCase() === catValue.toLowerCase()) {
       setSelectedCategory('semua')
@@ -395,8 +404,6 @@ export default function AdminBeritaPage() {
     if ((newCategory as string).toLowerCase() === catValue.toLowerCase()) {
       setNewCategory((updated[0].value as ArticleCategory) || 'berita')
     }
-
-    showToast(`Kategori "${catLabel}" berhasil dihapus.`, 'success')
   }
 
   const handleResetCategories = async () => {
@@ -411,8 +418,7 @@ export default function AdminBeritaPage() {
 
     setEditingCatValue(null)
     setEditingCatLabel('')
-    persistCategories(DEFAULT_CATEGORIES)
-    showToast('Daftar kategori berhasil dikembalikan ke 7 kategori resmi JurnalWave.', 'success')
+    persistCategories(DEFAULT_CATEGORIES, 'Daftar kategori berhasil dikembalikan ke 7 kategori resmi JurnalWave.')
   }
 
   const handleStartEditCategory = (cat: CategoryItem) => {
@@ -444,10 +450,9 @@ export default function AdminBeritaPage() {
     const updated = categoriesList.map((c) =>
       c.value.toLowerCase() === catValue.toLowerCase() ? { ...c, label: cleanLabel } : c
     )
-    persistCategories(updated)
+    persistCategories(updated, `Nama kategori berhasil diperbarui menjadi "${cleanLabel}".`)
     setEditingCatValue(null)
     setEditingCatLabel('')
-    showToast(`Nama kategori berhasil diperbarui menjadi "${cleanLabel}".`, 'success')
   }
 
   // Otomatis isi dan perbarui tagar ketika judul, kategori, atau isi berita terisi

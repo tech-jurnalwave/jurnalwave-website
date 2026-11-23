@@ -13,7 +13,8 @@ export async function GET() {
       success: true,
       data: categories,
     })
-  } catch {
+  } catch (err) {
+    console.error('Error GET /api/categories:', err)
     return NextResponse.json(
       {
         success: false,
@@ -24,24 +25,42 @@ export async function GET() {
   }
 }
 
-// POST: Menyimpan pembaruan kategori dari admin dan merevalidasi halaman publik
+// POST: Menyimpan pembaruan kategori dari admin dan menyinkronkan secara global
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const categories: CategoryItem[] = body.categories
+    let body: any = null
+    try {
+      body = await request.json()
+    } catch {
+      body = null
+    }
 
-    if (!Array.isArray(categories) || categories.length === 0) {
+    // Mendukung berbagai format payload: { categories: [...] }, { data: [...] }, atau array langsung [...]
+    const rawCategories = Array.isArray(body)
+      ? body
+      : Array.isArray(body?.categories)
+      ? body.categories
+      : Array.isArray(body?.data)
+      ? body.data
+      : []
+
+    if (!Array.isArray(rawCategories) || rawCategories.length === 0) {
       return NextResponse.json(
-        { success: false, message: 'Data kategori tidak valid atau kosong.' },
+        { success: false, message: 'Data kategori tidak boleh kosong.' },
         { status: 400 }
       )
     }
 
+    const categories: CategoryItem[] = rawCategories.map((c: any) => ({
+      value: String(c.value || c.label || '').toLowerCase().trim(),
+      label: String(c.label || c.value || '').trim(),
+    }))
+
     const saved = saveArticleCategories(categories)
     if (!saved) {
       return NextResponse.json(
-        { success: false, message: 'Gagal menyimpan kategori ke server.' },
-        { status: 500 }
+        { success: false, message: 'Format data kategori tidak valid.' },
+        { status: 400 }
       )
     }
 
@@ -53,15 +72,21 @@ export async function POST(request: NextRequest) {
       revalidatePath('/halo-jurnal/admin/berita')
     } catch {}
 
+    const updated = getArticleCategories()
+
     return NextResponse.json({
       success: true,
-      message: 'Daftar kategori berhasil disimpan ke server dan disinkronkan secara global!',
-      data: categories,
+      message: 'Daftar kategori berhasil disimpan dan disinkronkan secara global!',
+      data: updated,
     })
-  } catch (err) {
-    console.error('Error in /api/categories:', err)
+  } catch (err: unknown) {
+    console.error('Error POST /api/categories:', err)
     return NextResponse.json(
-      { success: false, message: 'Terjadi kesalahan saat memproses data kategori.' },
+      {
+        success: false,
+        message: 'Terjadi kendala teknis saat memproses kategori di server.',
+        error: err instanceof Error ? err.message : String(err),
+      },
       { status: 500 }
     )
   }
