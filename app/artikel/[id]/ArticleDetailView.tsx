@@ -207,102 +207,10 @@ export function ArticleDetailView({
     }
   }, [article?.id]);
 
-  // Track apakah sedang menggunakan Web Speech API (fallback)
+  // Track pemutar audio
   const usingSpeechSynthRef = useRef<boolean>(false);
 
-  // Fallback: Gunakan Web Speech API bawaan browser jika server TTS gagal
-  const playWithWebSpeech = () => {
-    if (!('speechSynthesis' in window)) {
-      setIsLoadingAudio(false);
-      setIsPlaying(false);
-      return;
-    }
-
-    const speechContent = (article?.content || '').replace(/<!--[\s\S]*?-->/g, '').trim();
-    const rawText = `${article?.title || ''}. ${article?.excerpt || ''}. ${speechContent}`;
-    const cleanText = rawText
-      .replace(/<[^>]*>/g, ' ')
-      .replace(/[*_#`~[\]()]/g, ' ')
-      .replace(/https?:\/\/\S+/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    if (!cleanText) {
-      setIsLoadingAudio(false);
-      setIsPlaying(false);
-      return;
-    }
-
-    window.speechSynthesis.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(cleanText.slice(0, 4000));
-    utterance.lang = 'id-ID';
-    utterance.rate = playbackRate;
-
-    // Cari suara Indonesia PRIA agar selaras dengan ArdiNeural di server TTS
-    // Kompatibel: Android Chrome, iOS Safari/Chrome, Desktop
-    const voices = window.speechSynthesis.getVoices();
-    const idVoices = voices.filter(v => v.lang.startsWith('id'));
-
-    // Daftar nama voice PRIA yang dikenal di berbagai platform
-    const knownMaleNames = [
-      'sanjar',           // iOS — id-ID Sanjar (pria)
-      'ardi',             // Edge/Windows — id-ID-ArdiNeural
-      'google id-id male', // Beberapa build Chrome
-      'microsoft ardi',   // Windows desktop
-    ];
-    // Daftar nama voice WANITA yang harus DIHINDARI
-    const knownFemaleNames = [
-      'damayanti',        // iOS — id-ID Damayanti (wanita)
-      'gadis',            // Edge/Windows — id-ID-GadisNeural
-      'google bahasa indonesia', // Android Chrome default (wanita)
-      'microsoft gadis',  // Windows desktop
-    ];
-
-    // Prioritas 1: Cari voice pria yang dikenal secara eksplisit
-    let selectedVoice = idVoices.find(v => {
-      const name = v.name.toLowerCase();
-      return knownMaleNames.some(m => name.includes(m));
-    }) || null;
-
-    // Prioritas 2: Cari voice Indonesia yang BUKAN wanita yang dikenal
-    if (!selectedVoice && idVoices.length > 1) {
-      selectedVoice = idVoices.find(v => {
-        const name = v.name.toLowerCase();
-        return !knownFemaleNames.some(f => name.includes(f));
-      }) || null;
-    }
-
-    // Tidak ada voice pria? Cari yang bukan wanita, atau atur pitch maskulin
-    if (!selectedVoice && idVoices.length > 0) {
-      selectedVoice = idVoices.find(v => !knownFemaleNames.some(f => v.name.toLowerCase().includes(f))) || idVoices[0];
-    }
-
-    if (selectedVoice) utterance.voice = selectedVoice;
-    // Set pitch maskulin rendah dan tempo semangat tegas khas berita
-    utterance.pitch = 0.82;
-    utterance.rate = playbackRate * 1.05;
-
-    utterance.onstart = () => {
-      usingSpeechSynthRef.current = true;
-      setIsPlaying(true);
-      setIsLoadingAudio(false);
-    };
-    utterance.onend = () => {
-      usingSpeechSynthRef.current = false;
-      setIsPlaying(false);
-      setCurrentTime(0);
-    };
-    utterance.onerror = () => {
-      usingSpeechSynthRef.current = false;
-      setIsPlaying(false);
-      setIsLoadingAudio(false);
-    };
-
-    window.speechSynthesis.speak(utterance);
-  };
-
-  // Eksekusi pemutaran audio (Server TTS Resmi ArdiNeural + Buffer Wait)
+  // Eksekusi pemutaran audio (Server Cloud TTS Suara Pria Resmi Fenrir)
   const handlePlayToggle = async () => {
     // Jika sedang pakai Web Speech, toggle pause/resume
     if (usingSpeechSynthRef.current) {
