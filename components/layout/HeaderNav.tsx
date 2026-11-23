@@ -39,17 +39,67 @@ export const HeaderNav: React.FC = () => {
     }
   };
 
-  // Kategori menu (Baris Bawah Navbar)
+  const [categories, setCategories] = useState<Array<{ value: string; label: string }>>([
+    { value: 'berita', label: 'Berita' },
+    { value: 'kuliner', label: 'Kuliner' },
+    { value: 'wisata', label: 'Wisata' },
+    { value: 'hiburan', label: 'Hiburan' },
+    { value: 'tech', label: 'Tech & Game' },
+    { value: 'sport', label: 'Sport' },
+    { value: 'inspirasi', label: 'Inspirasi' },
+  ]);
+
+  useEffect(() => {
+    // 1. Muat seketika dari cache lokal (0ms)
+    const syncCategories = () => {
+      try {
+        const saved =
+          localStorage.getItem('jurnal_wave_custom_categories') ||
+          localStorage.getItem('jurnal_wave_categories');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setCategories(parsed);
+          }
+        }
+      } catch {}
+    };
+
+    syncCategories();
+
+    // 2. Sinkronkan dengan data server global
+    fetch('/api/categories', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          setCategories(json.data);
+          try {
+            localStorage.setItem('jurnal_wave_custom_categories', JSON.stringify(json.data));
+            localStorage.setItem('jurnal_wave_categories', JSON.stringify(json.data));
+          } catch {}
+        }
+      })
+      .catch(() => {});
+
+    window.addEventListener('storage', syncCategories);
+    return () => window.removeEventListener('storage', syncCategories);
+  }, []);
+
+  const standardRoutes = new Set([
+    'berita', 'kuliner', 'wisata', 'hiburan', 'tech', 'sport', 'inspirasi',
+    'lifestyle', 'otomotif', 'science', 'health'
+  ]);
+
+  // Kategori menu dinamis (Baris Bawah Navbar)
   const navCategories = [
     { href: '/', label: 'Beranda' },
     { href: '/artikel', label: 'Semua Artikel' },
-    { href: '/berita', label: 'Berita' },
-    { href: '/kuliner', label: 'Kuliner' },
-    { href: '/wisata', label: 'Wisata' },
-    { href: '/hiburan', label: 'Hiburan' },
-    { href: '/tech', label: 'Tech & Game' },
-    { href: '/sport', label: 'Sport' },
-    { href: '/inspirasi', label: 'Inspirasi' },
+    ...categories.map((c) => ({
+      href: standardRoutes.has(c.value.toLowerCase())
+        ? `/${c.value.toLowerCase()}`
+        : `/kategori/${c.value.toLowerCase()}`,
+      label: c.label,
+    })),
     { href: '/loker', label: 'Loker' },
     { href: '/reels', label: 'Wave Reels' },
     { href: '/halo-jurnal', label: 'Hallo Jurnal' },

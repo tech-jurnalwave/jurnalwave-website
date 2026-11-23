@@ -255,8 +255,9 @@ export default function AdminBeritaPage() {
   const [editingCatValue, setEditingCatValue] = useState<string | null>(null)
   const [editingCatLabel, setEditingCatLabel] = useState<string>('')
 
-  // Inisialisasi & Sinkronisasi 7 Kategori Resmi JurnalWave dari localStorage
+  // Inisialisasi & Sinkronisasi Kategori Resmi JurnalWave dari Server & Cache
   useEffect(() => {
+    // 1. Muat seketika dari cache lokal (0ms)
     try {
       const savedCats =
         localStorage.getItem('jurnal_wave_custom_categories') ||
@@ -264,47 +265,56 @@ export default function AdminBeritaPage() {
       if (savedCats) {
         const parsed = JSON.parse(savedCats)
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Periksa apakah kategori inti JurnalWave sudah ada dan loker sudah dihapus dari artikel
-          const hasWaveCategories =
-            parsed.some((c: CategoryItem) => c.value === 'kuliner') &&
-            parsed.some((c: CategoryItem) => c.value === 'wisata') &&
-            parsed.some((c: CategoryItem) => c.value === 'hiburan') &&
-            parsed.some((c: CategoryItem) => c.value === 'inspirasi') &&
-            !parsed.some((c: CategoryItem) => c.value === 'loker')
-
-          if (hasWaveCategories) {
-            setCategoriesList(parsed)
-            return
-          }
-
-          // Jika browser menyimpan cache lama, upgrade otomatis ke 7 kategori resmi JurnalWave
-          const customAdded = parsed.filter(
-            (c: CategoryItem) =>
-              !DEFAULT_CATEGORIES.some((d) => d.value.toLowerCase() === c.value.toLowerCase()) &&
-              !['lifestyle', 'otomotif', 'science', 'health', 'loker'].includes(c.value.toLowerCase())
-          )
-          const merged = [...DEFAULT_CATEGORIES, ...customAdded]
-          setCategoriesList(merged)
-          localStorage.setItem('jurnal_wave_custom_categories', JSON.stringify(merged))
-          localStorage.setItem('jurnal_wave_categories', JSON.stringify(merged))
-          return
+          setCategoriesList(parsed)
         }
       }
-      setCategoriesList(DEFAULT_CATEGORIES)
-      localStorage.setItem('jurnal_wave_custom_categories', JSON.stringify(DEFAULT_CATEGORIES))
-      localStorage.setItem('jurnal_wave_categories', JSON.stringify(DEFAULT_CATEGORIES))
-    } catch {
-      setCategoriesList(DEFAULT_CATEGORIES)
-    }
+    } catch {}
+
+    // 2. Sinkronkan dengan data server global (/api/categories)
+    fetch('/api/categories', { cache: 'no-store' })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP error ${res.status}`)
+        return res.json()
+      })
+      .then((json) => {
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          setCategoriesList(json.data)
+          try {
+            localStorage.setItem('jurnal_wave_custom_categories', JSON.stringify(json.data))
+            localStorage.setItem('jurnal_wave_categories', JSON.stringify(json.data))
+          } catch {}
+        }
+      })
+      .catch((err) => {
+        console.warn('Background sync kategori notice:', err)
+      })
   }, [])
 
-  const persistCategories = (updated: CategoryItem[]) => {
+  const persistCategories = async (updated: CategoryItem[]) => {
+    // 1. Update state UI dan cache lokal seketika (0ms)
     setCategoriesList(updated)
     try {
       localStorage.setItem('jurnal_wave_custom_categories', JSON.stringify(updated))
       localStorage.setItem('jurnal_wave_categories', JSON.stringify(updated))
       window.dispatchEvent(new Event('storage'))
     } catch {}
+
+    // 2. Simpan secara permanen ke server agar berlaku ke semua akun admin dan publik
+    try {
+      const res = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categories: updated }),
+      })
+      const json = await res.json()
+      if (json.success) {
+        showToast('Kategori berhasil disimpan ke server dan disinkronkan secara global!', 'success')
+      } else {
+        showToast(json.message || 'Gagal menyimpan kategori ke server.', 'error')
+      }
+    } catch {
+      showToast('Kategori tersimpan lokal, namun kendala koneksi ke server.', 'error')
+    }
   }
 
   const handleMoveCategory = (index: number, direction: 'up' | 'down') => {
