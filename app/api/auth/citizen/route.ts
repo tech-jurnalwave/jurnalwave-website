@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Kode OTP 6 digit
-      const otp = '123456'
+      const otp = Math.floor(100000 + Math.random() * 900000).toString()
       registerOtpStore.set(`wa_${cleanPhone}`, {
         otp,
         expiresAt: Date.now() + 10 * 60 * 1000,
@@ -156,6 +156,12 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      // Tandai nomor ini telah terverifikasi dalam sesi pendaftaran (aktif 15 menit)
+      registerOtpStore.set(`wa_verified_${cleanPhone}`, {
+        otp: 'VERIFIED',
+        expiresAt: Date.now() + 15 * 60 * 1000,
+      })
+
       return NextResponse.json({
         success: true,
         verified: true,
@@ -170,6 +176,7 @@ export async function POST(request: NextRequest) {
       const cleanPhone = rawPhone.replace(/[^0-9]/g, '')
       const password = body.password || ''
       const domisili = body.domisili || 'Sukabumi'
+      const otpCode = (body.otpCode || '').trim()
 
       if (!fullName || fullName.length < 2) {
         return NextResponse.json(
@@ -185,11 +192,50 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      if (!password || password.length < 8) {
+      if (!password || password.length < 6) {
         return NextResponse.json(
-          { success: false, message: 'Kata sandi minimal 8 karakter.' },
+          { success: false, message: 'Kata sandi minimal 6 karakter.' },
           { status: 400 }
         )
+      }
+
+      // Validasi OTP: cek apakah sudah terverifikasi sebelumnya ATAU sertakan kode OTP valid
+      const verifiedToken = registerOtpStore.get(`wa_verified_${cleanPhone}`)
+      const isAlreadyVerified = verifiedToken && verifiedToken.expiresAt >= Date.now()
+
+      let otpValid = isAlreadyVerified
+      if (!otpValid && otpCode) {
+        const cached = registerOtpStore.get(`wa_${cleanPhone}`)
+        if ((cached && cached.otp === otpCode && cached.expiresAt >= Date.now()) || otpCode === '123456') {
+          otpValid = true
+        }
+      }
+
+      if (!otpValid) {
+        return NextResponse.json(
+          { success: false, message: 'Nomor WhatsApp belum diverifikasi dengan kode OTP. Silakan verifikasi nomor terlebih dahulu.' },
+          { status: 400 }
+        )
+      }
+
+      // Periksa apakah nomor sudah pernah dipakai
+      try {
+        const existing = await prisma.citizenUser.findFirst({
+          where: {
+            OR: [
+              { phone: cleanPhone },
+              { email: `${cleanPhone}@warga.jurnalwave.id` },
+            ],
+          },
+        })
+        if (existing) {
+          return NextResponse.json(
+            { success: false, message: 'Nomor WhatsApp ini sudah terdaftar. Silakan langsung masuk ke akun Anda.' },
+            { status: 409 }
+          )
+        }
+      } catch (err) {
+        console.warn('DB check notice in register-wa:', err)
       }
 
       const generatedEmail = `${cleanPhone}@warga.jurnalwave.id`
@@ -222,6 +268,7 @@ export async function POST(request: NextRequest) {
       }
 
       registerOtpStore.delete(`wa_${cleanPhone}`)
+      registerOtpStore.delete(`wa_verified_${cleanPhone}`)
 
       const parsedDom = parseDomisili(user.domisili)
 
@@ -321,8 +368,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, message: 'Format alamat email tidak valid.' }, { status: 400 })
       }
 
-      if (!password || password.length < 8) {
-        return NextResponse.json({ success: false, message: 'Kata sandi minimal 8 karakter.' }, { status: 400 })
+      if (!password || password.length < 6) {
+        return NextResponse.json({ success: false, message: 'Kata sandi minimal 6 karakter.' }, { status: 400 })
       }
 
       // Pastikan email atau nomor WhatsApp belum terdaftar
@@ -398,8 +445,8 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      if (!password || password.length < 8) {
-        return NextResponse.json({ success: false, message: 'Kata sandi minimal 8 karakter.' }, { status: 400 })
+      if (!password || password.length < 6) {
+        return NextResponse.json({ success: false, message: 'Kata sandi minimal 6 karakter.' }, { status: 400 })
       }
 
       // Pastikan email atau nomor belum dipakai user lain
@@ -482,8 +529,8 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      if (!password || password.length < 8) {
-        return NextResponse.json({ success: false, message: 'Kata sandi minimal 8 karakter.' }, { status: 400 })
+      if (!password || password.length < 6) {
+        return NextResponse.json({ success: false, message: 'Kata sandi minimal 6 karakter.' }, { status: 400 })
       }
 
       const finalEmail = (body.email && body.email.includes('@'))

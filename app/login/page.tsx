@@ -170,7 +170,7 @@ function LoginPageContent() {
               Masuk ke Akun
             </h1>
             <p className="text-xs sm:text-sm text-secondary font-medium tracking-tight mb-5">
-              Silakan masuk ke akun Anda untuk melanjutkan.
+              Gunakan Nomor WhatsApp dan kata sandi Anda untuk masuk.
             </p>
 
             {/* Error Alert */}
@@ -191,10 +191,10 @@ function LoginPageContent() {
 
             {/* Form Login Manual */}
             <form onSubmit={handleLogin} className="space-y-4">
-              {/* Nomor Handphone */}
+              {/* Nomor Handphone / WhatsApp */}
               <div>
                 <label className="block text-xs font-semibold text-on-surface mb-1.5">
-                  Nomor HP
+                  Nomor WhatsApp
                 </label>
                 <div className="relative">
                   <Phone className="w-4 h-4 text-secondary absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -203,7 +203,7 @@ function LoginPageContent() {
                     inputMode="numeric"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="Masukkan nomor HP"
+                    placeholder="Contoh: 081234567890"
                     required
                     className="w-full pl-10 pr-3.5 py-2.5 text-xs sm:text-sm bg-surface-container-low border border-outline-variant/80 rounded-lg text-on-surface placeholder:text-secondary focus:bg-surface-container-lowest focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                   />
