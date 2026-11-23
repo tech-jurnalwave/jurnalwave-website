@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { fetchArticleById } from '@/lib/wordpress';
+import { fetchArticleById, fetchArticles } from '@/lib/wordpress';
 import os from 'os';
 import { EdgeTTS } from '@andresaya/edge-tts';
 
@@ -76,10 +76,25 @@ const PHONETIC_REPLACEMENTS: [RegExp, string][] = [
   [/\bdeadline\b/gi, 'dedlain']
 ];
 
+// Dekode entitas HTML umum agar tidak dibaca mentah oleh mesin TTS
+function decodeHtmlEntities(str: string): string {
+  return str
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, 'dan')
+    .replace(/&quot;/gi, '"')
+    .replace(/&apos;/gi, "'")
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&hellip;/gi, '...')
+    .replace(/&mdash;/gi, ', ')
+    .replace(/&ndash;/gi, ', ');
+}
+
 // Bersihkan teks berita agar 100% murni naskah artikel asli (tanpa instruksi/basa-basi)
 function cleanArticleText(text: string): string {
   if (!text) return '';
-  let cleaned = text
+  let cleaned = decodeHtmlEntities(text)
     .replace(/<[^>]*>/g, ' ')
     .replace(/[*_#`~[\]()]/g, ' ')
     .replace(/https?:\/\/\S+/g, '')
@@ -96,26 +111,77 @@ function cleanArticleText(text: string): string {
   return cleaned;
 }
 
+// Memecah naskah berita panjang menjadi segmen aman (~1500 karakter) di batas kalimat
+// Mencegah batas WebSocket EdgeTTS terlampaui dan menjamin 100% isi artikel dibacakan utuh
+function splitTextIntoSafeChunks(text: string, maxChunkLength = 1500): string[] {
+  if (text.length <= maxChunkLength) return [text];
+
+  const sentences = text.match(/[^.!?]+[.!?]+|\S+/g) || [text];
+  const chunks: string[] = [];
+  let currentChunk = '';
+
+  for (const sentence of sentences) {
+    if ((currentChunk + ' ' + sentence).trim().length <= maxChunkLength) {
+      currentChunk = currentChunk ? `${currentChunk} ${sentence}` : sentence;
+    } else {
+      if (currentChunk.trim()) chunks.push(currentChunk.trim());
+      if (sentence.length > maxChunkLength) {
+        const words = sentence.split(/\s+/);
+        let subChunk = '';
+        for (const word of words) {
+          if ((subChunk + ' ' + word).trim().length <= maxChunkLength) {
+            subChunk = subChunk ? `${subChunk} ${word}` : word;
+          } else {
+            if (subChunk.trim()) chunks.push(subChunk.trim());
+            subChunk = word;
+          }
+        }
+        currentChunk = subChunk;
+      } else {
+        currentChunk = sentence;
+      }
+    }
+  }
+
+  if (currentChunk.trim()) {
+    chunks.push(currentChunk.trim());
+  }
+
+  return chunks.length > 0 ? chunks : [text];
+}
+
 // Menghasilkan audio pria ArdiNeural menggunakan EdgeTTS Node.js (Universal untuk Vercel & Lokal)
 async function generateMaleAudioWithEdgeTTS(cleanText: string, cacheFile: string): Promise<Buffer> {
-  const tts = new EdgeTTS();
+  const chunks = splitTextIntoSafeChunks(cleanText, 1500);
+  const audioBuffers: Buffer[] = [];
 
-  await tts.synthesize(cleanText, VOICE_NAME, {
-    rate: VOICE_RATE,
-    pitch: VOICE_PITCH,
-    outputFormat: 'audio-24khz-48kbitrate-mono-mp3'
-  });
-  const buffer = tts.toBuffer();
-  if (buffer && buffer.length > 500) {
+  for (const chunk of chunks) {
+    const tts = new EdgeTTS();
+    await tts.synthesize(chunk, VOICE_NAME, {
+      rate: VOICE_RATE,
+      pitch: VOICE_PITCH,
+      outputFormat: 'audio-24khz-48kbitrate-mono-mp3'
+    });
+    const buf = tts.toBuffer();
+    if (buf && buf.length > 100) {
+      audioBuffers.push(buf);
+    }
+  }
+
+  if (audioBuffers.length === 0) {
+    throw new Error('EdgeTTS produced empty buffer');
+  }
+
+  const combined = Buffer.concat(audioBuffers);
+  if (combined.length > 500) {
     try {
       ensureCacheDir();
-      fs.writeFileSync(cacheFile, buffer);
+      fs.writeFileSync(cacheFile, combined);
     } catch (saveErr) {
       console.warn('Could not write cache file:', saveErr);
     }
-    return buffer;
   }
-  throw new Error('EdgeTTS produced empty buffer');
+  return combined;
 }
 
 // Mendapatkan buffer audio pria ArdiNeural konsisten 100% untuk seluruh artikel
@@ -145,9 +211,13 @@ export async function GET(request: Request) {
     let cacheKey = '';
 
     if (id) {
-      cacheKey = `article-${id}-ardi-v4`;
+      cacheKey = `article-${id}-ardi-v5`;
       if (!rawText) {
-        const article = await fetchArticleById(id);
+        let article: any = await fetchArticleById(id);
+        if (!article) {
+          const allArticles = await fetchArticles();
+          article = allArticles.find((a) => String(a.id) === id || a.slug === id) || null;
+        }
         if (article) {
           const title = article.title ? `${article.title.replace(/[.?!]+$/, '')}.` : '';
           const excerpt = article.excerpt ? `${article.excerpt.replace(/[.?!]+$/, '')}.` : '';
@@ -164,7 +234,7 @@ export async function GET(request: Request) {
 
     if (!cacheKey) {
       const hash = crypto.createHash('md5').update(clean).digest('hex').slice(0, 12);
-      cacheKey = `text-${hash}-ardi-v4`;
+      cacheKey = `text-${hash}-ardi-v5`;
     }
 
     ensureCacheDir();
@@ -221,9 +291,13 @@ export async function POST(request: Request) {
 
     let cacheKey = '';
     if (id) {
-      cacheKey = `article-${id}-ardi-v4`;
+      cacheKey = `article-${id}-ardi-v5`;
       if (!rawText) {
-        const article = await fetchArticleById(id);
+        let article: any = await fetchArticleById(id);
+        if (!article) {
+          const allArticles = await fetchArticles();
+          article = allArticles.find((a) => String(a.id) === id || a.slug === id) || null;
+        }
         if (article) {
           const title = article.title ? `${article.title.replace(/[.?!]+$/, '')}.` : '';
           const excerpt = article.excerpt ? `${article.excerpt.replace(/[.?!]+$/, '')}.` : '';
@@ -240,7 +314,7 @@ export async function POST(request: Request) {
 
     if (!cacheKey) {
       const hash = crypto.createHash('md5').update(clean).digest('hex').slice(0, 12);
-      cacheKey = `text-${hash}-ardi-v4`;
+      cacheKey = `text-${hash}-ardi-v5`;
     }
 
     ensureCacheDir();
