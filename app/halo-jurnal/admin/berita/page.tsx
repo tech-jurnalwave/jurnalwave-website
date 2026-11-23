@@ -168,104 +168,6 @@ const generateSmartTags = (
   return tags.join(', ')
 }
 
-// Kata sambung yang dilarang berada di awal kalimat Subjudul / Lead
-const INVALID_START_WORDS = /^(tetapi|namun|sementara|adapun|sedangkan|dan|atau|bahkan|sehingga|maka|pasalnya|sebab|karena|oleh karena itu|kemudian|selanjutnya|selain itu|di sisi lain|meski|meskipun|walaupun|padahal|lantaran)\b/i
-
-/**
- * Menyaring kalimat pemikat (hook / lead) terbaik dari naskah berita
- * yang menarik perhatian pembaca, bersih tanpa kata sambung gantung dan tanpa kutipan putus.
- */
-const generateSmartLead = (title: string, content: string): string => {
-  if (!content || !content.trim()) return ''
-
-  // 1. Bersihkan naskah dari tag/komentar dan wire headers
-  const clean = content
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/^(JURNALWAVE\.COM|JURNAL WAVE)(\s*[-–—]\s*)/i, '')
-    .replace(/^([A-Z\s]+)\s*[-–—]\s*/, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-
-  if (!clean) return ''
-
-  // 2. Pecah ke dalam kalimat-kalimat
-  const rawSentences = clean.match(/[^.!?]+[.!?]+/g) || []
-
-  // 3. Filter ketat kalimat yang layak menjadi subjudul pemikat
-  const validCandidates = rawSentences
-    .map((s) => s.trim())
-    .filter((s) => {
-      // Panjang ideal subjudul antara 45 sampai 160 karakter
-      if (s.length < 45 || s.length > 165) return false
-
-      // Tolak kalimat yang diawali tanda kutip, strip, atau koma
-      if (/^["'“”„«\-,–—]/.test(s)) return false
-
-      // Tolak kalimat yang diakhiri tanda kutip gantung tanpa pasangan awal
-      const quotesCount = (s.match(/["'“”„«»]/g) || []).length
-      if (quotesCount % 2 !== 0) return false
-
-      // Tolak kalimat yang diawali kata sambung gantung (Tetapi, Namun, Sementara, dll.)
-      if (INVALID_START_WORDS.test(s)) return false
-
-      // Tolak teks administratif editorial
-      if (/^(baca juga|editor|reporter|foto:|penulis:|dokumen|sumber:)/i.test(s)) return false
-
-      return true
-    })
-
-  if (validCandidates.length === 0) {
-    // Jika tidak ada yang lolos kriteria ketat, cari kalimat pertama yang bersih dari kata sambung
-    const firstClean = rawSentences
-      .map((s) => s.trim())
-      .find((s) => s.length >= 40 && !INVALID_START_WORDS.test(s) && !/^["'“”]/.test(s))
-    if (firstClean) {
-      return firstClean.length > 160 ? firstClean.slice(0, 155).replace(/\s+\S*$/, '') + '...' : firstClean
-    }
-    return ''
-  }
-
-  // Kata kunci penanda daya tarik berita (Hook Keywords)
-  const HOOK_KEYWORDS = /(berhasil|sukses|resmi|mencatat|tercatat|sorotan|penting|terungkap|memastikan|lonjakan|dampak|fenomena|kemenangan|potensi|langkah|strategi|perhatian|unggulan|puncak|fokus|diimbau|ajang|persiapan|sejarah|prestasi|antusias|viral)/i
-
-  let bestLead = ''
-  let bestScore = -100
-
-  for (let idx = 0; idx < validCandidates.length; idx++) {
-    const s = validCandidates[idx]
-    let score = 0
-
-    // Poin daya tarik kata kunci berita
-    const matches = s.match(new RegExp(HOOK_KEYWORDS.source, 'gi'))
-    if (matches) {
-      score += matches.length * 4
-    }
-
-    // Poin panjang ideal (65-130 karakter enak dibaca dalam 1 tarikan nafas)
-    if (s.length >= 65 && s.length <= 130) {
-      score += 3
-    }
-
-    // Kurangi nilai jika kalimat mirip/menjiplak judul
-    if (title && s.toLowerCase().includes(title.toLowerCase().trim())) {
-      score -= 5
-    }
-
-    // Beri sedikit prioritas untuk kalimat di awal/tengah cerita (alur pengait alami)
-    if (idx <= 3) {
-      score += 2
-    }
-
-    if (score > bestScore) {
-      bestScore = score
-      bestLead = s
-    }
-  }
-
-  return bestLead || validCandidates[0] || ''
-}
-
 function formatPublishDateTime(createdAt?: string, publishedDate?: string) {
   if (createdAt) {
     try {
@@ -345,7 +247,6 @@ export default function AdminBeritaPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isTagsManuallyEdited, setIsTagsManuallyEdited] = useState(false)
-  const [isExcerptManuallyEdited, setIsExcerptManuallyEdited] = useState(false)
 
   // Manajemen Kategori Berita
   const [categoriesList, setCategoriesList] = useState<CategoryItem[]>(DEFAULT_CATEGORIES)
@@ -546,17 +447,6 @@ export default function AdminBeritaPage() {
     setNewTags(autoTags)
   }, [newTitle, newCategory, newContent, isTagsManuallyEdited])
 
-  // Otomatis pilih kalimat pemikat (lead) ketika judul atau isi berita terisi
-  useEffect(() => {
-    if (isExcerptManuallyEdited) return
-    if (!newContent.trim()) {
-      setNewExcerpt('')
-      return
-    }
-    const auto = generateSmartLead(newTitle, newContent)
-    setNewExcerpt(auto)
-  }, [newTitle, newContent, isExcerptManuallyEdited])
-
   // Helper deduplikasi artikel berdasarkan slug, title, atau id
   const dedupeArticles = (items: Article[]): Article[] => {
     const seen = new Set<string>()
@@ -739,7 +629,7 @@ export default function AdminBeritaPage() {
       const isDraft = forceStatus ? forceStatus === 'draft' : newPublishType === 'draft'
       const finalCategoryLabel = getCategoryLabel(newCategory).toUpperCase()
       const cleanContent = (newContent || '').replace(/<!--[\s\S]*?-->/g, '').trim()
-      const autoExcerpt = newExcerpt.trim() || generateSmartLead(newTitle, cleanContent)
+      const autoExcerpt = newExcerpt.trim()
       const rawTags = newTags.trim() || generateSmartTags(newTitle, newCategory, cleanContent)
       const parsedTags = rawTags
         .split(',')
@@ -792,7 +682,7 @@ export default function AdminBeritaPage() {
       }
 
       if (!createdArticle) {
-        alert(`❌ GAGAL MENERBITKAN BERITA KE DATABASE:\n${apiErrorMessage}\n\nBerita TIDAK disimpan karena gagal masuk ke server database. Silakan pastikan Anda sudah login admin di /halo-jurnal/admin/login dan koneksi server stabil.`)
+        alert(`❌ GAGAL MENERBITKAN BERITA KE DATABASE:\n${apiErrorMessage}\n\nBerita TIDAK disimpan karena gagal masuk ke server database. Silakan pastikan Anda sudah login admin di /jw-gate-781 dan koneksi server stabil.`)
         return
       }
 
@@ -811,7 +701,6 @@ export default function AdminBeritaPage() {
       setNewRedaktur('')
       setNewTags('')
       setIsTagsManuallyEdited(false)
-      setIsExcerptManuallyEdited(false)
       setNewIsHero(false)
       setNewPublishType('now')
 
@@ -835,10 +724,7 @@ export default function AdminBeritaPage() {
         .map((t) => t.trim())
         .filter(Boolean)
     }
-    let initialExcerpt = article.excerpt
-    if (!initialExcerpt || !initialExcerpt.trim()) {
-      initialExcerpt = generateSmartLead(article.title, article.content)
-    }
+    let initialExcerpt = article.excerpt || ''
 
     if (article.status === 'draft') {
       setEditPublishType('draft')
@@ -920,7 +806,7 @@ export default function AdminBeritaPage() {
     try {
       const finalCategoryLabel = getCategoryLabel(editingArticle.category).toUpperCase()
       const cleanContent = (editingArticle.content || '').replace(/<!--[\s\S]*?-->/g, '').trim()
-      const autoExcerpt = editingArticle.excerpt?.trim() || generateSmartLead(editingArticle.title, cleanContent)
+      const autoExcerpt = editingArticle.excerpt?.trim() || ''
       const captionVal = editingArticle.imageCaption?.trim() || editingArticle.imageAlt?.trim() || undefined
       const updatedArticle = {
         ...editingArticle,
@@ -1071,7 +957,6 @@ export default function AdminBeritaPage() {
             type="button"
             onClick={() => {
               setIsTagsManuallyEdited(false)
-              setIsExcerptManuallyEdited(false)
               setIsCreateModalOpen(true)
             }}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#c00015] hover:bg-[#a00012] text-white text-xs font-semibold transition shadow-2xs cursor-pointer"
@@ -1933,39 +1818,16 @@ export default function AdminBeritaPage() {
       {fullscreenTarget && (
         <div className="fixed inset-0 z-[100] bg-white flex flex-col animate-in fade-in duration-150">
           {/* Top Bar */}
-          <div className="px-6 py-3 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="px-2 py-0.5 rounded bg-[#c00015]/10 text-[#c00015] font-bold text-xs uppercase tracking-wide">
-                Layar Penuh
-              </span>
-              <h2 className="text-sm font-bold text-slate-800 truncate">
-                {fullscreenTarget === 'create'
-                  ? newTitle || 'Artikel Baru'
-                  : editingArticle?.title || 'Edit Artikel'}
-              </h2>
-            </div>
-
-            <div className="flex items-center gap-4 shrink-0">
-              <span className="text-xs text-slate-500 font-medium">
-                {(fullscreenTarget === 'create'
-                  ? newContent
-                  : editingArticle?.content || ''
-                )
-                  .trim()
-                  .split(/\s+/)
-                  .filter(Boolean).length}{' '}
-                kata
-              </span>
-              <button
-                type="button"
-                onClick={() => setFullscreenTarget(null)}
-                className="px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 transition shadow-xs cursor-pointer"
-                title="Keluar layar penuh (Esc)"
-              >
-                <Minimize2 className="w-3.5 h-3.5" />
-                <span>Selesai & Kembali</span>
-              </button>
-            </div>
+          <div className="px-4 sm:px-6 py-3 border-b border-slate-200 bg-slate-50/80 flex items-center justify-end">
+            <button
+              type="button"
+              onClick={() => setFullscreenTarget(null)}
+              className="px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+              title="Keluar layar penuh (Esc)"
+            >
+              <Minimize2 className="w-3.5 h-3.5" />
+              <span>Kembali</span>
+            </button>
           </div>
 
           {/* Textarea Workspace */}
