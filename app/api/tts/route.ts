@@ -221,7 +221,7 @@ async function generateAudioWithGemini(cleanText: string, cacheFile: string): Pr
   const pcmBuffers: Buffer[] = [];
 
   for (const chunk of chunks) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-lite-tts:generateContent?key=${apiKey}`;
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
