@@ -155,9 +155,12 @@ export default function AdminReelsPage() {
   const handleSocialUrlChange = async (url: string) => {
     setFormSocialUrl(url)
     const lower = url.toLowerCase().trim()
-    if (!lower) return
+    if (!lower) {
+      setDetectedPlatform('instagram')
+      return
+    }
 
-    let plat = 'tiktok'
+    let plat = 'instagram'
     if (lower.includes('tiktok.com')) {
       plat = 'tiktok'
     } else if (lower.includes('youtube.com') || lower.includes('youtu.be')) {
@@ -173,11 +176,13 @@ export default function AdminReelsPage() {
         const match = url.match(/youtu\.be\/([a-zA-Z0-9_-]+)/)
         if (match && match[1]) ytId = match[1]
       }
-      if (ytId && !formThumbnail) {
+      if (ytId) {
         setFormThumbnail(`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`)
       }
     } else if (lower.includes('instagram.com')) {
       plat = 'instagram'
+    } else if (lower.includes('facebook.com') || lower.includes('fb.watch')) {
+      plat = 'facebook'
     }
     setDetectedPlatform(plat)
 
@@ -189,7 +194,10 @@ export default function AdminReelsPage() {
         if (res.ok) {
           const json = await res.json()
           const data = json.data || json
-          if (data.thumbnailUrl && !formThumbnail) {
+          if (data.platform) {
+            setDetectedPlatform(data.platform)
+          }
+          if (data.thumbnailUrl) {
             setFormThumbnail(data.thumbnailUrl)
           }
           if (data.title && !formTitle) {
@@ -640,12 +648,9 @@ export default function AdminReelsPage() {
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[90vh]">
             {/* Header Modal */}
             <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Film className="w-5 h-5 text-[#c00015]" />
-                <h3 className="font-heading font-bold text-slate-900 text-sm sm:text-base">
-                  {editingReel ? 'Edit Video Reels' : 'Tambah Video Reels'}
-                </h3>
-              </div>
+              <h3 className="font-heading font-bold text-slate-900 text-sm sm:text-base">
+                {editingReel ? 'Edit Video Reels' : 'Tambah Video Reels'}
+              </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
                 className="text-slate-400 hover:text-slate-700 p-1 rounded-md transition cursor-pointer"
@@ -659,14 +664,37 @@ export default function AdminReelsPage() {
             <form onSubmit={handleSubmitForm} className="p-5 space-y-4 overflow-y-auto flex-1 text-xs">
               {/* 1. Link Video Medsos */}
               <div className="space-y-1.5">
-                <label className="font-bold text-slate-800 flex items-center justify-between">
-                  <span>Link Video (TikTok / Instagram / YouTube Shorts) <span className="text-[#c00015]">*</span></span>
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-800 flex items-center gap-2">
+                    <span>Link Video Medsos <span className="text-[#c00015]">*</span></span>
+                    {formSocialUrl.trim() && (
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase transition-all shadow-2xs ${
+                          detectedPlatform === 'tiktok'
+                            ? 'bg-black text-white'
+                            : detectedPlatform === 'youtube'
+                            ? 'bg-[#FF0000] text-white'
+                            : detectedPlatform === 'facebook'
+                            ? 'bg-[#1877F2] text-white'
+                            : 'bg-gradient-to-r from-[#f09433] via-[#dc2743] to-[#bc1888] text-white'
+                        }`}
+                      >
+                        {detectedPlatform === 'youtube'
+                          ? 'YouTube Shorts'
+                          : detectedPlatform === 'tiktok'
+                          ? 'TikTok Video'
+                          : detectedPlatform === 'facebook'
+                          ? 'Facebook Watch'
+                          : 'Instagram Reels'}
+                      </span>
+                    )}
+                  </label>
                   {isFetchingMetadata && (
                     <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
                       <Loader2 className="w-3 h-3 animate-spin" /> Mengambil cover...
                     </span>
                   )}
-                </label>
+                </div>
                 <div className="relative">
                   <input
                     type="url"
@@ -683,7 +711,7 @@ export default function AdminReelsPage() {
                   )}
                 </div>
                 <p className="text-[11px] text-slate-500">
-                  Tempelkan link video, sistem otomatis mencoba mengambil foto cover aslinya.
+                  Tempelkan link video, sistem otomatis mendeteksi platform dan mengambil cover aslinya.
                 </p>
               </div>
 

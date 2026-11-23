@@ -42,6 +42,32 @@ export async function GET(req: NextRequest) {
     // 2. TikTok (termasuk shortlink vt.tiktok.com)
     if (lower.includes('tiktok.com')) {
       try {
+        // Coba endpoint resmi TikTok oEmbed (cepat, bebas token & langsung mengembalikan cover frame)
+        try {
+          const oembedRes = await fetch(
+            `https://www.tiktok.com/oembed?url=${encodeURIComponent(cleanUrl)}`,
+            {
+              headers: { 'User-Agent': 'Mozilla/5.0' },
+              cache: 'no-store',
+            }
+          );
+          if (oembedRes.ok) {
+            const oembedJson = await oembedRes.json();
+            if (oembedJson.thumbnail_url) {
+              return NextResponse.json({
+                success: true,
+                data: {
+                  platform: 'tiktok',
+                  thumbnailUrl: oembedJson.thumbnail_url,
+                  creator: oembedJson.author_name ? `@${oembedJson.author_name}` : '',
+                  title: oembedJson.title || '',
+                },
+              });
+            }
+          }
+        } catch {}
+
+        // Fallback: Scraping OpenGraph
         const res = await fetch(cleanUrl, {
           redirect: 'follow',
           headers: {
@@ -105,6 +131,19 @@ export async function GET(req: NextRequest) {
           platform: 'instagram',
           thumbnailUrl: '',
           creator,
+          title: '',
+        },
+      });
+    }
+
+    // 4. Facebook
+    if (lower.includes('facebook.com') || lower.includes('fb.watch')) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          platform: 'facebook',
+          thumbnailUrl: '',
+          creator: '',
           title: '',
         },
       });
