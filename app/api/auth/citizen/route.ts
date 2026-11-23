@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { hashPassword, comparePassword } from '@/lib/auth'
 import { sendRegisterOtp } from '@/lib/mail'
+import { sendWhatsAppOtp } from '@/lib/whatsapp'
 
 // In-Memory store untuk ketahanan OTP pendaftaran warga
 declare global {
@@ -124,10 +125,22 @@ export async function POST(request: NextRequest) {
         expiresAt: Date.now() + 10 * 60 * 1000,
       })
 
+      // Kirim via Fonnte WhatsApp Gateway
+      const recipientName = (body.fullName || body.name || '').trim()
+      const waResult = await sendWhatsAppOtp(cleanPhone, otp, recipientName)
+
+      const hasFonnteToken = Boolean(
+        process.env.FONNTE_TOKEN?.trim() &&
+        process.env.FONNTE_TOKEN?.trim() !== 'your_fonnte_token_here'
+      )
+
       return NextResponse.json({
         success: true,
-        message: `Kode verifikasi OTP berhasil dikirimkan ke WhatsApp ${cleanPhone}.`,
-        otpDemo: otp,
+        message: hasFonnteToken && waResult.success
+          ? `Kode verifikasi OTP berhasil dikirimkan ke WhatsApp ${cleanPhone}.`
+          : `Kode verifikasi OTP berhasil disiapkan untuk WhatsApp ${cleanPhone}.`,
+        otpDemo: hasFonnteToken && waResult.success ? undefined : otp,
+        isRealWaSent: hasFonnteToken && waResult.success,
       })
     }
 

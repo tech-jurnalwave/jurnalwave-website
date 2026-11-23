@@ -41,7 +41,7 @@ export default function DaftarPage() {
   const [infoMessage, setInfoMessage] = useState('')
   const [success, setSuccess] = useState(false)
 
-  // Countdown timer untuk kirim ulang OTP
+  // Countdown timer untuk jeda kirim ulang OTP
   useEffect(() => {
     let timer: NodeJS.Timeout
     if (countdown > 0) {
@@ -69,31 +69,36 @@ export default function DaftarPage() {
         body: JSON.stringify({
           action: 'send-wa-otp',
           phone: cleanPhone,
+          fullName: fullName.trim(),
         }),
       })
 
       const data = await res.json()
 
       if (!res.ok || !data.success) {
-        setError(data.message || 'Gagal mengirim kode OTP. Silakan periksa nomor Anda.')
+        setError(data.message || 'Gagal mengirim kode OTP. Periksa nomor Anda.')
         return
       }
 
       setOtpSent(true)
       setOtpVerified(false)
       setCountdown(60) // Cooldown 60 detik
+
       if (data.otpDemo) {
         setDemoOtpCode(data.otpDemo)
+      } else {
+        setDemoOtpCode('')
       }
-      setInfoMessage(`Kode OTP telah dikirim ke WhatsApp ${cleanPhone}.`)
+
+      setInfoMessage(data.message || `Kode verifikasi OTP telah dikirimkan ke WhatsApp ${cleanPhone}.`)
     } catch {
-      setError('Terjadi kendala jaringan saat mengirim OTP. Coba lagi.')
+      setError('Terjadi kendala jaringan saat mengirim kode OTP ke WhatsApp.')
     } finally {
       setOtpSending(false)
     }
   }
 
-  // Verifikasi Kode OTP yang dimasukkan warga
+  // Verifikasi Kode OTP yang dimasukkan
   const handleVerifyOtp = async (codeToVerify?: string) => {
     const targetOtp = (codeToVerify || otpCode).trim()
     const cleanPhone = phone.replace(/[^0-9]/g, '')
@@ -126,7 +131,7 @@ export default function DaftarPage() {
       }
 
       setOtpVerified(true)
-      setInfoMessage('Nomor WhatsApp berhasil diverifikasi! Silakan buat kata sandi Anda.')
+      setInfoMessage('Nomor WhatsApp terverifikasi! Silakan buat kata sandi untuk menyelesaikan pendaftaran.')
     } catch {
       setError('Terjadi kendala saat memverifikasi kode OTP.')
     } finally {
@@ -154,7 +159,7 @@ export default function DaftarPage() {
     }
 
     if (!otpVerified) {
-      setError('Mohon verifikasi nomor WhatsApp Anda dengan kode OTP terlebih dahulu.')
+      setError('Mohon klik "Kirim OTP" dan verifikasi nomor WhatsApp Anda terlebih dahulu.')
       return
     }
 
@@ -285,7 +290,7 @@ export default function DaftarPage() {
                 </div>
                 <h2 className="font-heading font-bold text-xl text-on-surface">Pendaftaran Berhasil!</h2>
                 <p className="text-xs text-secondary max-w-sm mx-auto">
-                  Akun warga Anda telah aktif dan terverifikasi. Mengalihkan Anda langsung ke portal beranda...
+                  Akun warga Anda telah terverifikasi dan aktif. Mengalihkan Anda langsung ke portal beranda...
                 </p>
                 <div className="flex justify-center pt-2">
                   <Loader2 className="w-5 h-5 animate-spin text-primary" />
@@ -297,7 +302,7 @@ export default function DaftarPage() {
                   Daftar Akun Warga
                 </h1>
                 <p className="text-xs sm:text-sm text-secondary font-medium tracking-tight mb-4">
-                  Daftar dengan Nomor WhatsApp Anda. Simpel, cepat, dan terverifikasi aman.
+                  Daftar akun pelapor terverifikasi dengan Nomor WhatsApp Anda.
                 </p>
 
                 {error && (
@@ -334,7 +339,7 @@ export default function DaftarPage() {
                     </div>
                   </div>
 
-                  {/* Kolom 2: Nomor WhatsApp dengan Tombol Verifikasi OTP */}
+                  {/* Kolom 2: Nomor WhatsApp dengan Tombol Kirim OTP */}
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="text-xs font-semibold text-on-surface">
@@ -398,7 +403,7 @@ export default function DaftarPage() {
                     </div>
                   </div>
 
-                  {/* Kolom 3: Input Kode OTP (Hanya jika OTP sudah dikirim & belum terverifikasi) */}
+                  {/* Kolom 3: Input Kode OTP (Muncul saat OTP dikirim & belum terverifikasi) */}
                   {otpSent && !otpVerified && (
                     <div className="p-3 rounded-xl bg-surface-container border border-primary/20 space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
                       <div className="flex items-center justify-between">
@@ -416,7 +421,7 @@ export default function DaftarPage() {
                             className="text-[10px] text-amber-600 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
                           >
                             <Sparkles className="w-2.5 h-2.5" />
-                            <span>Pakai demo: {demoOtpCode}</span>
+                            <span>Pakai kode: {demoOtpCode}</span>
                           </button>
                         )}
                       </div>
@@ -451,7 +456,7 @@ export default function DaftarPage() {
                         </button>
                       </div>
                       <p className="text-[10px] text-secondary">
-                        Kode 6 digit telah dikirimkan ke WhatsApp Anda. Berlaku selama 10 menit.
+                        Kode verifikasi 6 digit telah dikirimkan ke WhatsApp Anda. Berlaku selama 10 menit.
                       </p>
                     </div>
                   )}
