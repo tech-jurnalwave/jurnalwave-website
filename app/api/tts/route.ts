@@ -184,21 +184,119 @@ async function generateMaleAudioWithEdgeTTS(cleanText: string, cacheFile: string
   return combined;
 }
 
-// Mendapatkan buffer audio pria ArdiNeural konsisten 100% untuk seluruh artikel
-async function getAudioBuffer(cleanText: string, cacheFile: string): Promise<Buffer> {
+// Konversi raw PCM 24kHz 16-bit Mono ke format file WAV standar yang didukung 100% browser
+function pcmToWav(pcmBuffer: Buffer, sampleRate = 24000, numChannels = 1): Buffer {
+  const header = Buffer.alloc(44);
+  const byteRate = sampleRate * numChannels * 2;
+  const blockAlign = numChannels * 2;
+  const dataSize = pcmBuffer.length;
+  const chunkSize = 36 + dataSize;
+
+  header.write('RIFF', 0);
+  header.writeUInt32LE(chunkSize, 4);
+  header.write('WAVE', 8);
+
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20); // PCM
+  header.writeUInt16LE(numChannels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(byteRate, 28);
+  header.writeUInt16LE(blockAlign, 32);
+  header.writeUInt16LE(16, 34); // 16-bit
+
+  header.write('data', 36);
+  header.writeUInt32LE(dataSize, 40);
+
+  return Buffer.concat([header, pcmBuffer]);
+}
+
+// Menghasilkan audio pembaca berita pria tegas melalui Google Gemini Flash TTS (REST HTTPS — Bebas Timeout Cloud Vercel)
+async function generateAudioWithGemini(cleanText: string, cacheFile: string): Promise<Buffer> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY is not defined');
+
+  // Pecah naskah per segmen ~1200 karakter agar pemrosesan cepat & tidak terputus
+  const chunks = splitTextIntoSafeChunks(cleanText, 1200);
+  const pcmBuffers: Buffer[] = [];
+
+  for (const chunk of chunks) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: chunk }] }],
+        generationConfig: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: 'Fenrir' // Suara pria tegas, mantap, dan berwibawa khas pembaca berita
+              }
+            }
+          }
+        }
+      })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Gemini TTS API responded ${res.status}: ${errText}`);
+    }
+
+    const data = await res.json();
+    const inlineData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+    if (inlineData?.data) {
+      pcmBuffers.push(Buffer.from(inlineData.data, 'base64'));
+    }
+  }
+
+  if (pcmBuffers.length === 0) {
+    throw new Error('Gemini TTS produced empty audio');
+  }
+
+  const combinedPcm = Buffer.concat(pcmBuffers);
+  const wavBuffer = pcmToWav(combinedPcm, 24000, 1);
+
+  try {
+    ensureCacheDir();
+    fs.writeFileSync(cacheFile, wavBuffer);
+  } catch (err) {
+    console.warn('Could not write cache file:', err);
+  }
+
+  return wavBuffer;
+}
+
+// Mendapatkan buffer audio pria konsisten 100% untuk seluruh artikel
+async function getAudioBuffer(cleanText: string, cacheFile: string): Promise<{ buffer: Buffer; mimeType: string }> {
   ensureCacheDir();
   // 1. Jika sudah ada di disk cache, baca langsung (0.001 detik)
   if (fs.existsSync(cacheFile)) {
     try {
       const existing = fs.readFileSync(cacheFile);
       if (existing.length > 500) {
-        return existing;
+        const isWav = existing.subarray(0, 4).toString('ascii') === 'RIFF';
+        return { buffer: existing, mimeType: isWav ? 'audio/wav' : 'audio/mpeg' };
       }
     } catch {}
   }
 
-  // 2. Generate audio pria ArdiNeural resmi via Node.js EdgeTTS (bekerja 100% di server Vercel & lokal)
-  return await generateMaleAudioWithEdgeTTS(cleanText, cacheFile);
+  // 2. Prioritas 1: Google Gemini Flash TTS (Resmi, Cepat, Suara Pria Berita Tegas, Bebas Blokir Datacenter Vercel)
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (geminiKey) {
+    try {
+      const buffer = await generateAudioWithGemini(cleanText, cacheFile);
+      return { buffer, mimeType: 'audio/wav' };
+    } catch (geminiErr) {
+      console.warn('Gemini TTS synthesis notice, trying EdgeTTS:', geminiErr);
+    }
+  }
+
+  // 3. Prioritas 2 (Fallback): EdgeTTS ArdiNeural
+  const buffer = await generateMaleAudioWithEdgeTTS(cleanText, cacheFile);
+  return { buffer, mimeType: 'audio/mpeg' };
 }
 
 // Handler GET: Digunakan oleh pemutar audio HTML5 (<audio src="/api/tts?id=...">)
@@ -211,7 +309,7 @@ export async function GET(request: Request) {
     let cacheKey = '';
 
     if (id) {
-      cacheKey = `article-${id}-ardi-v5`;
+      cacheKey = `article-${id}-v6`;
       if (!rawText) {
         let article: any = await fetchArticleById(id);
         if (!article) {
@@ -234,13 +332,13 @@ export async function GET(request: Request) {
 
     if (!cacheKey) {
       const hash = crypto.createHash('md5').update(clean).digest('hex').slice(0, 12);
-      cacheKey = `text-${hash}-ardi-v5`;
+      cacheKey = `text-${hash}-v6`;
     }
 
     ensureCacheDir();
-    const cacheFile = path.join(CACHE_DIR, `${cacheKey}.mp3`);
+    const cacheFile = path.join(CACHE_DIR, `${cacheKey}.wav`);
 
-    const fullBuffer = await getAudioBuffer(clean, cacheFile);
+    const { buffer: fullBuffer, mimeType } = await getAudioBuffer(clean, cacheFile);
     const total = fullBuffer.length;
 
     // Dukungan HTTP Range seek (geser maju/mundur 10 detik atau klik slider)
@@ -258,7 +356,7 @@ export async function GET(request: Request) {
           'Content-Range': `bytes ${start}-${end}/${total}`,
           'Accept-Ranges': 'bytes',
           'Content-Length': String(chunksize),
-          'Content-Type': 'audio/mpeg',
+          'Content-Type': mimeType,
           'Cache-Control': 'public, max-age=604800, stale-while-revalidate=86400',
         },
       });
@@ -267,7 +365,7 @@ export async function GET(request: Request) {
     return new Response(new Uint8Array(fullBuffer), {
       status: 200,
       headers: {
-        'Content-Type': 'audio/mpeg',
+        'Content-Type': mimeType,
         'Content-Length': String(total),
         'Accept-Ranges': 'bytes',
         'Cache-Control': 'public, max-age=604800, stale-while-revalidate=86400',
@@ -291,7 +389,7 @@ export async function POST(request: Request) {
 
     let cacheKey = '';
     if (id) {
-      cacheKey = `article-${id}-ardi-v5`;
+      cacheKey = `article-${id}-v6`;
       if (!rawText) {
         let article: any = await fetchArticleById(id);
         if (!article) {
@@ -314,18 +412,18 @@ export async function POST(request: Request) {
 
     if (!cacheKey) {
       const hash = crypto.createHash('md5').update(clean).digest('hex').slice(0, 12);
-      cacheKey = `text-${hash}-ardi-v5`;
+      cacheKey = `text-${hash}-v6`;
     }
 
     ensureCacheDir();
-    const cacheFile = path.join(CACHE_DIR, `${cacheKey}.mp3`);
+    const cacheFile = path.join(CACHE_DIR, `${cacheKey}.wav`);
 
-    const fullBuffer = await getAudioBuffer(clean, cacheFile);
+    const { buffer: fullBuffer, mimeType } = await getAudioBuffer(clean, cacheFile);
 
     return new Response(new Uint8Array(fullBuffer), {
       status: 200,
       headers: {
-        'Content-Type': 'audio/mpeg',
+        'Content-Type': mimeType,
         'Content-Length': String(fullBuffer.length),
         'Cache-Control': 'public, max-age=604800, stale-while-revalidate=86400',
       },
