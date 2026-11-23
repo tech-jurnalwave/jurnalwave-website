@@ -66,6 +66,7 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
 
   // Hak akses menu untuk staf admin (null = Superadmin / Akses Penuh)
   const [allowedPermissions, setAllowedPermissions] = useState<string[] | null>(null)
+  const [isSuperadmin, setIsSuperadmin] = useState<boolean>(true)
 
   const syncUserPermissions = () => {
     if (typeof window === 'undefined') return
@@ -75,9 +76,12 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
         const parsed = JSON.parse(savedUser)
 
         const isSuper =
-          parsed.role === 'superadmin' ||
-          parsed.email === 'admin@jurnalwave.com' ||
+          parsed.role?.toLowerCase() === 'superadmin' ||
+          parsed.email?.toLowerCase() === 'admin@jurnalwave.com' ||
+          parsed.email?.toLowerCase() === 'tech.jurnalwave@gmail.com' ||
           parsed.isSuperadmin === true
+
+        setIsSuperadmin(Boolean(isSuper))
 
         let resolvedName = parsed.name || 'Super Admin'
         let resolvedEmail = parsed.email || 'admin@jurnalwave.com'
@@ -120,16 +124,17 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
             (m: any) => m.email?.toLowerCase() === parsed.email?.toLowerCase()
           )
           if (found && Array.isArray(found.permissions)) {
-            setAllowedPermissions(found.permissions)
+            setAllowedPermissions(found.permissions.filter((p: string) => p !== 'pengguna'))
             return
           }
         }
 
         if (Array.isArray(parsed.permissions)) {
-          setAllowedPermissions(parsed.permissions)
+          setAllowedPermissions(parsed.permissions.filter((p: string) => p !== 'pengguna'))
           return
         }
       }
+      setIsSuperadmin(true)
       setAllowedPermissions(null)
     } catch {}
   }
@@ -247,6 +252,10 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
+        // Menu Kelola Pengguna strictly eksklusif hanya untuk Superadmin
+        if (item.href === '/halo-jurnal/admin/pengguna' && !isSuperadmin) {
+          return false
+        }
         if (!allowedPermissions) return true // Superadmin / Akses Penuh
         const permKey = HREF_TO_PERMISSION[item.href]
         return permKey ? allowedPermissions.includes(permKey) : true
