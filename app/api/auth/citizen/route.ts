@@ -129,18 +129,20 @@ export async function POST(request: NextRequest) {
       const recipientName = (body.fullName || body.name || '').trim()
       const waResult = await sendWhatsAppOtp(cleanPhone, otp, recipientName)
 
-      const hasFonnteToken = Boolean(
-        process.env.FONNTE_TOKEN?.trim() &&
-        process.env.FONNTE_TOKEN?.trim() !== 'your_fonnte_token_here'
-      )
+      if (!waResult.success) {
+        console.warn('WhatsApp gateway send notice:', waResult.message, waResult.detail)
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Gagal mengirim OTP ke WhatsApp: ${waResult.message}. Pastikan perangkat WhatsApp di dashboard Fonnte dalam status terhubung (connect).`,
+          },
+          { status: 502 }
+        )
+      }
 
       return NextResponse.json({
         success: true,
-        message: hasFonnteToken && waResult.success
-          ? `Kode verifikasi OTP berhasil dikirimkan ke WhatsApp ${cleanPhone}.`
-          : `Kode verifikasi OTP berhasil disiapkan untuk WhatsApp ${cleanPhone}.`,
-        otpDemo: hasFonnteToken && waResult.success ? undefined : otp,
-        isRealWaSent: hasFonnteToken && waResult.success,
+        message: `Kode verifikasi OTP berhasil dikirimkan ke WhatsApp ${cleanPhone}.`,
       })
     }
 
