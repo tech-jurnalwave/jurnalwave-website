@@ -160,13 +160,6 @@ export function ArticleDetailView({
   const [playbackRate, setPlaybackRate] = useState<number>(1);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const playTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
-    };
-  }, []);
 
   // Perkiraan durasi membaca / TTS (~125 kata per menit) jika durasi asli belum terload
   const cleanContentForSpeech = (article?.content || '').replace(/<!--[\s\S]*?-->/g, '').trim();
@@ -207,72 +200,8 @@ export function ArticleDetailView({
     }
   }, [article?.id]);
 
-  // Track pemutar audio
-  const usingSpeechSynthRef = useRef<boolean>(false);
-
-  // Fallback cadangan instan: Web Speech API native browser (Zero delay, 100% offline-ready)
-  const startWebSpeechFallback = useCallback(() => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      setIsLoadingAudio(false);
-      setIsPlaying(false);
-      return;
-    }
-
-    try {
-      window.speechSynthesis.cancel();
-      const cleanText = (fullArticleSpeechText || article?.title || '').slice(0, 4000);
-      const utterance = new SpeechSynthesisUtterance(cleanText);
-      utterance.lang = 'id-ID';
-      utterance.rate = playbackRate || 1;
-
-      const voices = window.speechSynthesis.getVoices();
-      const idVoice = voices.find((v) => v.lang.startsWith('id') || v.lang.includes('ID'));
-      if (idVoice) {
-        utterance.voice = idVoice;
-      }
-
-      utterance.onstart = () => {
-        usingSpeechSynthRef.current = true;
-        if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
-        setIsLoadingAudio(false);
-        setIsPlaying(true);
-        setIsAudioActive(true);
-      };
-
-      utterance.onend = () => {
-        usingSpeechSynthRef.current = false;
-        setIsPlaying(false);
-        setIsLoadingAudio(false);
-        setCurrentTime(0);
-      };
-
-      utterance.onerror = () => {
-        usingSpeechSynthRef.current = false;
-        setIsPlaying(false);
-        setIsLoadingAudio(false);
-      };
-
-      window.speechSynthesis.speak(utterance);
-    } catch {
-      setIsLoadingAudio(false);
-      setIsPlaying(false);
-    }
-  }, [fullArticleSpeechText, article?.title, playbackRate]);
-
-  // Eksekusi pemutaran audio (Server Cloud TTS Suara Pria Resmi Fenrir)
+  // Eksekusi pemutaran audio murni presenter berita resmi JurnalWave
   const handlePlayToggle = async () => {
-    // Jika sedang pakai Web Speech, toggle pause/resume
-    if (usingSpeechSynthRef.current) {
-      if (isPlaying) {
-        window.speechSynthesis.pause();
-        setIsPlaying(false);
-      } else {
-        window.speechSynthesis.resume();
-        setIsPlaying(true);
-      }
-      return;
-    }
-
     const audio = audioRef.current;
     if (!audio) return;
 
@@ -284,7 +213,6 @@ export function ArticleDetailView({
       audio.pause();
       setIsPlaying(false);
       setIsLoadingAudio(false);
-      if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
       return;
     }
 
@@ -299,30 +227,14 @@ export function ArticleDetailView({
     }
     audio.playbackRate = playbackRate;
 
-    // Timeout keamanan 7 detik (jika server lambat, baru beralih ke suara cadangan)
-    if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
-    playTimeoutRef.current = setTimeout(() => {
-      if (!isPlaying && isLoadingAudio) {
-        console.warn('Audio loading timeout, beralih ke Web Speech');
-        startWebSpeechFallback();
-      }
-    }, 7000);
-
-    // Langsung trigger play dalam konteks gesture klik pengguna
     audio.play()
       .then(() => {
-        if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
         setIsPlaying(true);
         setIsLoadingAudio(false);
       })
       .catch((err: any) => {
         console.warn('Audio play request status:', err?.name || err);
-        if (err?.name !== 'AbortError') {
-          if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
-          startWebSpeechFallback();
-        } else {
-          setIsLoadingAudio(false);
-        }
+        setIsLoadingAudio(false);
       });
   };
 
@@ -360,14 +272,9 @@ export function ArticleDetailView({
   };
 
   const handleCloseAudio = () => {
-    if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
     if (audioRef.current) {
       audioRef.current.pause();
     }
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-    usingSpeechSynthRef.current = false;
     setIsAudioActive(false);
     setIsPlaying(false);
     setIsLoadingAudio(false);
@@ -1227,7 +1134,6 @@ export function ArticleDetailView({
           }
         }}
         onPlaying={() => {
-          if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
           setIsLoadingAudio(false);
           setIsPlaying(true);
         }}
@@ -1235,15 +1141,14 @@ export function ArticleDetailView({
           setIsLoadingAudio(true);
         }}
         onEnded={() => {
-          if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
           setIsPlaying(false);
           setIsLoadingAudio(false);
           setCurrentTime(0);
         }}
         onError={(e) => {
-          console.warn('Audio tag error, beralih ke Web Speech:', e);
-          if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
-          startWebSpeechFallback();
+          console.warn('Audio tag playback notice:', e);
+          setIsLoadingAudio(false);
+          setIsPlaying(false);
         }}
         className="hidden"
       />
