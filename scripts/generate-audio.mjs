@@ -15,9 +15,61 @@ const VOICE_NAME = 'id-ID-ArdiNeural';
 const VOICE_RATE = '+6%';
 const VOICE_PITCH = '+0Hz';
 
+// Kamus fonetik istilah serapan & singkatan agar pelafalan bahasa Indonesia terdengar alami
+const PHONETIC_REPLACEMENTS = [
+  // Singkatan umum & Lembaga
+  [/\bUMKM\b/g, 'U M K M'],
+  [/\bGen[- ]?Z\b/gi, 'Gen Zi'],
+  [/\bWIB\b/g, 'W I B'],
+  [/\bGTA\b/g, 'G T A'],
+  [/\bFE\b/g, 'F E'],
+  [/\bRp\s*([\d.,]+)/gi, '$1 rupiah'],
+  // Musik & Hiburan
+  [/\bline[- ]?up\b/gi, 'lain ap'],
+  [/\bmerchandise\b/gi, 'mercendais'],
+  [/\blive\b/gi, 'laif'],
+  [/\bstreaming\b/gi, 'striming'],
+  [/\bevent\b/gi, 'ivent'],
+  [/\bcreative\b/gi, 'kreatif'],
+  [/\bfest\b/gi, 'fes'],
+  [/\bshowcase\b/gi, 'syokeis'],
+  [/\bteaser\b/gi, 'tiser'],
+  [/\btrailer\b/gi, 'treiler'],
+  [/\bcomeback\b/gi, 'kambek'],
+  // Bisnis & Gaya Hidup
+  [/\bbrand\b/gi, 'brend'],
+  [/\bbooth\b/gi, 'but'],
+  [/\bcoffee shop\b/gi, 'kofi syop'],
+  [/\bcold brew\b/gi, 'kold bru'],
+  [/\blifestyle\b/gi, 'laifstail'],
+  [/\breview\b/gi, 'rivyu'],
+  [/\bweekend\b/gi, 'wik-end'],
+  [/\bbudget\b/gi, 'bajet'],
+  [/\bworkshop\b/gi, 'worsyop'],
+  [/\bmeet[- ]?up\b/gi, 'mit ap'],
+  // Digital & Teknologi
+  [/\bstartup\b/gi, 'start ap'],
+  [/\bgadget\b/gi, 'gejet'],
+  [/\bsmartphone\b/gi, 'smartfon'],
+  [/\bpodcast\b/gi, 'podkes'],
+  [/\bonline\b/gi, 'onlain'],
+  [/\boffline\b/gi, 'oflain'],
+  [/\bupdate\b/gi, 'apdet'],
+  [/\bdownload\b/gi, 'daunlod'],
+  [/\bupload\b/gi, 'aplod'],
+  [/\bgaming\b/gi, 'geming'],
+  [/\bgamer\b/gi, 'gemer'],
+  [/\bgame\b/gi, 'gem'],
+  [/\bcontent creator\b/gi, 'konten krieitor'],
+  [/\binfluencer\b/gi, 'influenser'],
+  [/\brating\b/gi, 'reiting'],
+  [/\bfeedback\b/gi, 'fidbek'],
+  [/\bdeadline\b/gi, 'dedlain']
+];
+
 function cleanArticleText(text) {
   if (!text) return '';
-  return text
+  let cleaned = text
     .replace(/<[^>]*>/g, ' ')
     .replace(/[*_#`~[\]()]/g, ' ')
     .replace(/https?:\/\/\S+/g, '')
@@ -26,6 +78,12 @@ function cleanArticleText(text) {
     .replace(/\s+-\s+/g, ', ')
     .replace(/\s+/g, ' ')
     .trim();
+
+  for (const [pattern, replacement] of PHONETIC_REPLACEMENTS) {
+    cleaned = cleaned.replace(pattern, replacement);
+  }
+
+  return cleaned;
 }
 
 async function checkAudioExists(articleId) {
@@ -68,10 +126,26 @@ async function uploadToCloudinary(buffer, articleId) {
 }
 
 async function generateAudioForArticle(article) {
-  const rawText = `${article.title}. ${article.excerpt}. ${article.content}`;
+  const cleanTitle = (article.title || '').trim().replace(/[.?!]+$/, '');
+  const cleanContent = (article.content || '').replace(/<!--[\s\S]*?-->/g, '').trim();
+
+  // Mencegah judul disebut dua kali jika excerpt sama dengan judul atau sudah ada di naskah
+  let leadText = '';
+  if (article.excerpt) {
+    const trimmedExcerpt = article.excerpt.trim();
+    const isDupTitle = trimmedExcerpt.toLowerCase() === cleanTitle.toLowerCase();
+    const isInContent = cleanContent.toLowerCase().includes(trimmedExcerpt.toLowerCase());
+    const isTooShort = trimmedExcerpt.length < 20;
+    if (!isDupTitle && !isInContent && !isTooShort) {
+      leadText = `${trimmedExcerpt.replace(/[.?!]+$/, '')}. `;
+    }
+  }
+
+  // Format naskah presenter: Judul Headline (1x) diikuti jeda titik lalu Isi Berita
+  const rawText = `${cleanTitle}. ${leadText}${cleanContent}`;
   const cleaned = cleanArticleText(rawText);
 
-  console.log(`Menghasilkan audio untuk: [${article.id}] "${article.title.slice(0, 40)}..."`);
+  console.log(`Menghasilkan audio untuk: [${article.id}] "${cleanTitle.slice(0, 40)}..."`);
   const tts = new EdgeTTS();
   await tts.synthesize(cleaned, VOICE_NAME, {
     rate: VOICE_RATE,
@@ -91,12 +165,14 @@ async function generateAudioForArticle(article) {
 }
 
 async function main() {
+  const forceOverwrite = process.argv.includes('--force');
+
   if (!CLOUD_NAME || !API_KEY || !API_SECRET) {
     console.error('ERROR: Kredensial Cloudinary belum lengkap di .env');
     process.exit(1);
   }
 
-  console.log('--- Sinkronisasi Audio Berita JurnalWave ke Cloudinary ---');
+  console.log(`--- Sinkronisasi Audio Berita JurnalWave ke Cloudinary ${forceOverwrite ? '(MODE FORCE OVERWRITE)' : ''} ---`);
   const articles = await prisma.article.findMany({
     orderBy: { createdAt: 'desc' }
   });
@@ -104,11 +180,11 @@ async function main() {
   console.log(`Total artikel ditemukan: ${articles.length}`);
 
   for (const article of articles) {
-    const exists = await checkAudioExists(article.id);
+    const exists = !forceOverwrite && (await checkAudioExists(article.id));
     if (exists) {
       console.log(`[SUDAH ADA] ${article.id} - ${article.title.slice(0, 45)}...`);
     } else {
-      console.log(`[BELUM ADA] Menghasilkan audio untuk ${article.id}...`);
+      console.log(`[PROSES] Menghasilkan audio bersih 1x judul untuk ${article.id}...`);
       try {
         await generateAudioForArticle(article);
       } catch (err) {
