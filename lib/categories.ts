@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { prisma } from '@/lib/prisma'
 
 export interface CategoryItem {
   value: string
@@ -11,8 +12,8 @@ export const DEFAULT_CATEGORIES: CategoryItem[] = [
   { value: 'kuliner', label: 'Kuliner' },
   { value: 'wisata', label: 'Wisata' },
   { value: 'hiburan', label: 'Hiburan' },
-  { value: 'tech', label: 'Tech & Game' },
-  { value: 'sport', label: 'Sport' },
+  { value: 'tech', label: 'Tech' },
+  { value: 'sport', label: 'Sport & E-Sport' },
   { value: 'inspirasi', label: 'Inspirasi' },
 ]
 
@@ -77,6 +78,84 @@ export function getArticleCategories(): CategoryItem[] {
   // 3. Fallback ke 7 Kategori Resmi JurnalWave
   globalThis.__jurnalWaveGlobalCategories = DEFAULT_CATEGORIES
   return DEFAULT_CATEGORIES
+}
+
+/**
+ * Membaca daftar kategori resmi dari Database Neon (PostgreSQL)
+ * Sinkronisasi 100% konsisten antar Admin & Pengunjung Publik
+ */
+export async function getArticleCategoriesFromDb(): Promise<CategoryItem[]> {
+  try {
+    const rows = await prisma.$queryRaw<Array<{ value: string; label: string; order: number }>>`
+      SELECT value, label, "order" FROM categories ORDER BY "order" ASC
+    `
+    if (Array.isArray(rows) && rows.length > 0) {
+      const cleaned: CategoryItem[] = rows.map((r) => ({
+        value: String(r.value).toLowerCase().trim(),
+        label: String(r.label).trim(),
+      }))
+      globalThis.__jurnalWaveGlobalCategories = cleaned
+      return cleaned
+    }
+  } catch (err) {
+    console.warn('Notice saat membaca kategori dari database:', err)
+  }
+
+  return getArticleCategories()
+}
+
+/**
+ * Menyimpan pembaruan kategori secara permanen ke Database Neon
+ */
+export async function saveArticleCategoriesToDb(categories: CategoryItem[]): Promise<boolean> {
+  if (!Array.isArray(categories) || categories.length === 0) {
+    return false
+  }
+
+  const cleaned: CategoryItem[] = categories
+    .filter((c) => c && typeof c === 'object' && (c.value || c.label))
+    .map((c) => ({
+      value: String(c.value || c.label).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
+      label: String(c.label || c.value).trim(),
+    }))
+    .filter((c) => c.value.length > 0 && c.label.length > 0)
+
+  if (cleaned.length === 0) {
+    return false
+  }
+
+  // Update RAM memori server global (instan)
+  globalThis.__jurnalWaveGlobalCategories = cleaned
+
+  // Simpan ke PostgreSQL database di Neon
+  try {
+    await prisma.$executeRawUnsafe(`DELETE FROM categories`)
+    for (let i = 0; i < cleaned.length; i++) {
+      const c = cleaned[i]
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO categories (id, value, label, "order", "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, $4, NOW(), NOW())`,
+        `cat_${c.value}_${i}`,
+        c.value,
+        c.label,
+        i + 1
+      )
+    }
+  } catch (dbErr) {
+    console.error('Error menyimpan kategori ke database:', dbErr)
+  }
+
+  // Simpan juga ke file lokal jika filesystem mengizinkan
+  try {
+    const filePath = resolveCategoriesFilePath()
+    const dir = path.dirname(filePath)
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true })
+    }
+    fs.writeFileSync(filePath, JSON.stringify(cleaned, null, 2), 'utf-8')
+  } catch {}
+
+  return true
 }
 
 /**
