@@ -6,7 +6,8 @@
     "dev": "next dev --webpack",
     "build": "prisma generate && next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "generate-audio": "node scripts/generate-audio.mjs"
   },
   "dependencies": {
     "@andresaya/edge-tts": "^1.9.1",
