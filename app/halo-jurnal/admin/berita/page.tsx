@@ -261,7 +261,6 @@ export default function AdminBeritaPage() {
   // Form State untuk Tambah Berita Baru
   const [newTitle, setNewTitle] = useState('')
   const [newCategory, setNewCategory] = useState<ArticleCategory>('berita')
-  const [newExcerpt, setNewExcerpt] = useState('')
   const [newContent, setNewContent] = useState('')
   const [newImageUrl, setNewImageUrl] = useState('')
   const [newImageCaption, setNewImageCaption] = useState('')
@@ -658,7 +657,8 @@ export default function AdminBeritaPage() {
       const isDraft = forceStatus ? forceStatus === 'draft' : newPublishType === 'draft'
       const finalCategoryLabel = getCategoryLabel(newCategory).toUpperCase()
       const cleanContent = (newContent || '').replace(/<!--[\s\S]*?-->/g, '').trim()
-      const autoExcerpt = newExcerpt.trim()
+      const plainTextContent = cleanContent.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
+      const autoExcerpt = plainTextContent ? plainTextContent.slice(0, 160) : newTitle.trim()
       const rawTags = newTags.trim() || generateSmartTags(newTitle, newCategory, cleanContent)
       const parsedTags = rawTags
         .split(',')
@@ -722,7 +722,6 @@ export default function AdminBeritaPage() {
       // Reset Form
       setNewTitle('')
       setNewCategory('berita')
-      setNewExcerpt('')
       setNewContent('')
       setNewImageUrl('')
       setNewImageCaption('')
@@ -835,7 +834,8 @@ export default function AdminBeritaPage() {
     try {
       const finalCategoryLabel = getCategoryLabel(editingArticle.category).toUpperCase()
       const cleanContent = (editingArticle.content || '').replace(/<!--[\s\S]*?-->/g, '').trim()
-      const autoExcerpt = editingArticle.excerpt?.trim() || ''
+      const plainTextContent = cleanContent.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
+      const autoExcerpt = plainTextContent ? plainTextContent.slice(0, 160) : editingArticle.title.trim()
       const captionVal = editingArticle.imageCaption?.trim() || editingArticle.imageAlt?.trim() || undefined
       const updatedArticle = {
         ...editingArticle,
@@ -1495,22 +1495,6 @@ export default function AdminBeritaPage() {
                   />
                 </div>
 
-                {/* Ringkasan / Cuplikan Singkat (Excerpt) */}
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Ringkasan / Cuplikan Singkat <span className="font-normal text-slate-400">(Tampil di kartu pratinjau berita)</span>
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={editingArticle.excerpt || ''}
-                    onChange={(e) =>
-                      setEditingArticle({ ...editingArticle, excerpt: e.target.value })
-                    }
-                    placeholder="Masukkan cuplikan singkat (jika dikosongkan, otomatis mengambil kalimat awal isi artikel)..."
-                    className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015] leading-relaxed"
-                  />
-                </div>
-
                 {/* Isi Artikel */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
@@ -1771,20 +1755,6 @@ export default function AdminBeritaPage() {
                     onChange={(e) => setNewImageCaption(e.target.value)}
                     placeholder="Masukkan keterangan foto..."
                     className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015]"
-                  />
-                </div>
-
-                {/* Ringkasan / Cuplikan Singkat (Excerpt) */}
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Ringkasan / Cuplikan Singkat <span className="font-normal text-slate-400">(Tampil di kartu pratinjau berita)</span>
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={newExcerpt}
-                    onChange={(e) => setNewExcerpt(e.target.value)}
-                    placeholder="Masukkan cuplikan singkat (jika dikosongkan, otomatis mengambil kalimat awal isi artikel)..."
-                    className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015] leading-relaxed"
                   />
                 </div>
 
