@@ -207,15 +207,72 @@ export function ArticleDetailView({
     }
   }, [article?.id]);
 
-  // Pastikan tidak ada sisa suara sintesis browser lain yang tertinggal
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-  }, [article?.id]);
+  // Track pemutar audio
+  const usingSpeechSynthRef = useRef<boolean>(false);
 
-  // Eksekusi pemutaran audio tunggal resmi JurnalWave (Suara Pria Berita Fenrir)
+  // Fallback cadangan instan: Web Speech API native browser (Zero delay, 100% offline-ready)
+  const startWebSpeechFallback = useCallback(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      setIsLoadingAudio(false);
+      setIsPlaying(false);
+      return;
+    }
+
+    try {
+      window.speechSynthesis.cancel();
+      const cleanText = (fullArticleSpeechText || article?.title || '').slice(0, 4000);
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.lang = 'id-ID';
+      utterance.rate = playbackRate || 1;
+
+      const voices = window.speechSynthesis.getVoices();
+      const idVoice = voices.find((v) => v.lang.startsWith('id') || v.lang.includes('ID'));
+      if (idVoice) {
+        utterance.voice = idVoice;
+      }
+
+      utterance.onstart = () => {
+        usingSpeechSynthRef.current = true;
+        if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
+        setIsLoadingAudio(false);
+        setIsPlaying(true);
+        setIsAudioActive(true);
+      };
+
+      utterance.onend = () => {
+        usingSpeechSynthRef.current = false;
+        setIsPlaying(false);
+        setIsLoadingAudio(false);
+        setCurrentTime(0);
+      };
+
+      utterance.onerror = () => {
+        usingSpeechSynthRef.current = false;
+        setIsPlaying(false);
+        setIsLoadingAudio(false);
+      };
+
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      setIsLoadingAudio(false);
+      setIsPlaying(false);
+    }
+  }, [fullArticleSpeechText, article?.title, playbackRate]);
+
+  // Eksekusi pemutaran audio (Server Cloud TTS Suara Pria Resmi Fenrir)
   const handlePlayToggle = async () => {
+    // Jika sedang pakai Web Speech, toggle pause/resume
+    if (usingSpeechSynthRef.current) {
+      if (isPlaying) {
+        window.speechSynthesis.pause();
+        setIsPlaying(false);
+      } else {
+        window.speechSynthesis.resume();
+        setIsPlaying(true);
+      }
+      return;
+    }
+
     const audio = audioRef.current;
     if (!audio) return;
 
@@ -241,11 +298,14 @@ export function ArticleDetailView({
     }
     audio.playbackRate = playbackRate;
 
-    // Timeout keamanan maksimal 45 detik untuk sintesis perdana naskah berita lengkap
+    // Timeout keamanan maksimal 15 detik agar loading tidak menggantung selamanya
     if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
     playTimeoutRef.current = setTimeout(() => {
-      setIsLoadingAudio(false);
-    }, 45000);
+      if (!isPlaying && isLoadingAudio) {
+        console.warn('Audio loading timeout, beralih ke Web Speech');
+        startWebSpeechFallback();
+      }
+    }, 12000);
 
     // Langsung trigger play dalam konteks gesture klik pengguna
     audio.play()
@@ -256,8 +316,10 @@ export function ArticleDetailView({
       })
       .catch((err: any) => {
         console.warn('Audio play request status:', err?.name || err);
-        if (err?.name === 'AbortError') {
+        if (err?.name !== 'AbortError') {
           if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
+          startWebSpeechFallback();
+        } else {
           setIsLoadingAudio(false);
         }
       });
@@ -304,6 +366,7 @@ export function ArticleDetailView({
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
+    usingSpeechSynthRef.current = false;
     setIsAudioActive(false);
     setIsPlaying(false);
     setIsLoadingAudio(false);
@@ -1177,10 +1240,9 @@ export function ArticleDetailView({
           setCurrentTime(0);
         }}
         onError={(e) => {
-          console.warn('Audio tag error:', e);
+          console.warn('Audio tag error, beralih ke Web Speech:', e);
           if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
-          setIsLoadingAudio(false);
-          setIsPlaying(false);
+          startWebSpeechFallback();
         }}
         className="hidden"
       />
