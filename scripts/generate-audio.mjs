@@ -129,23 +129,11 @@ async function generateAudioForArticle(article) {
   const cleanTitle = (article.title || '').trim().replace(/[.?!]+$/, '');
   const cleanContent = (article.content || '').replace(/<!--[\s\S]*?-->/g, '').trim();
 
-  // Mencegah judul disebut dua kali jika excerpt sama dengan judul atau sudah ada di naskah
-  let leadText = '';
-  if (article.excerpt) {
-    const trimmedExcerpt = article.excerpt.trim();
-    const isDupTitle = trimmedExcerpt.toLowerCase() === cleanTitle.toLowerCase();
-    const isInContent = cleanContent.toLowerCase().includes(trimmedExcerpt.toLowerCase());
-    const isTooShort = trimmedExcerpt.length < 20;
-    if (!isDupTitle && !isInContent && !isTooShort) {
-      leadText = `${trimmedExcerpt.replace(/[.?!]+$/, '')}. `;
-    }
-  }
-
-  // Format naskah presenter: Judul Headline (1x) diikuti jeda titik lalu Isi Berita
-  const rawText = `${cleanTitle}. ${leadText}${cleanContent}`;
+  // Naskah murni: Judul Berita (1x) diikuti jeda titik lalu Isi Berita Lengkap (tanpa leads/excerpt sama sekali)
+  const rawText = `${cleanTitle}. ${cleanContent}`;
   const cleaned = cleanArticleText(rawText);
 
-  console.log(`Menghasilkan audio untuk: [${article.id}] "${cleanTitle.slice(0, 40)}..."`);
+  console.log(`Menghasilkan audio murni: [${article.id}] "${cleanTitle.slice(0, 45)}..."`);
   const tts = new EdgeTTS();
   await tts.synthesize(cleaned, VOICE_NAME, {
     rate: VOICE_RATE,
@@ -184,7 +172,7 @@ async function main() {
     if (exists) {
       console.log(`[SUDAH ADA] ${article.id} - ${article.title.slice(0, 45)}...`);
     } else {
-      console.log(`[PROSES] Menghasilkan audio bersih 1x judul untuk ${article.id}...`);
+      console.log(`[PROSES] Menghasilkan audio (Judul + Isi Berita saja) untuk ${article.id}...`);
       try {
         await generateAudioForArticle(article);
       } catch (err) {
