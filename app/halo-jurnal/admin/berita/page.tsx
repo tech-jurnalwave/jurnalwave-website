@@ -68,8 +68,8 @@ const DEFAULT_CATEGORIES: CategoryItem[] = [
   { value: 'kuliner', label: 'Kuliner' },
   { value: 'wisata', label: 'Wisata' },
   { value: 'hiburan', label: 'Hiburan' },
-  { value: 'tech', label: 'Tech' },
-  { value: 'sport', label: 'Sport & E-Sport' },
+  { value: 'tech', label: 'Tech & Game' },
+  { value: 'sport', label: 'Sport' },
   { value: 'inspirasi', label: 'Inspirasi' },
 ]
 
@@ -1495,6 +1495,22 @@ export default function AdminBeritaPage() {
                   />
                 </div>
 
+                {/* Ringkasan / Cuplikan Singkat (Excerpt) */}
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Ringkasan / Cuplikan Singkat <span className="font-normal text-slate-400">(Tampil di kartu pratinjau berita)</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={editingArticle.excerpt || ''}
+                    onChange={(e) =>
+                      setEditingArticle({ ...editingArticle, excerpt: e.target.value })
+                    }
+                    placeholder="Masukkan cuplikan singkat (jika dikosongkan, otomatis mengambil kalimat awal isi artikel)..."
+                    className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015] leading-relaxed"
+                  />
+                </div>
+
                 {/* Isi Artikel */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
@@ -1755,6 +1771,20 @@ export default function AdminBeritaPage() {
                     onChange={(e) => setNewImageCaption(e.target.value)}
                     placeholder="Masukkan keterangan foto..."
                     className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015]"
+                  />
+                </div>
+
+                {/* Ringkasan / Cuplikan Singkat (Excerpt) */}
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Ringkasan / Cuplikan Singkat <span className="font-normal text-slate-400">(Tampil di kartu pratinjau berita)</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={newExcerpt}
+                    onChange={(e) => setNewExcerpt(e.target.value)}
+                    placeholder="Masukkan cuplikan singkat (jika dikosongkan, otomatis mengambil kalimat awal isi artikel)..."
+                    className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:border-[#c00015] leading-relaxed"
                   />
                 </div>
 

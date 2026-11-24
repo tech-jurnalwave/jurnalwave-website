@@ -230,11 +230,21 @@ export function BookmarkClient({ initialArticles = [], initialJobs = [] }: Bookm
                               {article.title}
                             </h3>
                           </Link>
-                          {article.excerpt && (
-                            <p className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 line-clamp-1 hidden sm:block">
-                              {article.excerpt}
-                            </p>
-                          )}
+                          {(() => {
+                            const rawExcerpt = (article.excerpt || '').replace(/<[^>]*>/g, '').trim();
+                            const rawTitle = (article.title || '').trim();
+                            let displayExcerpt = rawExcerpt;
+                            if (!rawExcerpt || rawExcerpt.toLowerCase() === rawTitle.toLowerCase() || rawExcerpt.length < 15) {
+                              const rawContent = (article.content || '').replace(/<[^>]*>/g, '').trim();
+                              displayExcerpt = rawContent ? rawContent.slice(0, 120) + '...' : '';
+                            }
+                            if (!displayExcerpt) return null;
+                            return (
+                              <p className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 line-clamp-1 hidden sm:block">
+                                {displayExcerpt}
+                              </p>
+                            );
+                          })()}
                           <span className="text-[10px] text-slate-400 dark:text-zinc-500">
                             {formatIndoDate(article.createdAt || article.publishedDate)}
                           </span>
