@@ -20,7 +20,7 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', className = '', imgClas
     <div className={`flex items-center shrink-0 ${className}`}>
       {/* eslint-disable-next-img-element */}
       <img
-        src="/logo-jurnal-wave.webp?v=2"
+        src="/logo-jurnal-wave.webp?v=3"
         alt="JurnalWave"
         className={`${heights[size]} w-auto object-contain transition-transform duration-200 group-hover:scale-102 shrink-0 ${imgClassName}`}
       />
