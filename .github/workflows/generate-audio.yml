@@ -1,0 +1,41 @@
+name: Generate JurnalWave Article Audio
+
+on:
+  schedule:
+    # Otomatis berjalan setiap 30 menit
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    # Memungkinkan trigger manual satu-klik dari tab Actions di GitHub
+
+jobs:
+  sync-audio:
+    name: Sync News Presenter Audio to Cloudinary
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --prefer-offline --no-audit
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+
+      - name: Generate Presenter Audio & Upload to Cloudinary
+        run: node scripts/generate-audio.mjs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
