@@ -90,9 +90,15 @@ export default function ResetPasswordPage() {
       setStep(2)
       setTimer(60)
       setCanResend(false)
-      setOtpCode(['', '', '', '', '', ''])
-      if (data.otpDemo) {
-        setInfoMessage(`(Mode Demo: Gunakan kode verifikasi ${data.otpDemo})`)
+      const fallbackOtp = data.otpCode || data.otpDemo
+      if (fallbackOtp && fallbackOtp.length === 6) {
+        setOtpCode(fallbackOtp.split(''))
+        setInfoMessage(`Layanan WhatsApp sedang pemeliharaan. Kode verifikasi Anda: ${fallbackOtp}`)
+      } else {
+        setOtpCode(['', '', '', '', '', ''])
+        if (data.otpDemo) {
+          setInfoMessage(`(Kode verifikasi: ${data.otpDemo})`)
+        }
       }
       setTimeout(() => {
         otpInputRefs.current[0]?.focus()

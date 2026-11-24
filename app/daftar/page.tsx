@@ -84,8 +84,10 @@ export default function DaftarPage() {
       setOtpVerified(false)
       setCountdown(60) // Cooldown 60 detik
 
-      if (data.otpDemo) {
-        setDemoOtpCode(data.otpDemo)
+      const fallbackOtp = data.otpCode || data.otpDemo
+      if (fallbackOtp) {
+        setDemoOtpCode(fallbackOtp)
+        setOtpCode(fallbackOtp)
       } else {
         setDemoOtpCode('')
       }
@@ -455,9 +457,20 @@ export default function DaftarPage() {
                           )}
                         </button>
                       </div>
-                      <p className="text-[10px] text-secondary">
-                        Kode verifikasi 6 digit telah dikirimkan ke WhatsApp Anda. Berlaku selama 10 menit.
-                      </p>
+                      {demoOtpCode ? (
+                        <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex items-center justify-between">
+                          <span>
+                            Kode Smart OTP: <strong className="font-bold text-sm tracking-wider text-primary">{demoOtpCode}</strong>
+                          </span>
+                          <span className="text-[10px] text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/60 px-1.5 py-0.5 rounded font-medium">
+                            Otomatis Terisi
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-secondary">
+                          Kode verifikasi 6 digit telah dikirimkan ke WhatsApp Anda. Berlaku selama 10 menit.
+                        </p>
+                      )}
                     </div>
                   )}
 

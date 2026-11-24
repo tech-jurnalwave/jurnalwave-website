@@ -122,25 +122,48 @@ export async function POST(request: NextRequest) {
       const otp = Math.floor(100000 + Math.random() * 900000).toString()
       registerOtpStore.set(`wa_${cleanPhone}`, {
         otp,
-        expiresAt: Date.now() + 10 * 60 * 1000,
+        expiresAt: Date.now() + 15 * 60 * 1000,
       })
+
+      // Simpan ke PostgreSQL database agar tahan restart & multi-container serverless di Vercel
+      try {
+        await prisma.passwordResetOtp.deleteMany({
+          where: { email: `wa_${cleanPhone}` },
+        })
+        await prisma.passwordResetOtp.create({
+          data: {
+            email: `wa_${cleanPhone}`,
+            otpCode: otp,
+            expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+          },
+        })
+      } catch (dbErr) {
+        console.warn('DB OTP persistence notice:', dbErr)
+      }
 
       // Kirim via Fonnte WhatsApp Gateway
       const recipientName = (body.fullName || body.name || '').trim()
       const waResult = await sendWhatsAppOtp(cleanPhone, otp, recipientName)
 
-      const hasFonnteToken = Boolean(
-        process.env.FONNTE_TOKEN?.trim() &&
-        process.env.FONNTE_TOKEN?.trim() !== 'your_fonnte_token_here'
-      )
+      // SMART OTP: Jika WhatsApp Fonnte sedang aktif & terhubung, kirimkan via WhatsApp
+      if (waResult.success) {
+        return NextResponse.json({
+          success: true,
+          isRealWaSent: true,
+          isSmartOtp: false,
+          message: `Kode verifikasi OTP berhasil dikirimkan ke WhatsApp ${cleanPhone}.`,
+        })
+      }
 
+      // SMART OTP FALLBACK: Jika Fonnte disconnect / kuota habis, selamatkan registrasi seketika!
+      console.warn('WhatsApp gateway offline/disconnect, activating Smart OTP fallback:', waResult.message)
       return NextResponse.json({
         success: true,
-        message: hasFonnteToken && waResult.success
-          ? `Kode verifikasi OTP berhasil dikirimkan ke WhatsApp ${cleanPhone}.`
-          : `Kode verifikasi OTP berhasil disiapkan untuk WhatsApp ${cleanPhone}.`,
-        otpDemo: hasFonnteToken && waResult.success ? undefined : otp,
-        isRealWaSent: hasFonnteToken && waResult.success,
+        isRealWaSent: false,
+        isSmartOtp: true,
+        otpCode: otp,
+        otpDemo: otp,
+        message: `Layanan WhatsApp sedang pemeliharaan. Kode verifikasi Anda adalah: ${otp}`,
       })
     }
 
@@ -158,9 +181,22 @@ export async function POST(request: NextRequest) {
       }
 
       const cached = registerOtpStore.get(`wa_${cleanPhone}`)
-      const isValid =
-        (cached && cached.otp === otpCode && cached.expiresAt >= Date.now()) ||
-        otpCode === '123456'
+      let isValid = (cached && cached.otp === otpCode && cached.expiresAt >= Date.now()) || otpCode === '123456'
+
+      if (!isValid) {
+        try {
+          const dbOtp = await prisma.passwordResetOtp.findFirst({
+            where: {
+              email: `wa_${cleanPhone}`,
+              otpCode: otpCode,
+              expiresAt: { gte: new Date() },
+            },
+          })
+          if (dbOtp) isValid = true
+        } catch (dbErr) {
+          console.warn('DB OTP lookup notice in verify-wa-otp:', dbErr)
+        }
+      }
 
       if (!isValid) {
         return NextResponse.json(
@@ -174,6 +210,20 @@ export async function POST(request: NextRequest) {
         otp: 'VERIFIED',
         expiresAt: Date.now() + 15 * 60 * 1000,
       })
+      try {
+        await prisma.passwordResetOtp.deleteMany({
+          where: { email: `wa_verified_${cleanPhone}` },
+        })
+        await prisma.passwordResetOtp.create({
+          data: {
+            email: `wa_verified_${cleanPhone}`,
+            otpCode: 'VERIFIED',
+            expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+          },
+        })
+      } catch (dbErr) {
+        console.warn('DB verified save notice:', dbErr)
+      }
 
       return NextResponse.json({
         success: true,
@@ -214,13 +264,37 @@ export async function POST(request: NextRequest) {
 
       // Validasi OTP: cek apakah sudah terverifikasi sebelumnya ATAU sertakan kode OTP valid
       const verifiedToken = registerOtpStore.get(`wa_verified_${cleanPhone}`)
-      const isAlreadyVerified = verifiedToken && verifiedToken.expiresAt >= Date.now()
+      let isAlreadyVerified = Boolean(verifiedToken && verifiedToken.expiresAt >= Date.now())
+
+      if (!isAlreadyVerified) {
+        try {
+          const dbVerified = await prisma.passwordResetOtp.findFirst({
+            where: {
+              email: `wa_verified_${cleanPhone}`,
+              expiresAt: { gte: new Date() },
+            },
+          })
+          if (dbVerified) isAlreadyVerified = true
+        } catch {}
+      }
 
       let otpValid = isAlreadyVerified
       if (!otpValid && otpCode) {
         const cached = registerOtpStore.get(`wa_${cleanPhone}`)
         if ((cached && cached.otp === otpCode && cached.expiresAt >= Date.now()) || otpCode === '123456') {
           otpValid = true
+        }
+        if (!otpValid) {
+          try {
+            const dbOtp = await prisma.passwordResetOtp.findFirst({
+              where: {
+                email: `wa_${cleanPhone}`,
+                otpCode: otpCode,
+                expiresAt: { gte: new Date() },
+              },
+            })
+            if (dbOtp) otpValid = true
+          } catch {}
         }
       }
 
