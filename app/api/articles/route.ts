@@ -6,6 +6,7 @@ import { clearServerArticlesCache } from '@/lib/wordpress'
 import { INITIAL_ARTICLES } from '@/lib/initialArticles'
 
 import { ensureCloudinaryUrl, deleteFromCloudinary } from '@/lib/cloudinary'
+import { triggerAudioGenerationWorkflow } from '@/lib/audioSync'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -28,26 +29,6 @@ async function sanitizeArticleImage(rawUrl?: string | null): Promise<string> {
     }
   }
   return trimmed
-}
-
-// Helper pemicu robot otomatis pembuatan audio presenter di GitHub Actions
-async function triggerAudioGenerationWorkflow() {
-  const token = process.env.GITHUB_TOKEN || process.env.ADMIN_GITHUB_TOKEN
-  if (!token) return
-  try {
-    await fetch('https://api.github.com/repos/tech-jurnalwave/jurnalwave-website/actions/workflows/generate-audio.yml/dispatches', {
-      method: 'POST',
-      headers: {
-        Authorization: `token ${token}`,
-        Accept: 'application/vnd.github.v3+json',
-        'User-Agent': 'JurnalWave',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ ref: 'main' }),
-    })
-  } catch (err) {
-    console.warn('Audio generation dispatch notice:', err)
-  }
 }
 
 // Helper format artikel dari Prisma ke format Frontend

@@ -109,6 +109,7 @@ export function ArticleDetailView({
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [audioDuration, setAudioDuration] = useState<number>(0);
   const [playbackRate, setPlaybackRate] = useState<number>(1);
+  const [audioNotice, setAudioNotice] = useState<string>('');
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -175,6 +176,7 @@ export function ArticleDetailView({
     }
 
     setIsLoadingAudio(true);
+    setAudioNotice('');
 
     // Pastikan src terpasang langsung ke CDN Cloudinary (atau fallback /api/tts)
     const targetSrc = audioCloudinaryUrl || `/api/tts?id=${encodeURIComponent(article.id)}`;
@@ -188,10 +190,18 @@ export function ArticleDetailView({
       .then(() => {
         setIsPlaying(true);
         setIsLoadingAudio(false);
+        setAudioNotice('');
       })
-      .catch((err: any) => {
+      .catch(async (err: any) => {
         console.warn('Audio play request status:', err?.name || err);
         setIsLoadingAudio(false);
+        // Jika audio belum ada di CDN (berita baru dibuat), hubungi /api/tts untuk memicu generator
+        try {
+          const res = await fetch(`/api/tts?id=${encodeURIComponent(article.id)}`);
+          if (res.status === 202) {
+            setAudioNotice('Audio berita baru sedang disiapkan otomatis (~15-30 detik). Silakan coba putar sebentar lagi.');
+          }
+        } catch {}
       });
   };
 
@@ -982,7 +992,14 @@ export function ArticleDetailView({
 
       {/* Floating Bottom Mini Player (Simple Capsule - Positioned above BottomNav on mobile) */}
       {isAudioActive && (
-        <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-lg bg-surface/95 dark:bg-slate-900/95 backdrop-blur-md rounded-full shadow-2xl border border-outline-variant/80 dark:border-slate-800 px-3.5 py-2.5 sm:px-4 sm:py-3 flex items-center gap-2 sm:gap-3 transition-all duration-300 animate-in fade-in slide-in-from-bottom-5">
+        <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-lg flex flex-col items-center gap-2 pointer-events-auto">
+          {audioNotice && (
+            <div className="px-3.5 py-1.5 rounded-full bg-primary/95 text-white text-[11px] sm:text-xs font-medium shadow-lg backdrop-blur-sm animate-pulse flex items-center gap-1.5 max-w-[95%] text-center">
+              <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+              <span>{audioNotice}</span>
+            </div>
+          )}
+          <div className="w-full bg-surface/95 dark:bg-slate-900/95 backdrop-blur-md rounded-full shadow-2xl border border-outline-variant/80 dark:border-slate-800 px-3.5 py-2.5 sm:px-4 sm:py-3 flex items-center gap-2 sm:gap-3 transition-all duration-300 animate-in fade-in slide-in-from-bottom-5">
           {/* Rewind 10s */}
           <button
             type="button"
@@ -1070,6 +1087,7 @@ export function ArticleDetailView({
             </button>
           </div>
         </div>
+      </div>
       )}
 
       {/* Audio Elemen Fisik DOM — Streaming instan langsung dari Cloudinary CDN */}
@@ -1098,10 +1116,16 @@ export function ArticleDetailView({
           setIsLoadingAudio(false);
           setCurrentTime(0);
         }}
-        onError={(e) => {
+        onError={async (e) => {
           console.warn('Audio tag playback notice:', e);
           setIsLoadingAudio(false);
           setIsPlaying(false);
+          try {
+            const res = await fetch(`/api/tts?id=${encodeURIComponent(article.id)}`);
+            if (res.status === 202) {
+              setAudioNotice('Audio berita baru sedang disiapkan otomatis (~15-30 detik). Silakan coba putar sebentar lagi.');
+            }
+          } catch {}
         }}
         className="hidden"
       />
