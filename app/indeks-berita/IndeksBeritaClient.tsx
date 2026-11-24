@@ -685,21 +685,6 @@ export function IndeksBeritaClient() {
                             {article.title}
                           </h3>
                         </Link>
-                        {(() => {
-                          const rawExcerpt = (article.excerpt || '').replace(/<[^>]*>/g, '').trim();
-                          const rawTitle = (article.title || '').trim();
-                          let displayExcerpt = rawExcerpt;
-                          if (!rawExcerpt || rawExcerpt.toLowerCase() === rawTitle.toLowerCase() || rawExcerpt.length < 15) {
-                            const rawContent = (article.content || '').replace(/<[^>]*>/g, '').trim();
-                            displayExcerpt = rawContent ? rawContent.slice(0, 140) + '...' : '';
-                          }
-                          if (!displayExcerpt) return null;
-                          return (
-                            <p className="text-xs text-slate-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
-                              {displayExcerpt}
-                            </p>
-                          );
-                        })()}
                         <span className="text-slate-400 dark:text-zinc-500 text-[10px] sm:text-[11px] font-normal">
                           {formatIndoDate(article.createdAt || article.publishedDate)}
                         </span>

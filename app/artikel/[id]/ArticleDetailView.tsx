@@ -115,7 +115,7 @@ export function ArticleDetailView({
 
   // Perkiraan durasi membaca / TTS (~125 kata per menit) jika durasi asli belum terload
   const cleanContentForSpeech = (article?.content || '').replace(/<!--[\s\S]*?-->/g, '').trim();
-  const fullArticleSpeechText = `${article?.title || ''} ${article?.excerpt || ''} ${cleanContentForSpeech}`.trim();
+  const fullArticleSpeechText = `${article?.title || ''}. ${cleanContentForSpeech}`.trim();
   const wordCount = fullArticleSpeechText ? fullArticleSpeechText.split(/\s+/).length : 0;
   const estimatedDuration = Math.max(15, Math.round((wordCount / 125) * 60));
   const totalDuration = audioDuration > 0 ? audioDuration : estimatedDuration;
