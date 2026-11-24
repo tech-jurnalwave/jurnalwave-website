@@ -6,6 +6,9 @@ import { fetchArticleById, fetchArticles } from '@/lib/wordpress';
 import os from 'os';
 import { EdgeTTS } from '@andresaya/edge-tts';
 
+export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
+
 // Suara resmi presenter berita JurnalWave: Microsoft Azure/Edge Neural Voice (Pria Tegas & Semangat Berita)
 const VOICE_NAME = 'id-ID-ArdiNeural';
 const VOICE_RATE = '+6%'; // Tempo tegas, bersemangat dan lugas khas pembaca berita
@@ -150,42 +153,38 @@ function splitTextIntoSafeChunks(text: string, maxChunkLength = 1500): string[] 
   return chunks.length > 0 ? chunks : [text];
 }
 
-// Menghasilkan audio pria ArdiNeural menggunakan EdgeTTS Node.js (Universal untuk Vercel & Lokal, Super Cepat 1-2 Detik)
+// Menghasilkan audio pria ArdiNeural menggunakan Microsoft Edge TTS (Tanpa Batas Kuota Harian, Super Cepat 2-3 Detik, Baca Utuh Seluruh Berita)
 async function generateMaleAudioWithEdgeTTS(cleanText: string, cacheFile: string): Promise<Buffer> {
-  const chunks = splitTextIntoSafeChunks(cleanText, 1500);
+  const maxAttempts = 3;
+  let lastErr: any = null;
 
-  // Proses semua potongan naskah secara paralel agar seluruh artikel selesai dalam 1-2 detik
-  const audioBuffers = await Promise.all(
-    chunks.map(async (chunk) => {
-      const tts = new EdgeTTS();
-      await tts.synthesize(chunk, VOICE_NAME, {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const tts = new EdgeTTS({ secMsGecVersion: '1-131.0.2903.86' });
+      await tts.synthesize(cleanText, VOICE_NAME, {
         rate: VOICE_RATE,
         pitch: VOICE_PITCH,
         outputFormat: 'audio-24khz-48kbitrate-mono-mp3'
       });
       const buf = tts.toBuffer();
-      if (buf && buf.length > 100) {
+      if (buf && buf.length > 500) {
+        try {
+          ensureCacheDir();
+          fs.writeFileSync(cacheFile, buf);
+        } catch (saveErr) {
+          console.warn('Could not write cache file:', saveErr);
+        }
         return buf;
       }
-      return Buffer.alloc(0);
-    })
-  );
-
-  const validBuffers = audioBuffers.filter(b => b.length > 0);
-  if (validBuffers.length === 0) {
-    throw new Error('EdgeTTS produced empty buffer');
-  }
-
-  const combined = Buffer.concat(validBuffers);
-  if (combined.length > 500) {
-    try {
-      ensureCacheDir();
-      fs.writeFileSync(cacheFile, combined);
-    } catch (saveErr) {
-      console.warn('Could not write cache file:', saveErr);
+    } catch (err: any) {
+      lastErr = err;
+      if (attempt < maxAttempts) {
+        await new Promise(r => setTimeout(r, 500));
+      }
     }
   }
-  return combined;
+
+  throw lastErr || new Error('EdgeTTS synthesis failed after retries');
 }
 
 // Konversi raw PCM 24kHz 16-bit Mono ke format file WAV standar yang didukung 100% browser
@@ -215,56 +214,78 @@ function pcmToWav(pcmBuffer: Buffer, sampleRate = 24000, numChannels = 1): Buffe
   return Buffer.concat([header, pcmBuffer]);
 }
 
-// Menghasilkan audio pembaca berita pria tegas melalui Google Gemini Flash TTS (Paralel Chunks)
+// Model Gemini TTS dengan urutan prioritas multi-model (Bebas Quota Limit)
+const GEMINI_TTS_MODELS = [
+  'gemini-3.8-flash-lite-tts',
+  'gemini-3.1-flash-tts-preview',
+  'gemini-2.5-flash-preview-tts',
+  'gemini-3.8-flash-tts'
+];
+
+// Menghasilkan audio pembaca berita pria tegas melalui Google Gemini Flash TTS (Multi-Model Resilience)
 async function generateAudioWithGemini(cleanText: string, cacheFile: string): Promise<Buffer> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY || '';
   if (!apiKey) throw new Error('GEMINI_API_KEY is not defined');
 
-  // Pecah naskah per segmen ~1500 karakter
-  const chunks = splitTextIntoSafeChunks(cleanText, 1500);
+  // Baca seluruh isi artikel utuh tanpa pemotongan
+  const chunks = splitTextIntoSafeChunks(cleanText, 2400);
 
-  // Proses paralel agar tidak ada jeda antrean sekuensial
-  const pcmBuffers = await Promise.all(
-    chunks.map(async (chunk) => {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-lite-tts:generateContent?key=${apiKey}`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: chunk }] }],
-          generationConfig: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: {
-                  voiceName: 'Fenrir' // Suara pria tegas, mantap, dan berwibawa khas pembaca berita
+  let pcmBuffers: Buffer[] = [];
+  let lastError: any = null;
+
+  for (const model of GEMINI_TTS_MODELS) {
+    try {
+      const results = await Promise.all(
+        chunks.map(async (chunk) => {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: chunk }] }],
+              generationConfig: {
+                responseModalities: ['AUDIO'],
+                speechConfig: {
+                  voiceConfig: {
+                    prebuiltVoiceConfig: {
+                      voiceName: 'Fenrir' // Suara pria tegas, mantap, dan berwibawa khas pembaca berita
+                    }
+                  }
                 }
               }
-            }
+            })
+          });
+
+          if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`Model ${model} responded ${res.status}: ${errText}`);
           }
+
+          const data = await res.json();
+          const inlineData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+          if (inlineData?.data) {
+            return Buffer.from(inlineData.data, 'base64');
+          }
+          return Buffer.alloc(0);
         })
-      });
+      );
 
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`Gemini TTS API responded ${res.status}: ${errText}`);
+      const valid = results.filter(b => b.length > 0);
+      if (valid.length > 0) {
+        pcmBuffers = valid;
+        break; // Sukses dengan model ini
       }
-
-      const data = await res.json();
-      const inlineData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-      if (inlineData?.data) {
-        return Buffer.from(inlineData.data, 'base64');
-      }
-      return Buffer.alloc(0);
-    })
-  );
-
-  const validBuffers = pcmBuffers.filter(b => b.length > 0);
-  if (validBuffers.length === 0) {
-    throw new Error('Gemini TTS produced empty audio');
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`Gemini model ${model} notice:`, err?.message || err);
+    }
   }
 
-  const combinedPcm = Buffer.concat(validBuffers);
+  if (pcmBuffers.length === 0) {
+    throw lastError || new Error('Semua model Gemini TTS gagal menghasilkan audio');
+  }
+
+  const combinedPcm = Buffer.concat(pcmBuffers);
   const wavBuffer = pcmToWav(combinedPcm, 24000, 1);
 
   try {
@@ -277,7 +298,7 @@ async function generateAudioWithGemini(cleanText: string, cacheFile: string): Pr
   return wavBuffer;
 }
 
-// Mendapatkan buffer audio pria konsisten 100% untuk seluruh artikel
+// Mendapatkan buffer audio pria konsisten 100% untuk seluruh naskah artikel
 async function getAudioBuffer(cleanText: string, cacheFile: string): Promise<{ buffer: Buffer; mimeType: string }> {
   ensureCacheDir();
   // 1. Jika sudah ada di disk cache, baca langsung (0.001 detik)
@@ -291,26 +312,22 @@ async function getAudioBuffer(cleanText: string, cacheFile: string): Promise<{ b
     } catch {}
   }
 
-  // 2. Prioritas 1: EdgeTTS ArdiNeural (Super cepat 1-2 detik, suara pria berita tegas, format MP3 kompatibel 100% di semua HP & Desktop)
+  // 2. Prioritas Utama: Microsoft Edge Neural Voice (Ardi - Suara Pria Berita Nasional, Bebas Batas Kuota Harian & Cepat 2-6 Detik)
   try {
     const buffer = await generateMaleAudioWithEdgeTTS(cleanText, cacheFile);
     return { buffer, mimeType: 'audio/mpeg' };
   } catch (edgeErr) {
-    console.warn('EdgeTTS synthesis notice, attempting Gemini fallback:', edgeErr);
+    console.warn('EdgeTTS notice, attempting Gemini fallback:', edgeErr);
   }
 
-  // 3. Prioritas 2 (Cadangan): Google Gemini Flash TTS (Fenrir - Suara Pria Tegas)
-  const geminiKey = process.env.GEMINI_API_KEY;
-  if (geminiKey) {
-    try {
-      const buffer = await generateAudioWithGemini(cleanText, cacheFile);
-      return { buffer, mimeType: 'audio/wav' };
-    } catch (geminiErr) {
-      console.warn('Gemini TTS synthesis notice:', geminiErr);
-    }
+  // 3. Cadangan Sekunder: Google Gemini Flash TTS (Fenrir - Suara Pria Berita)
+  try {
+    const buffer = await generateAudioWithGemini(cleanText, cacheFile);
+    return { buffer, mimeType: 'audio/wav' };
+  } catch (geminiErr) {
+    console.error('All TTS engines failed:', geminiErr);
+    throw new Error('Gagal memproses audio TTS.');
   }
-
-  throw new Error('Gagal memproses audio TTS.');
 }
 
 // Handler GET: Digunakan oleh pemutar audio HTML5 (<audio src="/api/tts?id=...">)
@@ -323,7 +340,7 @@ export async function GET(request: Request) {
     let cacheKey = '';
 
     if (id) {
-      cacheKey = `article-${id}-v8`;
+      cacheKey = `article-${id}-v14`;
       if (!rawText) {
         let article: any = await fetchArticleById(id);
         if (!article) {
@@ -333,8 +350,8 @@ export async function GET(request: Request) {
         if (article) {
           const title = article.title ? `${article.title.replace(/[.?!]+$/, '')}.` : '';
           const excerpt = article.excerpt ? `${article.excerpt.replace(/[.?!]+$/, '')}.` : '';
-          const content = article.content || '';
-          rawText = `${title} ${excerpt} ${content}`;
+          const content = (article.content || '').replace(/<!--[\s\S]*?-->/g, ' ').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+          rawText = `${title} ${excerpt} ${content}`.trim();
         }
       }
     }
@@ -346,7 +363,7 @@ export async function GET(request: Request) {
 
     if (!cacheKey) {
       const hash = crypto.createHash('md5').update(clean).digest('hex').slice(0, 12);
-      cacheKey = `text-${hash}-v8`;
+      cacheKey = `text-${hash}-v14`;
     }
 
     ensureCacheDir();
@@ -403,7 +420,7 @@ export async function POST(request: Request) {
 
     let cacheKey = '';
     if (id) {
-      cacheKey = `article-${id}-v8`;
+      cacheKey = `article-${id}-v14`;
       if (!rawText) {
         let article: any = await fetchArticleById(id);
         if (!article) {
@@ -413,8 +430,8 @@ export async function POST(request: Request) {
         if (article) {
           const title = article.title ? `${article.title.replace(/[.?!]+$/, '')}.` : '';
           const excerpt = article.excerpt ? `${article.excerpt.replace(/[.?!]+$/, '')}.` : '';
-          const content = article.content || '';
-          rawText = `${title} ${excerpt} ${content}`;
+          const content = (article.content || '').replace(/<!--[\s\S]*?-->/g, ' ').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+          rawText = `${title} ${excerpt} ${content}`.trim();
         }
       }
     }
@@ -426,7 +443,7 @@ export async function POST(request: Request) {
 
     if (!cacheKey) {
       const hash = crypto.createHash('md5').update(clean).digest('hex').slice(0, 12);
-      cacheKey = `text-${hash}-v8`;
+      cacheKey = `text-${hash}-v14`;
     }
 
     ensureCacheDir();

@@ -207,23 +207,15 @@ export function ArticleDetailView({
     }
   }, [article?.id]);
 
-  // Track pemutar audio
-  const usingSpeechSynthRef = useRef<boolean>(false);
-
-  // Eksekusi pemutaran audio (Server Cloud TTS Suara Pria Resmi Fenrir)
-  const handlePlayToggle = async () => {
-    // Jika sedang pakai Web Speech, toggle pause/resume
-    if (usingSpeechSynthRef.current) {
-      if (isPlaying) {
-        window.speechSynthesis.pause();
-        setIsPlaying(false);
-      } else {
-        window.speechSynthesis.resume();
-        setIsPlaying(true);
-      }
-      return;
+  // Pastikan tidak ada sisa suara sintesis browser lain yang tertinggal
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
     }
+  }, [article?.id]);
 
+  // Eksekusi pemutaran audio tunggal resmi JurnalWave (Suara Pria Berita Fenrir)
+  const handlePlayToggle = async () => {
     const audio = audioRef.current;
     if (!audio) return;
 
@@ -249,11 +241,11 @@ export function ArticleDetailView({
     }
     audio.playbackRate = playbackRate;
 
-    // Timeout keamanan maksimal 15 detik agar loading tidak menggantung selamanya
+    // Timeout keamanan maksimal 45 detik untuk sintesis perdana naskah berita lengkap
     if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
     playTimeoutRef.current = setTimeout(() => {
       setIsLoadingAudio(false);
-    }, 15000);
+    }, 45000);
 
     // Langsung trigger play dalam konteks gesture klik pengguna
     audio.play()
@@ -312,7 +304,6 @@ export function ArticleDetailView({
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
-    usingSpeechSynthRef.current = false;
     setIsAudioActive(false);
     setIsPlaying(false);
     setIsLoadingAudio(false);
