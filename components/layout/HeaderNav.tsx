@@ -44,8 +44,8 @@ export const HeaderNav: React.FC = () => {
     { value: 'kuliner', label: 'Kuliner' },
     { value: 'wisata', label: 'Wisata' },
     { value: 'hiburan', label: 'Hiburan' },
-    { value: 'tech', label: 'Tech & Game' },
-    { value: 'sport', label: 'Sport' },
+    { value: 'tech', label: 'Tech' },
+    { value: 'sport', label: 'Sport & E-Sport' },
     { value: 'inspirasi', label: 'Inspirasi' },
   ]);
 

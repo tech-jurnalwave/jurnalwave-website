@@ -11,7 +11,10 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function generateMetadata({ params }: ArticleDetailPageProps): Promise<Metadata> {
-  const { id } = await params;
+  let { id } = await params;
+  if (id.toLowerCase() === 'kepo') {
+    id = 'tampil-gemilang-tim-futsal-man-1-sukabumi-sukses-sabet-gelar-juara-laga-id-regional-sukabumi-raya';
+  }
   let article = null;
 
   try {
@@ -108,6 +111,9 @@ export async function generateMetadata({ params }: ArticleDetailPageProps): Prom
 
 export default async function ArticleDetailPage({ params }: ArticleDetailPageProps) {
   const { id } = await params;
+  if (id.toLowerCase() === 'kepo') {
+    redirect('/artikel/tampil-gemilang-tim-futsal-man-1-sukabumi-sukses-sabet-gelar-juara-laga-id-regional-sukabumi-raya');
+  }
   let article = null;
   let allArticles: any[] = [];
 

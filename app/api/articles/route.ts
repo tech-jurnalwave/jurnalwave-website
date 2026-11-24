@@ -519,6 +519,9 @@ export async function PUT(request: NextRequest) {
     if (typeof body.title === 'string' && body.title.trim()) {
       updateData.title = body.title.trim()
     }
+    if (typeof body.slug === 'string' && body.slug.trim()) {
+      updateData.slug = body.slug.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/(^-|-$)+/g, '')
+    }
     if (typeof body.excerpt === 'string' && body.excerpt.trim()) {
       updateData.excerpt = body.excerpt.trim()
     }

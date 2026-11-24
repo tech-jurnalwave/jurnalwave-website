@@ -216,4 +216,16 @@ model Job {
   @@map("jobs")
 }
 
+// 14. Model Kategori Konten Resmi JurnalWave
+model Category {
+  id        String   @id @default(cuid())
+  value     String   @unique @db.VarChar(100)
+  label     String   @db.VarChar(100)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("categories")
+}
+
 

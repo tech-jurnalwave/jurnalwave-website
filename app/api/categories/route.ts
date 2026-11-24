@@ -1,31 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getArticleCategories, saveArticleCategories, CategoryItem } from '@/lib/categories'
+import {
+  getArticleCategories,
+  getArticleCategoriesFromDb,
+  saveArticleCategoriesToDb,
+  CategoryItem,
+} from '@/lib/categories'
 import { revalidatePath } from 'next/cache'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-// GET: Membaca daftar kategori global terkini (dipakai oleh semua admin & publik)
+// GET: Membaca daftar kategori global terkini dari database (dipakai oleh semua admin & publik)
 export async function GET() {
   try {
-    const categories = getArticleCategories()
+    const categories = await getArticleCategoriesFromDb()
     return NextResponse.json({
       success: true,
       data: categories,
     })
   } catch (err) {
     console.error('Error GET /api/categories:', err)
-    return NextResponse.json(
-      {
-        success: false,
-        message: 'Gagal membaca daftar kategori.',
-      },
-      { status: 500 }
-    )
+    return NextResponse.json({
+      success: true,
+      data: getArticleCategories(),
+    })
   }
 }
 
-// POST: Menyimpan pembaruan kategori dari admin dan menyinkronkan secara global
+// POST: Menyimpan pembaruan kategori dari admin dan menyinkronkan secara global ke database
 export async function POST(request: NextRequest) {
   try {
     let body: any = null
@@ -56,7 +58,7 @@ export async function POST(request: NextRequest) {
       label: String(c.label || c.value || '').trim(),
     }))
 
-    const saved = saveArticleCategories(categories)
+    const saved = await saveArticleCategoriesToDb(categories)
     if (!saved) {
       return NextResponse.json(
         { success: false, message: 'Format data kategori tidak valid.' },
@@ -72,7 +74,7 @@ export async function POST(request: NextRequest) {
       revalidatePath('/halo-jurnal/admin/berita')
     } catch {}
 
-    const updated = getArticleCategories()
+    const updated = await getArticleCategoriesFromDb()
 
     return NextResponse.json({
       success: true,
