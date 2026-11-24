@@ -30,6 +30,26 @@ async function sanitizeArticleImage(rawUrl?: string | null): Promise<string> {
   return trimmed
 }
 
+// Helper pemicu robot otomatis pembuatan audio presenter di GitHub Actions
+async function triggerAudioGenerationWorkflow() {
+  const token = process.env.GITHUB_TOKEN || process.env.ADMIN_GITHUB_TOKEN
+  if (!token) return
+  try {
+    await fetch('https://api.github.com/repos/tech-jurnalwave/jurnalwave-website/actions/workflows/generate-audio.yml/dispatches', {
+      method: 'POST',
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+        'User-Agent': 'JurnalWave',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ref: 'main' }),
+    })
+  } catch (err) {
+    console.warn('Audio generation dispatch notice:', err)
+  }
+}
+
 // Helper format artikel dari Prisma ke format Frontend
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapArticleFromDb(item: any) {
@@ -459,6 +479,9 @@ export async function POST(request: NextRequest) {
     clearServerArticlesCache()
     invalidateArticlesCache()
 
+    // Picu robot otomatis pembuatan audio presenter di GitHub Actions
+    triggerAudioGenerationWorkflow().catch(() => {})
+
     try {
       revalidatePath('/')
       revalidatePath('/berita')
@@ -518,9 +541,6 @@ export async function PUT(request: NextRequest) {
     }
     if (typeof body.title === 'string' && body.title.trim()) {
       updateData.title = body.title.trim()
-    }
-    if (typeof body.slug === 'string' && body.slug.trim()) {
-      updateData.slug = body.slug.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/(^-|-$)+/g, '')
     }
     if (typeof body.excerpt === 'string' && body.excerpt.trim()) {
       updateData.excerpt = body.excerpt.trim()
@@ -598,6 +618,9 @@ export async function PUT(request: NextRequest) {
     clearServerArticlesCache()
     invalidateArticlesCache()
 
+    // Picu robot otomatis pembuatan audio presenter di GitHub Actions
+    triggerAudioGenerationWorkflow().catch(() => {})
+
     try {
       revalidatePath('/')
       revalidatePath('/berita')
@@ -651,6 +674,9 @@ export async function DELETE(request: NextRequest) {
 
     clearServerArticlesCache()
     invalidateArticlesCache()
+
+    // Picu robot otomatis pembuatan audio presenter di GitHub Actions
+    triggerAudioGenerationWorkflow().catch(() => {})
 
     // Bersihkan file cover & media di Cloudinary secara asynchronous di background
     if (articleToDelete?.imageUrl) {
