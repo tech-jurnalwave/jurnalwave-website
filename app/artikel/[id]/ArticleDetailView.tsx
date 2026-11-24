@@ -290,22 +290,23 @@ export function ArticleDetailView({
 
     setIsLoadingAudio(true);
 
-    // Pastikan src terpasang jika belum ada
-    const targetSrc = `/api/tts?id=${encodeURIComponent(article.id)}`;
+    // Pastikan src terpasang jika belum ada (kirim teks naskah langsung agar server tidak terhambat query database)
+    const speechTextExcerpt = (fullArticleSpeechText || article?.title || '').slice(0, 1500);
+    const targetSrc = `/api/tts?id=${encodeURIComponent(article.id)}${speechTextExcerpt ? `&text=${encodeURIComponent(speechTextExcerpt)}` : ''}`;
     const currentSrc = audio.getAttribute('src') || '';
     if (!currentSrc || !currentSrc.includes(`/api/tts?id=${encodeURIComponent(article.id)}`)) {
       audio.setAttribute('src', targetSrc);
     }
     audio.playbackRate = playbackRate;
 
-    // Timeout keamanan maksimal 15 detik agar loading tidak menggantung selamanya
+    // Timeout keamanan 7 detik (jika server lambat, baru beralih ke suara cadangan)
     if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
     playTimeoutRef.current = setTimeout(() => {
       if (!isPlaying && isLoadingAudio) {
         console.warn('Audio loading timeout, beralih ke Web Speech');
         startWebSpeechFallback();
       }
-    }, 12000);
+    }, 7000);
 
     // Langsung trigger play dalam konteks gesture klik pengguna
     audio.play()
@@ -1214,7 +1215,7 @@ export function ArticleDetailView({
       {/* Audio Elemen Fisik DOM — src native HTTP stream langsung ke endpoint TTS */}
       <audio
         ref={audioRef}
-        src={article?.id ? `/api/tts?id=${encodeURIComponent(article.id)}` : undefined}
+        src={article?.id ? `/api/tts?id=${encodeURIComponent(article.id)}${fullArticleSpeechText ? `&text=${encodeURIComponent(fullArticleSpeechText.slice(0, 1500))}` : ''}` : undefined}
         preload="none"
         playsInline
         onTimeUpdate={(e) => {

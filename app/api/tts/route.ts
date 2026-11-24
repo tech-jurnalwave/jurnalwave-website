@@ -153,42 +153,27 @@ function splitTextIntoSafeChunks(text: string, maxChunkLength = 1500): string[] 
   return chunks.length > 0 ? chunks : [text];
 }
 
-// Menghasilkan audio pria ArdiNeural menggunakan EdgeTTS Node.js (Universal untuk Vercel & Lokal, Super Cepat 1-2 Detik)
+// Menghasilkan audio pria ArdiNeural menggunakan EdgeTTS Node.js (Universal untuk Vercel & Lokal, Super Cepat 2-4 Detik)
 async function generateMaleAudioWithEdgeTTS(cleanText: string, cacheFile: string): Promise<Buffer> {
-  const chunks = splitTextIntoSafeChunks(cleanText, 1500);
-
-  // Proses semua potongan naskah secara paralel agar seluruh artikel selesai dalam 1-2 detik
-  const audioBuffers = await Promise.all(
-    chunks.map(async (chunk) => {
-      const tts = new EdgeTTS();
-      await tts.synthesize(chunk, VOICE_NAME, {
-        rate: VOICE_RATE,
-        pitch: VOICE_PITCH,
-        outputFormat: 'audio-24khz-48kbitrate-mono-mp3'
-      });
-      const buf = tts.toBuffer();
-      if (buf && buf.length > 100) {
-        return buf;
-      }
-      return Buffer.alloc(0);
-    })
-  );
-
-  const validBuffers = audioBuffers.filter(b => b.length > 0);
-  if (validBuffers.length === 0) {
+  const tts = new EdgeTTS();
+  // Gunakan naskah artikel langsung tanpa memecah websocket paralel agar tidak terkena limit 429
+  await tts.synthesize(cleanText, VOICE_NAME, {
+    rate: VOICE_RATE,
+    pitch: VOICE_PITCH,
+    outputFormat: 'audio-24khz-48kbitrate-mono-mp3'
+  });
+  const buf = tts.toBuffer();
+  if (!buf || buf.length < 500) {
     throw new Error('EdgeTTS produced empty buffer');
   }
 
-  const combined = Buffer.concat(validBuffers);
-  if (combined.length > 500) {
-    try {
-      ensureCacheDir();
-      fs.writeFileSync(cacheFile, combined);
-    } catch (saveErr) {
-      console.warn('Could not write cache file:', saveErr);
-    }
+  try {
+    ensureCacheDir();
+    fs.writeFileSync(cacheFile, buf);
+  } catch (saveErr) {
+    console.warn('Could not write cache file:', saveErr);
   }
-  return combined;
+  return buf;
 }
 
 // Konversi raw PCM 24kHz 16-bit Mono ke format file WAV standar yang didukung 100% browser
@@ -294,23 +279,23 @@ async function getAudioBuffer(cleanText: string, cacheFile: string): Promise<{ b
     } catch {}
   }
 
-  // 2. Prioritas 1: Google Gemini Flash TTS (Fenrir - Suara Pria Berita Tegas, Stabil & Resmi)
+  // 2. Prioritas 1: EdgeTTS ArdiNeural (Suara Pria Berita Mantap JurnalWave, Super Cepat 2-4 Detik, Format MP3 Ringan)
+  try {
+    const buffer = await generateMaleAudioWithEdgeTTS(cleanText, cacheFile);
+    return { buffer, mimeType: 'audio/mpeg' };
+  } catch (edgeErr) {
+    console.warn('EdgeTTS synthesis notice, attempting Gemini fallback:', edgeErr);
+  }
+
+  // 3. Prioritas 2 (Cadangan): Google Gemini Flash TTS (Fenrir - Suara Pria Tegas)
   const geminiKey = process.env.GEMINI_API_KEY;
   if (geminiKey && !geminiKey.includes('your_gemini')) {
     try {
       const buffer = await generateAudioWithGemini(cleanText, cacheFile);
       return { buffer, mimeType: 'audio/wav' };
     } catch (geminiErr) {
-      console.warn('Gemini TTS synthesis notice, attempting EdgeTTS fallback:', geminiErr);
+      console.warn('Gemini TTS synthesis notice:', geminiErr);
     }
-  }
-
-  // 3. Prioritas 2 (Cadangan): EdgeTTS ArdiNeural
-  try {
-    const buffer = await generateMaleAudioWithEdgeTTS(cleanText, cacheFile);
-    return { buffer, mimeType: 'audio/mpeg' };
-  } catch (edgeErr) {
-    console.warn('EdgeTTS synthesis notice:', edgeErr);
   }
 
   throw new Error('Gagal memproses audio TTS.');
@@ -326,18 +311,25 @@ export async function GET(request: Request) {
     let cacheKey = '';
 
     if (id) {
-      cacheKey = `article-${id}-v8`;
+      cacheKey = `article-${id}-v9`;
       if (!rawText) {
-        let article: any = await fetchArticleById(id);
-        if (!article) {
-          const allArticles = await fetchArticles();
-          article = allArticles.find((a) => String(a.id) === id || a.slug === id) || null;
-        }
-        if (article) {
-          const title = article.title ? `${article.title.replace(/[.?!]+$/, '')}.` : '';
-          const excerpt = article.excerpt ? `${article.excerpt.replace(/[.?!]+$/, '')}.` : '';
-          const content = article.content || '';
-          rawText = `${title} ${excerpt} ${content}`;
+        try {
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('DB Timeout')), 2500)
+          );
+          let article: any = await Promise.race([fetchArticleById(id), timeoutPromise]);
+          if (!article) {
+            const allArticles = await Promise.race([fetchArticles(), timeoutPromise]) as any[];
+            article = allArticles?.find((a) => String(a.id) === id || a.slug === id) || null;
+          }
+          if (article) {
+            const title = article.title ? `${article.title.replace(/[.?!]+$/, '')}.` : '';
+            const excerpt = article.excerpt ? `${article.excerpt.replace(/[.?!]+$/, '')}.` : '';
+            const content = article.content || '';
+            rawText = `${title} ${excerpt} ${content}`;
+          }
+        } catch (dbErr) {
+          console.warn('Fast DB fetch notice in TTS:', dbErr);
         }
       }
     }
