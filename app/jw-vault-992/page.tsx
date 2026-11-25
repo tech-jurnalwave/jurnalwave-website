@@ -40,7 +40,14 @@ export default function SuperadminSecretAuthPage() {
         body: JSON.stringify({ credential: response.credential }),
       })
 
-      const data = await res.json()
+      const rawText = await res.text()
+      let data: any = {}
+      try {
+        data = JSON.parse(rawText)
+      } catch {
+        setErrorMsg(`Respons server tidak valid (${res.status}). Silakan coba lagi.`)
+        return
+      }
 
       if (res.ok && data.success) {
         setSuccessMsg(data.message || 'Login Superadmin berhasil!')
@@ -55,7 +62,7 @@ export default function SuperadminSecretAuthPage() {
           )
         }
         setTimeout(() => {
-          router.push('/halo-jurnal/admin')
+          router.push('/jurnal-central')
           router.refresh()
         }, 500)
       } else {

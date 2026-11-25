@@ -294,7 +294,7 @@ export default function CitizenDirectoryTab({ onCountChange }: CitizenDirectoryT
                       <td className="py-3.5 px-4 align-middle text-center">
                         {citizen.totalReports > 0 ? (
                           <Link
-                            href={`/halo-jurnal/admin/laporan?search=${encodeURIComponent(citizen.phone || citizen.fullName)}`}
+                            href={`/jurnal-central/laporan?search=${encodeURIComponent(citizen.phone || citizen.fullName)}`}
                             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-red-500/10 hover:bg-red-500/20 text-[#c00015] font-semibold text-xs transition"
                             title="Buka daftar aduan dari nomor ini"
                           >

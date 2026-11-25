@@ -7,7 +7,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: ['/api/', '/halo-jurnal/admin/', '/admin/'],
+      disallow: ['/api/', '/jurnal-central/', '/halo-jurnal/admin/', '/admin/', '/jw-gate-781', '/jw-vault-992'],
     },
     sitemap: `${siteUrl}/sitemap.xml`,
   };

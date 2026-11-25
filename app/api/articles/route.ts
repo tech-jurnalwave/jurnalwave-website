@@ -6,6 +6,7 @@ import { clearServerArticlesCache } from '@/lib/wordpress'
 import { INITIAL_ARTICLES } from '@/lib/initialArticles'
 
 import { ensureCloudinaryUrl, deleteFromCloudinary } from '@/lib/cloudinary'
+import { triggerAudioGenerationWorkflow } from '@/lib/audioSync'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -459,6 +460,9 @@ export async function POST(request: NextRequest) {
     clearServerArticlesCache()
     invalidateArticlesCache()
 
+    // Picu robot otomatis pembuatan audio presenter di GitHub Actions
+    triggerAudioGenerationWorkflow().catch(() => {})
+
     try {
       revalidatePath('/')
       revalidatePath('/berita')
@@ -518,9 +522,6 @@ export async function PUT(request: NextRequest) {
     }
     if (typeof body.title === 'string' && body.title.trim()) {
       updateData.title = body.title.trim()
-    }
-    if (typeof body.slug === 'string' && body.slug.trim()) {
-      updateData.slug = body.slug.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/(^-|-$)+/g, '')
     }
     if (typeof body.excerpt === 'string' && body.excerpt.trim()) {
       updateData.excerpt = body.excerpt.trim()
@@ -598,6 +599,9 @@ export async function PUT(request: NextRequest) {
     clearServerArticlesCache()
     invalidateArticlesCache()
 
+    // Picu robot otomatis pembuatan audio presenter di GitHub Actions
+    triggerAudioGenerationWorkflow().catch(() => {})
+
     try {
       revalidatePath('/')
       revalidatePath('/berita')
@@ -651,6 +655,9 @@ export async function DELETE(request: NextRequest) {
 
     clearServerArticlesCache()
     invalidateArticlesCache()
+
+    // Picu robot otomatis pembuatan audio presenter di GitHub Actions
+    triggerAudioGenerationWorkflow().catch(() => {})
 
     // Bersihkan file cover & media di Cloudinary secara asynchronous di background
     if (articleToDelete?.imageUrl) {

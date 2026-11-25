@@ -1,24 +1,33 @@
-﻿import type { Metadata } from 'next';
+import type { Metadata } from 'next';
 import { CategoryTemplate } from '@/components/layout/CategoryTemplate';
 import { fetchArticles } from '@/lib/wordpress';
+import { getCategoryLabelFromDb } from '@/lib/categories.server';
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
-export const metadata: Metadata = {
-  title: 'Hiburan',
-  description: 'Kabar musik, jadwal dan review film bioskop, konser, dan pop culture anak muda terkini.',
-  openGraph: {
-    title: 'Hiburan | JurnalWave',
+export async function generateMetadata(): Promise<Metadata> {
+  const categoryLabel = await getCategoryLabelFromDb('hiburan');
+  return {
+    title: categoryLabel,
     description: 'Kabar musik, jadwal dan review film bioskop, konser, dan pop culture anak muda terkini.',
-  },
-};
+    openGraph: {
+      title: `${categoryLabel} | JurnalWave`,
+      description: 'Kabar musik, jadwal dan review film bioskop, konser, dan pop culture anak muda terkini.',
+    },
+  };
+}
 
 export default async function HiburanPage() {
-  const allArticles = await fetchArticles();
+  const [allArticles, categoryLabel] = await Promise.all([
+    fetchArticles(),
+    getCategoryLabelFromDb('hiburan'),
+  ]);
+
   const hiburanArticles = allArticles.filter(
     a =>
       a.category === 'hiburan' ||
-      (a.categoryLabel && a.categoryLabel.toUpperCase() === 'HIBURAN') ||
+      (a.categoryLabel && a.categoryLabel.toUpperCase().includes('HIBURAN')) ||
       a.title.toLowerCase().includes('musik') ||
       a.title.toLowerCase().includes('film') ||
       a.title.toLowerCase().includes('konser') ||
@@ -27,10 +36,10 @@ export default async function HiburanPage() {
 
   return (
     <CategoryTemplate
-      title="Hiburan"
+      title={categoryLabel}
       description="Kabar seputar musik, film bioskop, konser, dan pop culture anak muda terkini"
       articles={hiburanArticles}
-      categoryName="Hiburan"
+      categoryName={categoryLabel}
       allArticles={allArticles}
     />
   );

@@ -18,10 +18,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     pathname.startsWith('/jw-gate-781') ||
     pathname.startsWith('/jw-vault-992')
 
-  // Dedicated sub-portal layout for Hallo Jurnal
+  // Dedicated sub-portal layout for Hallo Jurnal & Jurnal Central (Admin)
   const isHaloJurnal = pathname.startsWith('/halo-jurnal')
+  const isJurnalCentral = pathname.startsWith('/jurnal-central')
 
-  if (isAuthPage || isHaloJurnal) {
+  if (isAuthPage || isHaloJurnal || isJurnalCentral) {
     return <main className="min-h-screen flex flex-col">{children}</main>
   }
 

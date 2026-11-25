@@ -54,8 +54,8 @@ const CATEGORY_DISPLAY_MAP: Record<string, string> = {
   kuliner: 'Kuliner',
   wisata: 'Wisata',
   hiburan: 'Hiburan',
-  tech: 'Tech & Game',
-  sport: 'Sport',
+  tech: 'Tech',
+  sport: 'Sport & E-Sport',
   inspirasi: 'Inspirasi',
   lifestyle: 'Lifestyle',
   otomotif: 'Otomotif',
@@ -181,7 +181,7 @@ function formatPublishDateTime(createdAt?: string, publishedDate?: string) {
         const minutes = String(d.getMinutes()).padStart(2, '0');
         return `${day} ${month} ${year} | ${hours}:${minutes} WIB`;
       }
-    } catch {}
+    } catch { }
   }
   if (publishedDate) {
     return publishedDate.includes('|') ? publishedDate : `${publishedDate} | 00:00 WIB`;
@@ -212,7 +212,7 @@ export default function AdminBeritaPage() {
             return dedupeArticles(parsed)
           }
         }
-      } catch {}
+      } catch { }
     }
     return []
   })
@@ -261,7 +261,6 @@ export default function AdminBeritaPage() {
   // Form State untuk Tambah Berita Baru
   const [newTitle, setNewTitle] = useState('')
   const [newCategory, setNewCategory] = useState<ArticleCategory>('berita')
-  const [newExcerpt, setNewExcerpt] = useState('')
   const [newContent, setNewContent] = useState('')
   const [newImageUrl, setNewImageUrl] = useState('')
   const [newImageCaption, setNewImageCaption] = useState('')
@@ -288,7 +287,7 @@ export default function AdminBeritaPage() {
             return parsed
           }
         }
-      } catch {}
+      } catch { }
     }
     return DEFAULT_CATEGORIES
   })
@@ -314,7 +313,7 @@ export default function AdminBeritaPage() {
             try {
               localStorage.setItem('jurnal_wave_custom_categories', JSON.stringify(json.data))
               localStorage.setItem('jurnal_wave_categories', JSON.stringify(json.data))
-            } catch {}
+            } catch { }
           }
         }
       })
@@ -330,7 +329,7 @@ export default function AdminBeritaPage() {
       localStorage.setItem('jurnal_wave_custom_categories', JSON.stringify(updated))
       localStorage.setItem('jurnal_wave_categories', JSON.stringify(updated))
       window.dispatchEvent(new Event('storage'))
-    } catch {}
+    } catch { }
 
     if (successNotice) {
       showToast(successNotice, 'success')
@@ -353,7 +352,7 @@ export default function AdminBeritaPage() {
           try {
             localStorage.setItem('jurnal_wave_custom_categories', JSON.stringify(json.data))
             localStorage.setItem('jurnal_wave_categories', JSON.stringify(json.data))
-          } catch {}
+          } catch { }
         }
       }
     } catch (err) {
@@ -658,7 +657,8 @@ export default function AdminBeritaPage() {
       const isDraft = forceStatus ? forceStatus === 'draft' : newPublishType === 'draft'
       const finalCategoryLabel = getCategoryLabel(newCategory).toUpperCase()
       const cleanContent = (newContent || '').replace(/<!--[\s\S]*?-->/g, '').trim()
-      const autoExcerpt = newExcerpt.trim()
+      const plainTextContent = cleanContent.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
+      const autoExcerpt = plainTextContent ? plainTextContent.slice(0, 160) : newTitle.trim()
       const rawTags = newTags.trim() || generateSmartTags(newTitle, newCategory, cleanContent)
       const parsedTags = rawTags
         .split(',')
@@ -722,7 +722,6 @@ export default function AdminBeritaPage() {
       // Reset Form
       setNewTitle('')
       setNewCategory('berita')
-      setNewExcerpt('')
       setNewContent('')
       setNewImageUrl('')
       setNewImageCaption('')
@@ -778,20 +777,20 @@ export default function AdminBeritaPage() {
         targetStatus === 'published'
           ? 'Tayangkan Artikel?'
           : targetStatus === 'archived'
-          ? 'Arsipkan Artikel?'
-          : 'Simpan Draf?',
+            ? 'Arsipkan Artikel?'
+            : 'Simpan Draf?',
       message:
         targetStatus === 'published'
           ? 'Tayangkan artikel ini ke publik sekarang?'
           : targetStatus === 'archived'
-          ? 'Tarik artikel ini dari publik ke arsip?'
-          : 'Ubah artikel ini menjadi draf redaksi?',
+            ? 'Tarik artikel ini dari publik ke arsip?'
+            : 'Ubah artikel ini menjadi draf redaksi?',
       confirmText:
         targetStatus === 'published'
           ? 'Tayangkan'
           : targetStatus === 'archived'
-          ? 'Arsipkan'
-          : 'Simpan Draf',
+            ? 'Arsipkan'
+            : 'Simpan Draf',
       cancelText: 'Batal',
       variant: targetStatus === 'published' ? 'success' : 'warning',
     })
@@ -813,8 +812,8 @@ export default function AdminBeritaPage() {
           targetStatus === 'published'
             ? `Artikel "${title}" kini sudah tayang secara publik!`
             : targetStatus === 'archived'
-            ? `Artikel "${title}" berhasil ditarik dan diarsipkan.`
-            : `Artikel "${title}" kini disimpan sebagai draf.`
+              ? `Artikel "${title}" berhasil ditarik dan diarsipkan.`
+              : `Artikel "${title}" kini disimpan sebagai draf.`
         showToast(successMsg, 'success')
       } else {
         showToast('Gagal memperbarui status: ' + (json?.message || 'Error tidak diketahui'), 'error')
@@ -835,7 +834,8 @@ export default function AdminBeritaPage() {
     try {
       const finalCategoryLabel = getCategoryLabel(editingArticle.category).toUpperCase()
       const cleanContent = (editingArticle.content || '').replace(/<!--[\s\S]*?-->/g, '').trim()
-      const autoExcerpt = editingArticle.excerpt?.trim() || ''
+      const plainTextContent = cleanContent.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
+      const autoExcerpt = plainTextContent ? plainTextContent.slice(0, 160) : editingArticle.title.trim()
       const captionVal = editingArticle.imageCaption?.trim() || editingArticle.imageAlt?.trim() || undefined
       const updatedArticle = {
         ...editingArticle,
@@ -847,8 +847,8 @@ export default function AdminBeritaPage() {
           editPublishType === 'draft'
             ? ('draft' as const)
             : editPublishType === 'archived'
-            ? ('archived' as const)
-            : ('published' as const),
+              ? ('archived' as const)
+              : ('published' as const),
         scheduledAt: null,
         content: cleanContent,
         imageCaption: captionVal,
@@ -1010,51 +1010,46 @@ export default function AdminBeritaPage() {
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
             <button
               onClick={() => setSelectedFilter('semua')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                selectedFilter === 'semua'
-                  ? 'bg-[#c00015] text-white shadow-2xs'
-                  : 'bg-slate-100 text-slate-600 hover:text-slate-900'
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${selectedFilter === 'semua'
+                ? 'bg-[#c00015] text-white shadow-2xs'
+                : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+                }`}
             >
               Semua ({totalCount})
             </button>
             <button
               onClick={() => setSelectedFilter('published')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                selectedFilter === 'published'
-                  ? 'bg-emerald-600 text-white shadow-2xs'
-                  : 'bg-slate-100 text-slate-600 hover:text-slate-900'
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${selectedFilter === 'published'
+                ? 'bg-emerald-600 text-white shadow-2xs'
+                : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+                }`}
             >
               Tayang ({publishedCount})
             </button>
             <button
               onClick={() => setSelectedFilter('draft')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                selectedFilter === 'draft'
-                  ? 'bg-indigo-600 text-white shadow-2xs'
-                  : 'bg-slate-100 text-slate-600 hover:text-slate-900'
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${selectedFilter === 'draft'
+                ? 'bg-indigo-600 text-white shadow-2xs'
+                : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+                }`}
             >
               Draf ({draftCount})
             </button>
             <button
               onClick={() => setSelectedFilter('archived')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                selectedFilter === 'archived'
-                  ? 'bg-slate-800 text-white shadow-2xs'
-                  : 'bg-slate-100 text-slate-600 hover:text-slate-900'
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${selectedFilter === 'archived'
+                ? 'bg-slate-800 text-white shadow-2xs'
+                : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+                }`}
             >
               Arsip ({archivedCount})
             </button>
             <button
               onClick={() => setSelectedFilter('hero')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                selectedFilter === 'hero'
-                  ? 'bg-[#c00015] text-white shadow-2xs'
-                  : 'bg-slate-100 text-slate-600 hover:text-slate-900'
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${selectedFilter === 'hero'
+                ? 'bg-[#c00015] text-white shadow-2xs'
+                : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+                }`}
             >
               Headline ({heroCount})
             </button>
@@ -1139,11 +1134,10 @@ export default function AdminBeritaPage() {
                           }
                         >
                           <Star
-                            className={`w-4 h-4 transition ${
-                              article.isHero
-                                ? 'fill-amber-400 text-amber-500 hover:scale-110'
-                                : 'fill-transparent text-slate-300 hover:text-amber-400 hover:scale-110'
-                            }`}
+                            className={`w-4 h-4 transition ${article.isHero
+                              ? 'fill-amber-400 text-amber-500 hover:scale-110'
+                              : 'fill-transparent text-slate-300 hover:text-amber-400 hover:scale-110'
+                              }`}
                           />
                         </button>
 
@@ -1239,11 +1233,10 @@ export default function AdminBeritaPage() {
                         <Link
                           href={`/artikel/${article.slug}`}
                           target="_blank"
-                          className={`p-1.5 rounded-lg transition ${
-                            article.status === 'draft' || article.status === 'archived'
-                              ? 'text-slate-300 hover:text-slate-400 cursor-not-allowed'
-                              : 'text-slate-400 hover:text-[#c00015] hover:bg-red-50 cursor-pointer'
-                          }`}
+                          className={`p-1.5 rounded-lg transition ${article.status === 'draft' || article.status === 'archived'
+                            ? 'text-slate-300 hover:text-slate-400 cursor-not-allowed'
+                            : 'text-slate-400 hover:text-[#c00015] hover:bg-red-50 cursor-pointer'
+                            }`}
                           title={
                             article.status === 'draft' || article.status === 'archived'
                               ? 'Belum tayang publik'
@@ -2002,9 +1995,8 @@ export default function AdminBeritaPage() {
                     return (
                       <div
                         key={cat.value}
-                        className={`p-2.5 px-3 flex items-center justify-between transition gap-2 ${
-                          isEditing ? 'bg-slate-50' : 'hover:bg-slate-50'
-                        }`}
+                        className={`p-2.5 px-3 flex items-center justify-between transition gap-2 ${isEditing ? 'bg-slate-50' : 'hover:bg-slate-50'
+                          }`}
                       >
                         {/* Tombol Urutan Posisi (Naik / Turun) */}
                         <div className="flex items-center gap-0.5 shrink-0">
@@ -2074,11 +2066,10 @@ export default function AdminBeritaPage() {
                         {/* Jumlah Berita & Tombol Aksi (Edit & Hapus) */}
                         <div className="flex items-center gap-1.5 shrink-0">
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap ${
-                              articleCount > 0
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : 'bg-slate-100 text-slate-500'
-                            }`}
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap ${articleCount > 0
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-slate-100 text-slate-500'
+                              }`}
                             title={`Digunakan oleh ${articleCount} artikel aktif`}
                           >
                             {articleCount} artikel

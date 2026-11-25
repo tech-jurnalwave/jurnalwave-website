@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import { CategoryTemplate } from '@/components/layout/CategoryTemplate';
 import { fetchArticles } from '@/lib/wordpress';
-import { getArticleCategories } from '@/lib/categories';
+import { getCategoryLabelFromDb } from '@/lib/categories.server';
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -11,9 +12,7 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const categories = getArticleCategories();
-  const found = categories.find((c) => c.value.toLowerCase() === slug.toLowerCase());
-  const label = found ? found.label : slug.charAt(0).toUpperCase() + slug.slice(1);
+  const label = await getCategoryLabelFromDb(slug);
 
   return {
     title: `${label} | JurnalWave`,
@@ -27,11 +26,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function DynamicCategoryPage({ params }: PageProps) {
   const { slug } = await params;
-  const categories = getArticleCategories();
-  const found = categories.find((c) => c.value.toLowerCase() === slug.toLowerCase());
-  const label = found ? found.label : slug.charAt(0).toUpperCase() + slug.slice(1);
-
-  const allArticles = await fetchArticles();
+  const [allArticles, label] = await Promise.all([
+    fetchArticles(),
+    getCategoryLabelFromDb(slug),
+  ]);
   const filtered = allArticles.filter((a) => {
     const cat = (a.category || '').toLowerCase();
     const catLabel = (a.categoryLabel || '').toLowerCase();

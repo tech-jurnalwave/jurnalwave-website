@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import {
-  getArticleCategories,
-  getArticleCategoriesFromDb,
-  saveArticleCategoriesToDb,
-  CategoryItem,
-} from '@/lib/categories'
+import { getArticleCategories, CategoryItem } from '@/lib/categories'
+import { getArticleCategoriesFromDb, saveArticleCategoriesToDb } from '@/lib/categories.server'
 import { revalidatePath } from 'next/cache'
 
 export const dynamic = 'force-dynamic'
@@ -27,7 +23,7 @@ export async function GET() {
   }
 }
 
-// POST: Menyimpan pembaruan kategori dari admin dan menyinkronkan secara global ke database
+// POST: Menyimpan pembaruan kategori dari admin dan menyinkronkan secara global
 export async function POST(request: NextRequest) {
   try {
     let body: any = null
@@ -71,7 +67,7 @@ export async function POST(request: NextRequest) {
       revalidatePath('/', 'layout')
       revalidatePath('/berita')
       revalidatePath('/artikel')
-      revalidatePath('/halo-jurnal/admin/berita')
+      revalidatePath('/jurnal-central/berita')
     } catch {}
 
     const updated = await getArticleCategoriesFromDb()

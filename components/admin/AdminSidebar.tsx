@@ -171,7 +171,7 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
       items: [
         {
           name: 'Dashboard',
-          href: '/halo-jurnal/admin',
+          href: '/jurnal-central',
           icon: LayoutDashboard,
           badge: null,
         },
@@ -182,25 +182,25 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
       items: [
         {
           name: 'Manajemen Konten',
-          href: '/halo-jurnal/admin/berita',
+          href: '/jurnal-central/berita',
           icon: Newspaper,
           badge: null,
         },
         {
           name: 'Wave Reels',
-          href: '/halo-jurnal/admin/reels',
+          href: '/jurnal-central/reels',
           icon: Film,
           badge: null,
         },
         {
           name: 'Lowongan Kerja',
-          href: '/halo-jurnal/admin/loker',
+          href: '/jurnal-central/loker',
           icon: Briefcase,
           badge: null,
         },
         {
           name: 'Polling Pembaca',
-          href: '/halo-jurnal/admin/polling',
+          href: '/jurnal-central/polling',
           icon: Vote,
           badge: null,
         },
@@ -211,7 +211,7 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
       items: [
         {
           name: 'Pengaduan Warga',
-          href: '/halo-jurnal/admin/laporan',
+          href: '/jurnal-central/laporan',
           icon: FileText,
           badge: null,
         },
@@ -222,13 +222,13 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
       items: [
         {
           name: 'Kelola Pengguna',
-          href: '/halo-jurnal/admin/pengguna',
+          href: '/jurnal-central/pengguna',
           icon: Users,
           badge: null,
         },
         {
           name: 'Keamanan',
-          href: '/halo-jurnal/admin/keamanan',
+          href: '/jurnal-central/keamanan',
           icon: ShieldCheck,
           badge: null,
         },
@@ -237,14 +237,14 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
   ]
 
   const HREF_TO_PERMISSION: Record<string, string> = {
-    '/halo-jurnal/admin': 'dashboard',
-    '/halo-jurnal/admin/berita': 'berita',
-    '/halo-jurnal/admin/reels': 'reels',
-    '/halo-jurnal/admin/loker': 'loker',
-    '/halo-jurnal/admin/polling': 'polling',
-    '/halo-jurnal/admin/laporan': 'laporan',
-    '/halo-jurnal/admin/pengguna': 'pengguna',
-    '/halo-jurnal/admin/keamanan': 'pengguna',
+    '/jurnal-central': 'dashboard',
+    '/jurnal-central/berita': 'berita',
+    '/jurnal-central/reels': 'reels',
+    '/jurnal-central/loker': 'loker',
+    '/jurnal-central/polling': 'polling',
+    '/jurnal-central/laporan': 'laporan',
+    '/jurnal-central/pengguna': 'pengguna',
+    '/jurnal-central/keamanan': 'pengguna',
   }
 
   // Filter menu sidebar berdasarkan hak akses akun yang login
@@ -253,7 +253,7 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
       ...section,
       items: section.items.filter((item) => {
         // Menu Kelola Pengguna strictly eksklusif hanya untuk Superadmin
-        if (item.href === '/halo-jurnal/admin/pengguna' && !isSuperadmin) {
+        if (item.href === '/jurnal-central/pengguna' && !isSuperadmin) {
           return false
         }
         if (!allowedPermissions) return true // Superadmin / Akses Penuh
@@ -264,7 +264,7 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
     .filter((section) => section.items.length > 0)
 
   const isActive = (href: string) => {
-    if (href === '/halo-jurnal/admin') {
+    if (href === '/jurnal-central') {
       return pathname === href
     }
     return pathname?.startsWith(href)
@@ -288,7 +288,7 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
       >
         {/* Header Logo Bersih */}
         <div className="h-16 px-5 flex items-center justify-between border-b border-slate-200">
-          <Link href="/halo-jurnal/admin" className="flex items-center gap-2.5">
+          <Link href="/jurnal-central" className="flex items-center gap-2.5">
             <img
               src="/halo-jurnal-icon.webp?v=original"
               alt="JurnalCentral"

@@ -398,6 +398,7 @@ function FeedPublikContent() {
                         const isVid =
                           report.laporan_lampiran?.[0]?.file_type?.startsWith('video/') ||
                           imgUrl.startsWith('data:video/') ||
+                          imgUrl.includes('/video/upload/') ||
                           imgUrl.endsWith('.mp4') ||
                           imgUrl.endsWith('.webm')
                         return (

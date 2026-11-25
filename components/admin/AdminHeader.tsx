@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import {
@@ -78,43 +78,46 @@ export default function AdminHeader({ onToggleSidebar }: AdminHeaderProps) {
   const handleSearchKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && searchQuery.trim()) {
       if (pathname.includes('/berita')) {
-        router.push(`/halo-jurnal/admin/berita?search=${encodeURIComponent(searchQuery.trim())}`)
+        router.push(`/jurnal-central/berita?search=${encodeURIComponent(searchQuery.trim())}`)
       } else {
-        router.push(`/halo-jurnal/admin/laporan?search=${encodeURIComponent(searchQuery.trim())}`)
+        router.push(`/jurnal-central/laporan?search=${encodeURIComponent(searchQuery.trim())}`)
       }
     }
   }
 
   // Menentukan teks breadcrumb secara dinamis sesuai halaman aktif
   const getBreadcrumb = () => {
-    if (pathname === '/halo-jurnal/admin' || pathname === '/halo-jurnal/admin/halo') {
-      return { section: 'Admin', page: 'Dashboard', sectionHref: '/halo-jurnal/admin' }
+    if (pathname === '/jurnal-central' || pathname === '/jurnal-central/dashboard') {
+      return { section: 'Jurnal Central', page: 'Dashboard', sectionHref: '/jurnal-central' }
     }
-    if (pathname?.startsWith('/halo-jurnal/admin/laporan/')) {
-      return { section: 'Hallo Jurnal', page: 'Detail Pengaduan Warga', sectionHref: '/halo-jurnal/admin/laporan' }
+    if (pathname?.startsWith('/jurnal-central/laporan/')) {
+      return { section: 'Hallo Jurnal', page: 'Detail Pengaduan Warga', sectionHref: '/jurnal-central/laporan' }
     }
-    if (pathname === '/halo-jurnal/admin/laporan') {
-      return { section: 'Hallo Jurnal', page: 'Buku Induk Pengaduan', sectionHref: '/halo-jurnal/admin/laporan' }
+    if (pathname === '/jurnal-central/laporan') {
+      return { section: 'Hallo Jurnal', page: 'Buku Induk Pengaduan', sectionHref: '/jurnal-central/laporan' }
     }
-    if (pathname === '/halo-jurnal/admin/chat') {
-      return { section: 'Hallo Jurnal', page: 'Pusat Chat Warga', sectionHref: '/halo-jurnal/admin/chat' }
+    if (pathname === '/jurnal-central/chat') {
+      return { section: 'Hallo Jurnal', page: 'Pusat Chat Warga', sectionHref: '/jurnal-central/chat' }
     }
-    if (pathname === '/halo-jurnal/admin/berita') {
-      return { section: 'JurnalWave', page: 'Manajemen Konten', sectionHref: '/halo-jurnal/admin/berita' }
+    if (pathname === '/jurnal-central/berita') {
+      return { section: 'JurnalWave', page: 'Manajemen Konten', sectionHref: '/jurnal-central/berita' }
     }
-    if (pathname === '/halo-jurnal/admin/reels') {
-      return { section: 'JurnalWave', page: 'Wave Reels', sectionHref: '/halo-jurnal/admin/reels' }
+    if (pathname === '/jurnal-central/reels') {
+      return { section: 'JurnalWave', page: 'Wave Reels', sectionHref: '/jurnal-central/reels' }
     }
-    if (pathname === '/halo-jurnal/admin/loker') {
-      return { section: 'JurnalWave', page: 'Lowongan Kerja', sectionHref: '/halo-jurnal/admin/loker' }
+    if (pathname === '/jurnal-central/loker') {
+      return { section: 'JurnalWave', page: 'Lowongan Kerja', sectionHref: '/jurnal-central/loker' }
     }
-    if (pathname === '/halo-jurnal/admin/kategori') {
-      return { section: 'JurnalWave', page: 'Kategori & Headline', sectionHref: '/halo-jurnal/admin/kategori' }
+    if (pathname === '/jurnal-central/polling') {
+      return { section: 'JurnalWave', page: 'Polling Pembaca', sectionHref: '/jurnal-central/polling' }
     }
-    if (pathname === '/halo-jurnal/admin/pengguna') {
-      return { section: 'Sistem', page: 'Kelola Pengguna', sectionHref: '/halo-jurnal/admin/pengguna' }
+    if (pathname === '/jurnal-central/pengguna') {
+      return { section: 'Sistem', page: 'Kelola Pengguna', sectionHref: '/jurnal-central/pengguna' }
     }
-    return { section: 'Admin', page: 'Ruang Kerja Redaksi', sectionHref: '/halo-jurnal/admin' }
+    if (pathname === '/jurnal-central/keamanan') {
+      return { section: 'Sistem', page: 'Keamanan Akun', sectionHref: '/jurnal-central/keamanan' }
+    }
+    return { section: 'Jurnal Central', page: 'Ruang Kerja Redaksi', sectionHref: '/jurnal-central' }
   }
 
   const breadcrumb = getBreadcrumb()
@@ -217,7 +220,7 @@ export default function AdminHeader({ onToggleSidebar }: AdminHeaderProps) {
                       return (
                         <Link
                           key={r.id}
-                          href={`/halo-jurnal/admin/laporan/${r.id}`}
+                          href={`/jurnal-central/laporan/${r.id}`}
                           onClick={() => {
                             setShowNotifications(false)
                             markReportAsRead(r.id)
@@ -263,7 +266,7 @@ export default function AdminHeader({ onToggleSidebar }: AdminHeaderProps) {
                   </div>
 
                   <Link
-                    href="/halo-jurnal/admin/laporan"
+                    href="/jurnal-central/laporan"
                     onClick={() => setShowNotifications(false)}
                     className="block text-center w-full py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-800 transition"
                   >

@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
 
     clearServerJobsCache();
     revalidatePath('/loker');
-    revalidatePath('/halo-jurnal/admin/loker');
+    revalidatePath('/jurnal-central/loker');
 
     return NextResponse.json({
       success: true,
@@ -194,7 +194,7 @@ export async function PUT(req: NextRequest) {
     clearServerJobsCache();
     revalidatePath('/loker');
     revalidatePath(`/loker/${id}`);
-    revalidatePath('/halo-jurnal/admin/loker');
+    revalidatePath('/jurnal-central/loker');
 
     return NextResponse.json({
       success: true,
@@ -235,7 +235,7 @@ export async function DELETE(req: NextRequest) {
 
     clearServerJobsCache();
     revalidatePath('/loker');
-    revalidatePath('/halo-jurnal/admin/loker');
+    revalidatePath('/jurnal-central/loker');
 
     // Bersihkan logo dari Cloudinary di background jika ada
     let logoUrl: string | undefined = undefined;

@@ -538,7 +538,7 @@ export default function AdminLaporanPage() {
                       {/* 2. Judul & Pelapor */}
                       <td className="py-3 px-4 align-middle min-w-0">
                         <Link
-                          href={`/halo-jurnal/admin/laporan/${report.id}`}
+                          href={`/jurnal-central/laporan/${report.id}`}
                           className="font-heading font-semibold text-slate-900 hover:text-[#c00015] transition-colors truncate block text-xs"
                           title={report.judul}
                         >
@@ -585,7 +585,7 @@ export default function AdminLaporanPage() {
                         <div className="inline-flex items-center justify-center gap-1.5">
                           {/* Chat Warga */}
                           <Link
-                            href={`/halo-jurnal/admin/chat?ticket=${report.nomor_tiket || report.id}`}
+                            href={`/jurnal-central/chat?ticket=${report.nomor_tiket || report.id}`}
                             className="p-1.5 rounded-md text-slate-400 hover:text-[#c00015] hover:bg-red-50 transition cursor-pointer"
                             title="Buka Chat dengan Pelapor"
                           >
@@ -594,7 +594,7 @@ export default function AdminLaporanPage() {
 
                           {/* Buka Detail Aduan */}
                           <Link
-                            href={`/halo-jurnal/admin/laporan/${report.id}`}
+                            href={`/jurnal-central/laporan/${report.id}`}
                             className="p-1.5 rounded-md text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer"
                             title="Buka Detail Aduan & Meja ACC"
                           >

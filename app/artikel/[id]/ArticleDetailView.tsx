@@ -26,6 +26,7 @@ import { Article } from '@/types';
 import { fetchArticles, fetchArticleById } from '@/lib/wordpress';
 import { formatArticleDate, formatIndoDateTime } from '@/lib/utils';
 import { isArticleSaved, toggleArticleBookmark } from '@/lib/bookmarks';
+import { getCategoryLabel, getCategoryUrl } from '@/lib/categories';
 
 function FacebookIcon({ className }: { className?: string }) {
   return (
@@ -66,55 +67,6 @@ const FONT_SIZE_CLASSES: Record<FontSize, string> = {
   md: 'text-[15px] sm:text-[16px] leading-relaxed',
   lg: 'text-[17px] sm:text-[18px] leading-relaxed'
 };
-
-// Kamus Fonetik Istilah Serapan / Bahasa Inggris agar Dilafalkan Alami & Pas oleh TTS Bahasa Indonesia
-// Berlaku otomatis untuk seluruh artikel berita di situs JurnalWave
-const LOANWORD_PHONETICS: [RegExp, string][] = [
-  // Musik & Event
-  [/\bline[- ]?up\b/gi, 'lain ap'],
-  [/\bmerchandise\b/gi, 'mercendais'],
-  [/\blive\b/gi, 'laif'],
-  [/\bstreaming\b/gi, 'striming'],
-  [/\bevent\b/gi, 'ivent'],
-  [/\bcreative\b/gi, 'kreatif'],
-  [/\bfest\b/gi, 'fes'],
-  [/\bshowcase\b/gi, 'syokeis'],
-  [/\bteaser\b/gi, 'tiser'],
-  [/\btrailer\b/gi, 'treiler'],
-  [/\bcomeback\b/gi, 'kambek'],
-  // Bisnis, Kuliner & Gaya Hidup
-  [/\bbrand\b/gi, 'brend'],
-  [/\bbooth\b/gi, 'but'],
-  [/\bcoffee shop\b/gi, 'kofi syop'],
-  [/\bcold brew\b/gi, 'kold bru'],
-  [/\blifestyle\b/gi, 'laifstail'],
-  [/\breview\b/gi, 'rivyu'],
-  [/\bweekend\b/gi, 'wik-end'],
-  [/\bbudget\b/gi, 'bajet'],
-  [/\bworkshop\b/gi, 'worsyop'],
-  [/\bmeet[- ]?up\b/gi, 'mit ap'],
-  // Digital & Teknologi
-  [/\bstartup\b/gi, 'start ap'],
-  [/\bgadget\b/gi, 'gejet'],
-  [/\bsmartphone\b/gi, 'smartfon'],
-  [/\bpodcast\b/gi, 'podkes'],
-  [/\bonline\b/gi, 'onlain'],
-  [/\boffline\b/gi, 'oflain'],
-  [/\bupdate\b/gi, 'apdet'],
-  [/\bdownload\b/gi, 'daunlod'],
-  [/\bupload\b/gi, 'aplod'],
-  [/\bgaming\b/gi, 'geming'],
-  [/\bgamer\b/gi, 'gemer'],
-  [/\bgame\b/gi, 'gem'],
-  [/\bcontent creator\b/gi, 'konten krieitor'],
-  [/\binfluencer\b/gi, 'influenser'],
-  [/\brating\b/gi, 'reiting'],
-  [/\bfeedback\b/gi, 'fidbek'],
-  [/\bdeadline\b/gi, 'dedlain'],
-  // Format Waktu & Finansial Lokal
-  [/\bWIB\b/gi, 'W I B'],
-  [/\bRp\s*([\d.,]+)/gi, '$1 rupiah'],
-];
 
 export function ArticleDetailView({
   id,
@@ -158,19 +110,13 @@ export function ArticleDetailView({
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [audioDuration, setAudioDuration] = useState<number>(0);
   const [playbackRate, setPlaybackRate] = useState<number>(1);
+  const [audioNotice, setAudioNotice] = useState<string>('');
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const playTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
-    };
-  }, []);
 
   // Perkiraan durasi membaca / TTS (~125 kata per menit) jika durasi asli belum terload
   const cleanContentForSpeech = (article?.content || '').replace(/<!--[\s\S]*?-->/g, '').trim();
-  const fullArticleSpeechText = `${article?.title || ''} ${article?.excerpt || ''} ${cleanContentForSpeech}`.trim();
+  const fullArticleSpeechText = `${article?.title || ''}. ${cleanContentForSpeech}`.trim();
   const wordCount = fullArticleSpeechText ? fullArticleSpeechText.split(/\s+/).length : 0;
   const estimatedDuration = Math.max(15, Math.round((wordCount / 125) * 60));
   const totalDuration = audioDuration > 0 ? audioDuration : estimatedDuration;
@@ -207,14 +153,18 @@ export function ArticleDetailView({
     }
   }, [article?.id]);
 
-  // Pastikan tidak ada sisa suara sintesis browser lain yang tertinggal
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-  }, [article?.id]);
+  // URL Audio Berita Presenter Pria Resmi JurnalWave dari Cloudinary CDN (Instant Load, 0 Timeout, Bebas Kuota)
+  const audioCloudinaryUrl = useMemo(() => {
+    if (!article?.id) return '';
+    const versionNum = article.updatedAt
+      ? Math.floor(new Date(article.updatedAt).getTime() / 1000)
+      : article.createdAt
+      ? Math.floor(new Date(article.createdAt).getTime() / 1000)
+      : 1;
+    return `https://res.cloudinary.com/bqnyd49z/video/upload/v${versionNum}/jurnalwave-audio/${encodeURIComponent(article.id)}.mp3`;
+  }, [article?.id, article?.updatedAt, article?.createdAt]);
 
-  // Eksekusi pemutaran audio tunggal resmi JurnalWave (Suara Pria Berita Fenrir)
+  // Eksekusi pemutaran audio murni presenter berita resmi JurnalWave
   const handlePlayToggle = async () => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -227,39 +177,36 @@ export function ArticleDetailView({
       audio.pause();
       setIsPlaying(false);
       setIsLoadingAudio(false);
-      if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
       return;
     }
 
     setIsLoadingAudio(true);
+    setAudioNotice('');
 
-    // Pastikan src terpasang jika belum ada
-    const targetSrc = `/api/tts?id=${encodeURIComponent(article.id)}`;
+    // Pastikan src terpasang langsung ke CDN Cloudinary (atau fallback /api/tts)
+    const targetSrc = audioCloudinaryUrl || `/api/tts?id=${encodeURIComponent(article.id)}`;
     const currentSrc = audio.getAttribute('src') || '';
-    if (!currentSrc || !currentSrc.includes(`/api/tts?id=${encodeURIComponent(article.id)}`)) {
+    if (!currentSrc || currentSrc !== targetSrc) {
       audio.setAttribute('src', targetSrc);
     }
     audio.playbackRate = playbackRate;
 
-    // Timeout keamanan maksimal 45 detik untuk sintesis perdana naskah berita lengkap
-    if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
-    playTimeoutRef.current = setTimeout(() => {
-      setIsLoadingAudio(false);
-    }, 45000);
-
-    // Langsung trigger play dalam konteks gesture klik pengguna
     audio.play()
       .then(() => {
-        if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
         setIsPlaying(true);
         setIsLoadingAudio(false);
+        setAudioNotice('');
       })
-      .catch((err: any) => {
+      .catch(async (err: any) => {
         console.warn('Audio play request status:', err?.name || err);
-        if (err?.name === 'AbortError') {
-          if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
-          setIsLoadingAudio(false);
-        }
+        setIsLoadingAudio(false);
+        // Jika audio belum ada di CDN (berita baru dibuat), hubungi /api/tts untuk memicu generator
+        try {
+          const res = await fetch(`/api/tts?id=${encodeURIComponent(article.id)}`);
+          if (res.status === 202) {
+            setAudioNotice('Audio berita baru sedang disiapkan otomatis (~15-30 detik). Silakan coba putar sebentar lagi.');
+          }
+        } catch {}
       });
   };
 
@@ -297,12 +244,8 @@ export function ArticleDetailView({
   };
 
   const handleCloseAudio = () => {
-    if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
     if (audioRef.current) {
       audioRef.current.pause();
-    }
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
     }
     setIsAudioActive(false);
     setIsPlaying(false);
@@ -356,7 +299,7 @@ export function ArticleDetailView({
     } else {
       try {
         navigator.mediaSession.playbackState = 'none';
-      } catch {}
+      } catch { }
     }
   }, [isAudioActive, isPlaying, article.title, article.categoryLabel, article.imageUrl, totalDuration]);
 
@@ -610,15 +553,12 @@ export function ArticleDetailView({
           Artikel
         </Link>
         <span className="text-slate-400">/</span>
-        <span className="text-[#c00015] font-bold">
-          {(() => {
-            const raw = (article.categoryLabel || article.category || 'BERITA').toUpperCase();
-            if (raw === 'INFRASTRUKTUR') return 'BERITA';
-            if (raw === 'WISATA') return 'TRAVELING';
-            if (raw === 'STYLE & FASHION') return 'STYLE';
-            return raw;
-          })()}
-        </span>
+        <Link
+          href={getCategoryUrl(article.category || '')}
+          className="text-[#c00015] font-bold hover:underline transition-colors cursor-pointer"
+        >
+          {getCategoryLabel(article.category || article.categoryLabel || '').toUpperCase()}
+        </Link>
       </nav>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
@@ -626,35 +566,35 @@ export function ArticleDetailView({
         <main className="lg:col-span-8 flex flex-col gap-stack-lg min-w-0">
           {/* Article Header (Sejajar langsung secara horizontal dengan TERPOPULER di kolom kanan) */}
           <header className="flex flex-col gap-3.5 mb-1">
-          <h1 className="font-headline-xl text-xl sm:text-2xl md:text-[26px] lg:text-[28px] font-bold text-on-surface dark:text-white leading-snug tracking-tight">
-            {article.title}
-          </h1>
+            <h1 className="font-headline-xl text-xl sm:text-2xl md:text-[26px] lg:text-[28px] font-bold text-on-surface dark:text-white leading-snug tracking-tight">
+              {article.title}
+            </h1>
 
-          {/* Baris Meta Penulis & Tanggal */}
-          <div className="border-t border-b border-slate-200/80 dark:border-slate-800 py-2 sm:py-2.5 my-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] sm:text-xs">
-            {/* Sisi Kiri: JURNALWAVE.COM • Oleh: Nama Penulis */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <div className="inline-flex items-center gap-1.5 shrink-0">
-                <span className="text-[#c00015] font-black tracking-wide uppercase">
-                  JURNALWAVE.COM
-                </span>
-                <span className="text-slate-300 dark:text-slate-600 font-bold">•</span>
-                <span className="text-slate-500 dark:text-slate-400">Oleh:</span>
+            {/* Baris Meta Penulis & Tanggal */}
+            <div className="border-t border-b border-slate-200/80 dark:border-slate-800 py-2 sm:py-2.5 my-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] sm:text-xs">
+              {/* Sisi Kiri: JURNALWAVE.COM • Oleh: Nama Penulis */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="inline-flex items-center gap-1.5 shrink-0">
+                  <span className="text-[#c00015] font-black tracking-wide uppercase">
+                    JURNALWAVE.COM
+                  </span>
+                  <span className="text-slate-300 dark:text-slate-600 font-bold">•</span>
+                  <span className="text-slate-500 dark:text-slate-400">Oleh:</span>
+                </div>
+                <strong className="font-bold text-slate-900 dark:text-white">
+                  {article.reporter || (article.author && article.author !== 'Tim Redaksi' ? article.author : 'Ilham Nugraha')}
+                </strong>
               </div>
-              <strong className="font-bold text-slate-900 dark:text-white">
-                {article.reporter || (article.author && article.author !== 'Tim Redaksi' ? article.author : 'Ilham Nugraha')}
-              </strong>
+
+              {/* Sisi Kanan: Tanggal Format Singkat */}
+              <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 whitespace-nowrap shrink-0">
+                <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span>{formatArticleDate(article.createdAt || article.publishedDate)}</span>
+              </div>
             </div>
 
-            {/* Sisi Kanan: Tanggal Format Singkat */}
-            <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 whitespace-nowrap shrink-0">
-              <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              <span>{formatArticleDate(article.createdAt || article.publishedDate)}</span>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-start gap-2 flex-wrap mb-1">
-            {/* Tombol Bagikan Populer + Tombol Simpan */}
+            <div className="flex items-center justify-start gap-2 flex-wrap mb-1">
+              {/* Tombol Bagikan Populer + Tombol Simpan */}
               {/* Facebook */}
               <button
                 type="button"
@@ -720,69 +660,68 @@ export function ArticleDetailView({
                 onClick={handleToggleBookmark}
                 title={isSaved ? 'Tersimpan (Klik untuk batal)' : 'Simpan Artikel'}
                 aria-label="Simpan Artikel"
-                className={`w-9 h-9 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-90 ${
-                  isSaved
+                className={`w-9 h-9 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-90 ${isSaved
                     ? 'bg-primary text-white shadow-xs'
                     : 'bg-surface-variant/80 text-on-surface hover:bg-surface-variant hover:text-primary border border-outline-variant/60'
-                }`}
+                  }`}
               >
                 <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
               </button>
             </div>
-        </header>
+          </header>
 
-        {/* Featured Image & Baris Utilitas Baca (Rapet ke Gambar) */}
-        <div className="flex flex-col gap-3">
-          <figure>
-            <div className="rounded-2xl overflow-hidden shadow-sm aspect-video border border-outline-variant/40 bg-slate-100 dark:bg-slate-800">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={article?.imageUrl || '/hero-banner.webp'}
-                alt={article?.imageCaption || article?.imageAlt || article?.title || 'JurnalWave'}
-                fetchPriority="high"
-                loading="eager"
-                decoding="async"
-                onError={(e) => {
-                  const target = e.currentTarget;
-                  if (target.src !== window.location.origin + '/hero-banner.webp') {
-                    target.src = '/hero-banner.webp';
-                  }
-                }}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            {(article?.imageCaption || article?.imageAlt) && (
-              <figcaption className="text-xs text-slate-500 dark:text-slate-400 italic text-center mt-2.5 px-3 leading-relaxed font-sans">
-                {article.imageCaption || article.imageAlt}
-              </figcaption>
-            )}
-          </figure>
+          {/* Featured Image & Baris Utilitas Baca (Rapet ke Gambar) */}
+          <div className="flex flex-col gap-3">
+            <figure>
+              <div className="rounded-2xl overflow-hidden shadow-sm aspect-video border border-outline-variant/40 bg-slate-100 dark:bg-slate-800">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={article?.imageUrl || '/hero-banner.webp'}
+                  alt={article?.imageCaption || article?.imageAlt || article?.title || 'JurnalWave'}
+                  fetchPriority="high"
+                  loading="eager"
+                  decoding="async"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    if (target.src !== window.location.origin + '/hero-banner.webp') {
+                      target.src = '/hero-banner.webp';
+                    }
+                  }}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              {(article?.imageCaption || article?.imageAlt) && (
+                <figcaption className="text-xs text-slate-500 dark:text-slate-400 italic text-center mt-2.5 px-3 leading-relaxed font-sans">
+                  {article.imageCaption || article.imageAlt}
+                </figcaption>
+              )}
+            </figure>
 
-          {/* Baris Utilitas Baca: Dengarkan Artikel (Kiri) & Ukuran Teks (Kanan) */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
-          {/* Sisi Kiri: Trigger Dengarkan Artikel */}
-          <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
-            <button
-              type="button"
-              onClick={handlePlayToggle}
-              className="inline-flex items-center gap-2.5 py-1 text-on-surface hover:text-primary text-xs sm:text-sm font-semibold transition-colors cursor-pointer group"
-            >
-              <span className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
-                {isLoadingAudio ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : isPlaying ? (
-                  <Pause className="w-3 h-3 fill-current" />
-                ) : (
-                  <Play className="w-3 h-3 fill-current ml-0.5" />
-                )}
-              </span>
-              <span className="flex items-center min-h-[20px]">
-                {isLoadingAudio ? (
-                  <span className="text-primary font-medium text-xs">Menyiapkan Audio...</span>
-                ) : isAudioActive && currentTime > 0 ? (
-                  isPlaying ? (
-                    <div className="flex items-center h-5 gap-[3px] mx-1" title="Sedang Memutar">
-                      <style>{`
+            {/* Baris Utilitas Baca: Dengarkan Artikel (Kiri) & Ukuran Teks (Kanan) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
+              {/* Sisi Kiri: Trigger Dengarkan Artikel */}
+              <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handlePlayToggle}
+                  className="inline-flex items-center gap-2.5 py-1 text-on-surface hover:text-primary text-xs sm:text-sm font-semibold transition-colors cursor-pointer group"
+                >
+                  <span className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                    {isLoadingAudio ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : isPlaying ? (
+                      <Pause className="w-3 h-3 fill-current" />
+                    ) : (
+                      <Play className="w-3 h-3 fill-current ml-0.5" />
+                    )}
+                  </span>
+                  <span className="flex items-center min-h-[20px]">
+                    {isLoadingAudio ? (
+                      <span className="text-primary font-medium text-xs">Menyiapkan Audio...</span>
+                    ) : isAudioActive && currentTime > 0 ? (
+                      isPlaying ? (
+                        <div className="flex items-center h-5 gap-[3px] mx-1" title="Sedang Memutar">
+                          <style>{`
                         @keyframes eq {
                           0%, 100% { transform: scaleY(0.25); }
                           50% { transform: scaleY(1); }
@@ -804,261 +743,265 @@ export function ArticleDetailView({
                         .bar-12 { animation: eq 1s ease-in-out infinite 0.15s; }
                         .bar-13 { animation: eq 0.95s ease-in-out infinite 0.35s; }
                       `}</style>
-                      <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-1"></span>
-                      <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-2"></span>
-                      <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-3"></span>
-                      <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-4"></span>
-                      <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-5"></span>
-                      <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-6"></span>
-                      <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-7"></span>
-                      <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-8"></span>
-                      <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-9"></span>
-                      <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-10"></span>
-                      <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-11"></span>
-                      <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-12"></span>
-                      <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-13"></span>
-                    </div>
+                          <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-1"></span>
+                          <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-2"></span>
+                          <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-3"></span>
+                          <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-4"></span>
+                          <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-5"></span>
+                          <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-6"></span>
+                          <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-7"></span>
+                          <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-8"></span>
+                          <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-9"></span>
+                          <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-10"></span>
+                          <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-11"></span>
+                          <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-12"></span>
+                          <span className="w-[3px] h-full bg-primary rounded-full eq-bar bar-13"></span>
+                        </div>
+                      ) : (
+                        'Lanjutkan Dengarkan'
+                      )
+                    ) : (
+                      'Dengarkan Artikel'
+                    )}
+                  </span>
+                  <span className="text-on-surface-variant/70 text-xs font-normal">
+                    • {formatTime(totalDuration)}
+                  </span>
+                </button>
+              </div>
+
+              {/* Sisi Kanan: Pengatur Ukuran Teks (A- / A / A+) */}
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <span className="text-xs font-medium text-on-surface-variant/70 hidden sm:inline">
+                  Ukuran Teks:
+                </span>
+                <div className="flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setFontSize('sm')}
+                    title="Ukuran teks kecil (13-14px)"
+                    aria-label="Ukuran teks kecil"
+                    className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${fontSize === 'sm'
+                        ? 'text-primary bg-primary/10'
+                        : 'text-on-surface-variant/70 hover:text-on-surface hover:bg-surface-variant/50'
+                      }`}
+                  >
+                    A-
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFontSize('md')}
+                    title="Ukuran teks normal (15-16px)"
+                    aria-label="Ukuran teks normal"
+                    className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${fontSize === 'md'
+                        ? 'text-primary bg-primary/10'
+                        : 'text-on-surface-variant/70 hover:text-on-surface hover:bg-surface-variant/50'
+                      }`}
+                  >
+                    A
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFontSize('lg')}
+                    title="Ukuran teks besar (17-18px)"
+                    aria-label="Ukuran teks besar"
+                    className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${fontSize === 'lg'
+                        ? 'text-primary bg-primary/10'
+                        : 'text-on-surface-variant/70 hover:text-on-surface hover:bg-surface-variant/50'
+                      }`}
+                  >
+                    A+
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Article Body, Reporter & Tags (Uniform Gap) */}
+          <div className={`font-sans text-slate-800 dark:text-slate-200 flex flex-col gap-5 sm:gap-6 leading-[1.85] transition-all duration-200 ${FONT_SIZE_CLASSES[fontSize]}`}>
+            {contentParagraphs.map((paragraph, idx) => {
+              const isFirst = idx === 0;
+              const cleanFirst = isFirst
+                ? paragraph.replace(/^(JURNALWAVE\.COM|JURNAL WAVE)(\s*[-–—]\s*)/i, '')
+                : paragraph;
+
+              // Posisi sisipan BACA JUGA (paragraf ke-2 atau ke-3)
+              const insertFirstAt = contentParagraphs.length >= 4 ? 2 : (contentParagraphs.length >= 2 ? 1 : 0);
+              const insertSecondAt = contentParagraphs.length >= 7 ? 5 : -1;
+
+              const rec1 = inlineRecommendedArticles[0];
+              const rec2 = inlineRecommendedArticles[1];
+
+              return (
+                <React.Fragment key={idx}>
+                  {isFirst ? (
+                    <p className="leading-[1.85]">
+                      <strong className="font-bold text-[#c00015] dark:text-red-500">
+                        JURNALWAVE.COM
+                      </strong>{' '}
+                      – {cleanFirst}
+                    </p>
                   ) : (
-                    'Lanjutkan Dengarkan'
-                  )
-                ) : (
-                  'Dengarkan Artikel'
-                )}
-              </span>
-              <span className="text-on-surface-variant/70 text-xs font-normal">
-                • {formatTime(totalDuration)}
-              </span>
-            </button>
-          </div>
+                    <p className="leading-[1.85]">{paragraph}</p>
+                  )}
 
-          {/* Sisi Kanan: Pengatur Ukuran Teks (A- / A / A+) */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <span className="text-xs font-medium text-on-surface-variant/70 hidden sm:inline">
-              Ukuran Teks:
-            </span>
-            <div className="flex items-center gap-0.5">
-              <button
-                type="button"
-                onClick={() => setFontSize('sm')}
-                title="Ukuran teks kecil (13-14px)"
-                aria-label="Ukuran teks kecil"
-                className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                  fontSize === 'sm'
-                    ? 'text-primary bg-primary/10'
-                    : 'text-on-surface-variant/70 hover:text-on-surface hover:bg-surface-variant/50'
-                }`}
-              >
-                A-
-              </button>
-              <button
-                type="button"
-                onClick={() => setFontSize('md')}
-                title="Ukuran teks normal (15-16px)"
-                aria-label="Ukuran teks normal"
-                className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                  fontSize === 'md'
-                    ? 'text-primary bg-primary/10'
-                    : 'text-on-surface-variant/70 hover:text-on-surface hover:bg-surface-variant/50'
-                }`}
-              >
-                A
-              </button>
-              <button
-                type="button"
-                onClick={() => setFontSize('lg')}
-                title="Ukuran teks besar (17-18px)"
-                aria-label="Ukuran teks besar"
-                className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                  fontSize === 'lg'
-                    ? 'text-primary bg-primary/10'
-                    : 'text-on-surface-variant/70 hover:text-on-surface hover:bg-surface-variant/50'
-                }`}
-              >
-                A+
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-        {/* Article Body, Reporter & Tags (Uniform Gap) */}
-        <div className={`font-sans text-slate-800 dark:text-slate-200 flex flex-col gap-5 sm:gap-6 leading-[1.85] transition-all duration-200 ${FONT_SIZE_CLASSES[fontSize]}`}>
-          {contentParagraphs.map((paragraph, idx) => {
-            const isFirst = idx === 0;
-            const cleanFirst = isFirst
-              ? paragraph.replace(/^(JURNALWAVE\.COM|JURNAL WAVE)(\s*[-–—]\s*)/i, '')
-              : paragraph;
-
-            // Posisi sisipan BACA JUGA (paragraf ke-2 atau ke-3)
-            const insertFirstAt = contentParagraphs.length >= 4 ? 2 : (contentParagraphs.length >= 2 ? 1 : 0);
-            const insertSecondAt = contentParagraphs.length >= 7 ? 5 : -1;
-
-            const rec1 = inlineRecommendedArticles[0];
-            const rec2 = inlineRecommendedArticles[1];
-
-            return (
-              <React.Fragment key={idx}>
-                {isFirst ? (
-                  <p className="leading-[1.85]">
-                    <strong className="font-bold text-[#c00015] dark:text-red-500">
-                      JURNALWAVE.COM
-                    </strong>{' '}
-                    – {cleanFirst}
-                  </p>
-                ) : (
-                  <p className="leading-[1.85]">{paragraph}</p>
-                )}
-
-                {/* Sisipan Kotak BACA JUGA Pertama (Gaya Murni SukabumiUpdate) */}
-                {idx === insertFirstAt && rec1 && (
-                  <div className="not-prose my-3 sm:my-4 p-3 sm:p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 hover:bg-slate-100/80 dark:hover:bg-slate-800/80 transition-all duration-200">
-                    <div className="flex items-center gap-2.5 sm:gap-3">
-                      <div className="w-1 self-stretch min-h-[1.5rem] bg-[#c00015] rounded-none shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <Link
-                          href={`/artikel/${rec1.slug || rec1.id}`}
-                          className="group flex flex-wrap items-baseline gap-1.5 text-xs sm:text-[13.5px] leading-snug"
-                        >
-                          <span className="text-[#c00015] font-extrabold tracking-wider uppercase shrink-0">
-                            BACA JUGA:
-                          </span>
-                          <span className="font-heading font-semibold text-slate-800 dark:text-slate-200 group-hover:text-[#c00015] transition-colors line-clamp-2">
-                            {rec1.title}
-                          </span>
-                        </Link>
+                  {/* Sisipan Kotak BACA JUGA Pertama (Gaya Murni SukabumiUpdate) */}
+                  {idx === insertFirstAt && rec1 && (
+                    <div className="not-prose my-3 sm:my-4 p-3 sm:p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 hover:bg-slate-100/80 dark:hover:bg-slate-800/80 transition-all duration-200">
+                      <div className="flex items-center gap-2.5 sm:gap-3">
+                        <div className="w-1 self-stretch min-h-[1.5rem] bg-[#c00015] rounded-none shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <Link
+                            href={`/artikel/${rec1.slug || rec1.id}`}
+                            className="group flex flex-wrap items-baseline gap-1.5 text-xs sm:text-[13.5px] leading-snug"
+                          >
+                            <span className="text-[#c00015] font-extrabold tracking-wider uppercase shrink-0">
+                              BACA JUGA:
+                            </span>
+                            <span className="font-heading font-semibold text-slate-800 dark:text-slate-200 group-hover:text-[#c00015] transition-colors line-clamp-2">
+                              {rec1.title}
+                            </span>
+                          </Link>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Sisipan Kotak BACA JUGA Kedua (Jika Naskah Panjang) */}
-                {idx === insertSecondAt && rec2 && (
-                  <div className="not-prose my-3 sm:my-4 p-3 sm:p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 hover:bg-slate-100/80 dark:hover:bg-slate-800/80 transition-all duration-200">
-                    <div className="flex items-center gap-2.5 sm:gap-3">
-                      <div className="w-1 self-stretch min-h-[1.5rem] bg-[#c00015] rounded-none shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <Link
-                          href={`/artikel/${rec2.slug || rec2.id}`}
-                          className="group flex flex-wrap items-baseline gap-1.5 text-xs sm:text-[13.5px] leading-snug"
-                        >
-                          <span className="text-[#c00015] font-extrabold tracking-wider uppercase shrink-0">
-                            BACA JUGA:
-                          </span>
-                          <span className="font-heading font-semibold text-slate-800 dark:text-slate-200 group-hover:text-[#c00015] transition-colors line-clamp-2">
-                            {rec2.title}
-                          </span>
-                        </Link>
+                  {/* Sisipan Kotak BACA JUGA Kedua (Jika Naskah Panjang) */}
+                  {idx === insertSecondAt && rec2 && (
+                    <div className="not-prose my-3 sm:my-4 p-3 sm:p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 hover:bg-slate-100/80 dark:hover:bg-slate-800/80 transition-all duration-200">
+                      <div className="flex items-center gap-2.5 sm:gap-3">
+                        <div className="w-1 self-stretch min-h-[1.5rem] bg-[#c00015] rounded-none shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <Link
+                            href={`/artikel/${rec2.slug || rec2.id}`}
+                            className="group flex flex-wrap items-baseline gap-1.5 text-xs sm:text-[13.5px] leading-snug"
+                          >
+                            <span className="text-[#c00015] font-extrabold tracking-wider uppercase shrink-0">
+                              BACA JUGA:
+                            </span>
+                            <span className="font-heading font-semibold text-slate-800 dark:text-slate-200 group-hover:text-[#c00015] transition-colors line-clamp-2">
+                              {rec2.title}
+                            </span>
+                          </Link>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
-              </React.Fragment>
-            );
-          })}
+                  )}
+                </React.Fragment>
+              );
+            })}
 
-          {/* Kotak Editor Khas SukabumiUpdate */}
-          <div className="p-3 sm:p-3.5 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 flex items-center">
-            <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mr-2">
-              EDITOR:
-            </span>
-            <strong className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-              {article.redaktur || article.editor || 'Ujang Herlan'}
-            </strong>
-          </div>
-
-          {/* Kotak Topik Terkait (Standar Desain SukabumiUpdate) */}
-          {uniqueTags.length > 0 && (
-            <div className="mt-6 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="w-1 h-3.5 sm:h-4 bg-[#c00015] rounded-none shrink-0 inline-block" />
-                <h4 className="font-bold text-xs uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                  TOPIK TERKAIT
-                </h4>
-              </div>
-              <div className="flex flex-wrap gap-2 sm:gap-2.5">
-                {uniqueTags.map((tag, idx) => {
-                  const tagSlug = tag.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
-                  return (
-                    <Link
-                      key={idx}
-                      href={`/topik/${encodeURIComponent(tagSlug)}`}
-                      className="inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-medium bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:border-[#c00015] hover:text-[#c00015] dark:hover:border-[#c00015] dark:hover:text-[#c00015] transition-all shadow-2xs group cursor-pointer"
-                    >
-                      <span className="text-[#c00015] font-bold mr-1">#</span>
-                      <span>{tag}</span>
-                    </Link>
-                  );
-                })}
-              </div>
+            {/* Kotak Editor Khas SukabumiUpdate */}
+            <div className="p-3 sm:p-3.5 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 flex items-center">
+              <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mr-2">
+                EDITOR:
+              </span>
+              <strong className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                {article.redaktur || article.editor || 'Ujang Herlan'}
+              </strong>
             </div>
-          )}
-        </div>
 
-        {/* Related Articles */}
-        <section className="mt-10 sm:mt-14 pb-2 sm:pb-4">
-          <div className="flex items-center gap-2 mb-4 sm:mb-6">
-            <span className="w-1 h-4 sm:h-5 bg-[#c00015] rounded-none shrink-0 inline-block" />
-            <h3 className="font-heading font-black text-sm sm:text-base tracking-wider uppercase text-slate-900 dark:text-white">
-              ARTIKEL TERKAIT
-            </h3>
+            {/* Kotak Topik Terkait (Standar Desain SukabumiUpdate) */}
+            {uniqueTags.length > 0 && (
+              <div className="mt-6 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-1 h-3.5 sm:h-4 bg-[#c00015] rounded-none shrink-0 inline-block" />
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                    TOPIK TERKAIT
+                  </h4>
+                </div>
+                <div className="flex flex-wrap gap-2 sm:gap-2.5">
+                  {uniqueTags.map((tag, idx) => {
+                    const tagSlug = tag.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+                    return (
+                      <Link
+                        key={idx}
+                        href={`/topik/${encodeURIComponent(tagSlug)}`}
+                        className="inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-medium bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:border-[#c00015] hover:text-[#c00015] dark:hover:border-[#c00015] dark:hover:text-[#c00015] transition-all shadow-2xs group cursor-pointer"
+                      >
+                        <span className="text-[#c00015] font-bold mr-1">#</span>
+                        <span>{tag}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
-          <div className="flex flex-col gap-2 sm:gap-4">
-            {relatedArticles.map(rel => (
-              <NewsCard key={rel.id} article={rel} variant="row" />
-            ))}
-          </div>
-        </section>
 
-        {/* Wave Reels */}
-        <section className="mt-2 mb-6">
-          <ReelsSection
-            reels={[]}
-            title="Wave Reels"
-            limit={6}
-          />
-        </section>
-
-        {/* Artikel Terkini */}
-        {latestArticles.length > 0 && (
-          <section className="mt-4 pb-6">
+          {/* Related Articles */}
+          <section className="mt-10 sm:mt-14 pb-2 sm:pb-4">
             <div className="flex items-center gap-2 mb-4 sm:mb-6">
               <span className="w-1 h-4 sm:h-5 bg-[#c00015] rounded-none shrink-0 inline-block" />
               <h3 className="font-heading font-black text-sm sm:text-base tracking-wider uppercase text-slate-900 dark:text-white">
-                ARTIKEL TERKINI
+                ARTIKEL TERKAIT
               </h3>
             </div>
-            <div className="flex flex-col gap-3 sm:gap-4">
-              {latestArticles.map(item => (
-                <NewsCard key={item.id} article={item} variant="row" />
+            <div className="flex flex-col gap-2 sm:gap-4">
+              {relatedArticles.map(rel => (
+                <NewsCard key={rel.id} article={rel} variant="row" />
               ))}
             </div>
-
-            {/* Tombol Tampilkan Lebih Banyak Menuju Indeks Berita */}
-            <div className="flex justify-center mt-6 sm:mt-8">
-              <Link
-                href="/indeks-berita"
-                className="inline-flex items-center justify-center gap-1.5 px-5 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 text-slate-600 dark:text-slate-300 hover:text-[#c00015] hover:border-[#c00015] dark:hover:text-[#c00015] dark:hover:border-[#c00015] text-xs font-medium transition-all shadow-2xs hover:shadow-xs active:scale-95 cursor-pointer"
-              >
-                <span>Tampilkan lebih banyak</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
           </section>
-        )}
-      </main>
 
-      {/* Kolom Kanan: Sidebar Khas Portal Berita (4 dari 12 Kolom) - Sejajar langsung dengan Judul di Kiri */}
-      <div className="lg:col-span-4 sticky top-20">
-        <NewsArticleSidebar
-          currentArticleId={article.id}
-          allArticles={allArticles}
-        />
+          {/* Wave Reels */}
+          <section className="mt-2 mb-6">
+            <ReelsSection
+              reels={[]}
+              title="Wave Reels"
+              limit={6}
+            />
+          </section>
+
+          {/* Artikel Terkini */}
+          {latestArticles.length > 0 && (
+            <section className="mt-4 pb-6">
+              <div className="flex items-center gap-2 mb-4 sm:mb-6">
+                <span className="w-1 h-4 sm:h-5 bg-[#c00015] rounded-none shrink-0 inline-block" />
+                <h3 className="font-heading font-black text-sm sm:text-base tracking-wider uppercase text-slate-900 dark:text-white">
+                  ARTIKEL TERKINI
+                </h3>
+              </div>
+              <div className="flex flex-col gap-3 sm:gap-4">
+                {latestArticles.map(item => (
+                  <NewsCard key={item.id} article={item} variant="row" />
+                ))}
+              </div>
+
+              {/* Tombol Tampilkan Lebih Banyak Menuju Indeks Berita */}
+              <div className="flex justify-center mt-6 sm:mt-8">
+                <Link
+                  href="/indeks-berita"
+                  className="inline-flex items-center justify-center gap-1.5 px-5 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 text-slate-600 dark:text-slate-300 hover:text-[#c00015] hover:border-[#c00015] dark:hover:text-[#c00015] dark:hover:border-[#c00015] text-xs font-medium transition-all shadow-2xs hover:shadow-xs active:scale-95 cursor-pointer"
+                >
+                  <span>Tampilkan lebih banyak</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </section>
+          )}
+        </main>
+
+        {/* Kolom Kanan: Sidebar Khas Portal Berita (4 dari 12 Kolom) - Sejajar langsung dengan Judul di Kiri */}
+        <div className="lg:col-span-4 sticky top-20">
+          <NewsArticleSidebar
+            currentArticleId={article.id}
+            allArticles={allArticles}
+          />
+        </div>
       </div>
-    </div>
 
       {/* Floating Bottom Mini Player (Simple Capsule - Positioned above BottomNav on mobile) */}
       {isAudioActive && (
-        <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-lg bg-surface/95 dark:bg-slate-900/95 backdrop-blur-md rounded-full shadow-2xl border border-outline-variant/80 dark:border-slate-800 px-3.5 py-2.5 sm:px-4 sm:py-3 flex items-center gap-2 sm:gap-3 transition-all duration-300 animate-in fade-in slide-in-from-bottom-5">
+        <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-lg flex flex-col items-center gap-2 pointer-events-auto">
+          {audioNotice && (
+            <div className="px-3.5 py-1.5 rounded-full bg-primary/95 text-white text-[11px] sm:text-xs font-medium shadow-lg backdrop-blur-sm animate-pulse flex items-center gap-1.5 max-w-[95%] text-center">
+              <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+              <span>{audioNotice}</span>
+            </div>
+          )}
+          <div className="w-full bg-surface/95 dark:bg-slate-900/95 backdrop-blur-md rounded-full shadow-2xl border border-outline-variant/80 dark:border-slate-800 px-3.5 py-2.5 sm:px-4 sm:py-3 flex items-center gap-2 sm:gap-3 transition-all duration-300 animate-in fade-in slide-in-from-bottom-5">
           {/* Rewind 10s */}
           <button
             type="button"
@@ -1146,13 +1089,14 @@ export function ArticleDetailView({
             </button>
           </div>
         </div>
+      </div>
       )}
 
-      {/* Audio Elemen Fisik DOM — src native HTTP stream langsung ke endpoint TTS */}
+      {/* Audio Elemen Fisik DOM — Streaming instan langsung dari Cloudinary CDN */}
       <audio
         ref={audioRef}
-        src={article?.id ? `/api/tts?id=${encodeURIComponent(article.id)}` : undefined}
-        preload="none"
+        src={audioCloudinaryUrl || (article?.id ? `/api/tts?id=${encodeURIComponent(article.id)}` : undefined)}
+        preload="metadata"
         playsInline
         onTimeUpdate={(e) => {
           setCurrentTime(Math.round(e.currentTarget.currentTime));
@@ -1163,7 +1107,6 @@ export function ArticleDetailView({
           }
         }}
         onPlaying={() => {
-          if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
           setIsLoadingAudio(false);
           setIsPlaying(true);
         }}
@@ -1171,16 +1114,20 @@ export function ArticleDetailView({
           setIsLoadingAudio(true);
         }}
         onEnded={() => {
-          if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
           setIsPlaying(false);
           setIsLoadingAudio(false);
           setCurrentTime(0);
         }}
-        onError={(e) => {
-          console.warn('Audio tag error:', e);
-          if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
+        onError={async (e) => {
+          console.warn('Audio tag playback notice:', e);
           setIsLoadingAudio(false);
           setIsPlaying(false);
+          try {
+            const res = await fetch(`/api/tts?id=${encodeURIComponent(article.id)}`);
+            if (res.status === 202) {
+              setAudioNotice('Audio berita baru sedang disiapkan otomatis (~15-30 detik). Silakan coba putar sebentar lagi.');
+            }
+          } catch {}
         }}
         className="hidden"
       />

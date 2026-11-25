@@ -244,7 +244,7 @@ export default function AdminDetailLaporanPage() {
           </p>
         </div>
         <Link
-          href="/halo-jurnal/admin/laporan"
+          href="/jurnal-central/laporan"
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#c00015] hover:bg-[#a00012] text-white text-xs font-semibold"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
@@ -527,7 +527,7 @@ export default function AdminDetailLaporanPage() {
       } catch {}
     }
 
-    router.replace('/halo-jurnal/admin/laporan')
+    router.replace('/jurnal-central/laporan')
   }
 
   // Format kategori (Title Case)
@@ -634,7 +634,7 @@ export default function AdminDetailLaporanPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
         <div className="flex items-center gap-3">
           <Link
-            href="/halo-jurnal/admin/laporan"
+            href="/jurnal-central/laporan"
             className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition shadow-2xs cursor-pointer"
             title="Kembali ke Daftar Aduan"
           >
@@ -723,7 +723,7 @@ export default function AdminDetailLaporanPage() {
 
                   <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
                     <Link
-                      href={`/halo-jurnal/admin/chat?ticket=${report.nomor_tiket || report.id}`}
+                      href={`/jurnal-central/chat?ticket=${report.nomor_tiket || report.id}`}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#c00015] hover:bg-[#a00012] text-white text-xs font-semibold transition shadow-2xs cursor-pointer shrink-0"
                       title="Buka Ruang Obrolan Web Resmi Hallo Jurnal"
                     >
@@ -851,6 +851,7 @@ export default function AdminDetailLaporanPage() {
                     const isVid =
                       (lamp.file_type && lamp.file_type.startsWith('video/')) ||
                       lamp.file_url?.startsWith('data:video/') ||
+                      lamp.file_url?.includes('/video/upload/') ||
                       lamp.file_url?.endsWith('.mp4') ||
                       lamp.file_url?.endsWith('.webm')
                     if (isVid) {
