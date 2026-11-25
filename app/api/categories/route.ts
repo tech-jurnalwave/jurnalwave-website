@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import {
-  getArticleCategories,
-  getArticleCategoriesFromDb,
-  saveArticleCategoriesToDb,
-  CategoryItem,
-} from '@/lib/categories'
+import { getArticleCategories, CategoryItem } from '@/lib/categories'
+import { getArticleCategoriesFromDb, saveArticleCategoriesToDb } from '@/lib/categories.server'
 import { revalidatePath } from 'next/cache'
 
 export const dynamic = 'force-dynamic'

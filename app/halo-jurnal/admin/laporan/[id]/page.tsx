@@ -851,6 +851,7 @@ export default function AdminDetailLaporanPage() {
                     const isVid =
                       (lamp.file_type && lamp.file_type.startsWith('video/')) ||
                       lamp.file_url?.startsWith('data:video/') ||
+                      lamp.file_url?.includes('/video/upload/') ||
                       lamp.file_url?.endsWith('.mp4') ||
                       lamp.file_url?.endsWith('.webm')
                     if (isVid) {

@@ -397,6 +397,7 @@ export default function HaloJurnalLaporanSayaPage() {
                         const isVideo =
                           fileType.startsWith('video/') ||
                           imgUrl.startsWith('data:video/') ||
+                          imgUrl.includes('/video/upload/') ||
                           imgUrl.endsWith('.mp4') ||
                           imgUrl.endsWith('.webm') ||
                           imgUrl.endsWith('.mov')

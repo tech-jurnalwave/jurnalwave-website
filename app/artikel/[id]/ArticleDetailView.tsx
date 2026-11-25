@@ -26,6 +26,7 @@ import { Article } from '@/types';
 import { fetchArticles, fetchArticleById } from '@/lib/wordpress';
 import { formatArticleDate, formatIndoDateTime } from '@/lib/utils';
 import { isArticleSaved, toggleArticleBookmark } from '@/lib/bookmarks';
+import { getCategoryLabel, getCategoryUrl } from '@/lib/categories';
 
 function FacebookIcon({ className }: { className?: string }) {
   return (
@@ -552,15 +553,12 @@ export function ArticleDetailView({
           Artikel
         </Link>
         <span className="text-slate-400">/</span>
-        <span className="text-[#c00015] font-bold">
-          {(() => {
-            const raw = (article.categoryLabel || article.category || 'BERITA').toUpperCase();
-            if (raw === 'INFRASTRUKTUR') return 'BERITA';
-            if (raw === 'WISATA') return 'TRAVELING';
-            if (raw === 'STYLE & FASHION') return 'STYLE';
-            return raw;
-          })()}
-        </span>
+        <Link
+          href={getCategoryUrl(article.category || '')}
+          className="text-[#c00015] font-bold hover:underline transition-colors cursor-pointer"
+        >
+          {getCategoryLabel(article.category || article.categoryLabel || '').toUpperCase()}
+        </Link>
       </nav>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">

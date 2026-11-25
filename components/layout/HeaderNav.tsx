@@ -12,6 +12,7 @@ import { SearchOverlay } from './SearchOverlay';
 import { Logo } from '../ui/Logo';
 import { WeatherWidget } from '../widgets/WeatherWidget';
 import { Button } from '../ui/button';
+import { getCategoryUrl } from '@/lib/categories';
 
 export const HeaderNav: React.FC = () => {
   const pathname = usePathname();
@@ -102,9 +103,7 @@ export const HeaderNav: React.FC = () => {
     { href: '/', label: 'Beranda' },
     { href: '/artikel', label: 'Semua Artikel' },
     ...categories.map((c) => ({
-      href: standardRoutes.has(c.value.toLowerCase())
-        ? `/${c.value.toLowerCase()}`
-        : `/kategori/${c.value.toLowerCase()}`,
+      href: getCategoryUrl(c.value),
       label: c.label,
     })),
     { href: '/loker', label: 'Loker' },
@@ -281,6 +280,7 @@ export const HeaderNav: React.FC = () => {
                       : item.href === '/berita'
                       ? pathname === '/berita' || pathname.startsWith('/berita/')
                       : pathname === item.href ||
+                        (item.href === '/sport-esport' && pathname === '/sport') ||
                         (item.href !== '/' && pathname.startsWith(item.href + '/')) ||
                         (item.href === '/halo-jurnal' && pathname.startsWith('/halo-jurnal'));
 

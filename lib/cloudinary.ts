@@ -87,8 +87,10 @@ export async function uploadToCloudinary(options: {
     const data = await res.json();
     let optimizedUrl = data.secure_url || data.url;
 
-    // Tambahkan transformasi otomatis WebP/AVIF (f_auto,q_auto) untuk gambar
-    if (!isVideo && optimizedUrl && optimizedUrl.includes('/upload/')) {
+    // Tambahkan transformasi otomatis f_auto,q_auto:
+    // - Gambar: Otomatis WebP / AVIF (sangat hemat ukuran & tajam)
+    // - Video: Otomatis WebM untuk Chrome/Android & MP4 untuk Safari/iOS (streaming cepat & hemat kuota)
+    if (optimizedUrl && optimizedUrl.includes('/upload/') && !optimizedUrl.includes('/upload/f_auto')) {
       optimizedUrl = optimizedUrl.replace('/upload/', '/upload/f_auto,q_auto/');
     }
 

@@ -242,7 +242,7 @@ export function HomeClient({ initialArticles = [], initialReels = [] }: HomeClie
         {/* 10. Kategori 6: SPORT & E-SPORT (Layout Seling) */}
         <HomeCategorySection
           title={getCategoryLabel('sport').toUpperCase()}
-          href="/sport"
+          href="/sport-esport"
           articles={sportArticles}
           reverseLayout={true}
         />

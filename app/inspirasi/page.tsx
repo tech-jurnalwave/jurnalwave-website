@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { CategoryTemplate } from '@/components/layout/CategoryTemplate';
 import { fetchArticles } from '@/lib/wordpress';
-import { getCategoryLabelFromDb } from '@/lib/categories';
+import { getCategoryLabelFromDb } from '@/lib/categories.server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;

@@ -51,6 +51,8 @@ export default function HaloJurnalLaporanDetailPage() {
   const [activePhoto, setActivePhoto] = useState<string | null>(null)
 
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
+  const prevMessageCountRef = useRef(0)
   const hasLoadedReportRef = useRef(false)
   const seenChatIdsRef = useRef<Set<string>>(new Set())
   const hasInitializedChatRef = useRef(false)
@@ -76,8 +78,14 @@ export default function HaloJurnalLaporanDetailPage() {
     } catch {}
   }
 
-  const scrollToBottom = () => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  // Menggulir hanya kontainer pesan di dalam kotak chat, BUKAN seluruh jendela browser
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior,
+      })
+    }
   }
 
   useEffect(() => {
@@ -153,8 +161,11 @@ export default function HaloJurnalLaporanDetailPage() {
   }, [id])
 
   useEffect(() => {
-    if (showChatSimulation || (user && report && (report.user_id === user.id || isLocalAuthor))) {
-      scrollToBottom()
+    // Hanya scroll ke dasar kontainer jika ada pesan baru bertambah (bukan setiap interval polling 5s)
+    if (messages.length > prevMessageCountRef.current) {
+      const isInitial = prevMessageCountRef.current === 0
+      prevMessageCountRef.current = messages.length
+      scrollToBottom(isInitial ? 'auto' : 'smooth')
     }
   }, [messages, showChatSimulation])
 
@@ -856,6 +867,7 @@ export default function HaloJurnalLaporanDetailPage() {
                     const isVid =
                       (lampiran.file_type && lampiran.file_type.startsWith('video/')) ||
                       lampiran.file_url?.startsWith('data:video/') ||
+                      lampiran.file_url?.includes('/video/upload/') ||
                       lampiran.file_url?.endsWith('.mp4') ||
                       lampiran.file_url?.endsWith('.webm')
 
@@ -893,6 +905,7 @@ export default function HaloJurnalLaporanDetailPage() {
                       const isVid =
                         (lampiran.file_type && lampiran.file_type.startsWith('video/')) ||
                         lampiran.file_url?.startsWith('data:video/') ||
+                        lampiran.file_url?.includes('/video/upload/') ||
                         lampiran.file_url?.endsWith('.mp4') ||
                         lampiran.file_url?.endsWith('.webm')
                       if (isVid) {
@@ -1075,7 +1088,7 @@ export default function HaloJurnalLaporanDetailPage() {
                 </p>
               </div>
                 {/* Message Thread (HANYA DITAMPILKAN JIKA PEMILIK LAPORAN ATAU ADMIN) */}
-                <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1 mb-4 no-scrollbar">
+                <div ref={chatContainerRef} className="space-y-4 max-h-[380px] overflow-y-auto pr-1 mb-4 no-scrollbar">
                   {messages.length > 0 ? (
                     messages.map((msg) => {
                       const isRedaksi =
@@ -1144,6 +1157,7 @@ export default function HaloJurnalLaporanDetailPage() {
                               const isVid =
                                 (msg.file_type && msg.file_type.startsWith('video/')) ||
                                 msg.file_url.startsWith('data:video/') ||
+                                msg.file_url.includes('/video/upload/') ||
                                 msg.file_url.endsWith('.mp4') ||
                                 msg.file_url.endsWith('.webm')
                               if (isVid) {
