@@ -81,7 +81,7 @@ export default function AdminStaffSecretLoginPage() {
           )
         }
         setTimeout(() => {
-          router.push('/halo-jurnal/admin')
+          router.push('/jurnal-central')
           router.refresh()
         }, 500)
       } else {

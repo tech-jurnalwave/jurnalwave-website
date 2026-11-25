@@ -319,7 +319,7 @@ export default function UnifiedMasterDashboardPage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
         {/* Card 1: Total Artikel */}
         <Link
-          href="/halo-jurnal/admin/berita"
+          href="/jurnal-central/berita"
           className="p-3.5 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-2xs hover:border-[#c00015]/40 transition group flex items-center justify-between"
         >
           <div className="space-y-0.5 min-w-0">
@@ -340,7 +340,7 @@ export default function UnifiedMasterDashboardPage() {
 
         {/* Card 2: Total Reel */}
         <Link
-          href="/halo-jurnal/admin/reels"
+          href="/jurnal-central/reels"
           className="p-3.5 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-2xs hover:border-[#c00015]/40 transition group flex items-center justify-between"
         >
           <div className="space-y-0.5 min-w-0">
@@ -361,7 +361,7 @@ export default function UnifiedMasterDashboardPage() {
 
         {/* Card 3: Total Lowongan */}
         <Link
-          href="/halo-jurnal/admin/loker"
+          href="/jurnal-central/loker"
           className="p-3.5 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-2xs hover:border-[#c00015]/40 transition group flex items-center justify-between"
         >
           <div className="space-y-0.5 min-w-0">
@@ -382,7 +382,7 @@ export default function UnifiedMasterDashboardPage() {
 
         {/* Card 4: Total Aduan */}
         <Link
-          href="/halo-jurnal/admin/laporan"
+          href="/jurnal-central/laporan"
           className="p-3.5 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-2xs hover:border-[#c00015]/40 transition group flex items-center justify-between"
         >
           <div className="space-y-0.5 min-w-0">
@@ -403,7 +403,7 @@ export default function UnifiedMasterDashboardPage() {
 
         {/* Card 5: Aduan Butuh ACC */}
         <Link
-          href="/halo-jurnal/admin/laporan?tab=menunggu_acc"
+          href="/jurnal-central/laporan?tab=menunggu_acc"
           className="p-3.5 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-2xs hover:border-[#c00015]/40 transition group flex items-center justify-between col-span-2 sm:col-span-1"
         >
           <div className="space-y-0.5 min-w-0">
@@ -482,7 +482,7 @@ export default function UnifiedMasterDashboardPage() {
                 </div>
 
                 <Link
-                  href="/halo-jurnal/admin/laporan"
+                  href="/jurnal-central/laporan"
                   className="text-[11px] font-semibold text-[#c00015] hover:underline flex items-center gap-1 shrink-0"
                 >
                   <span>Semua</span>
@@ -510,7 +510,7 @@ export default function UnifiedMasterDashboardPage() {
 
                 <div>
                   <Link
-                    href={`/halo-jurnal/admin/laporan/${topSupportedReport.id}`}
+                    href={`/jurnal-central/laporan/${topSupportedReport.id}`}
                     className="font-bold text-xs sm:text-sm text-slate-900 hover:text-[#c00015] block transition leading-snug"
                   >
                     {topSupportedReport.judul}
@@ -526,7 +526,7 @@ export default function UnifiedMasterDashboardPage() {
                   </span>
 
                   <Link
-                    href={`/halo-jurnal/admin/berita?ref_ticket=${topSupportedReport.nomor_tiket}`}
+                    href={`/jurnal-central/berita?ref_ticket=${topSupportedReport.nomor_tiket}`}
                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#c00015] hover:bg-[#a00012] text-white text-[11px] font-bold transition shadow-2xs cursor-pointer"
                   >
                     <Plus className="w-3 h-3" />
@@ -564,7 +564,7 @@ export default function UnifiedMasterDashboardPage() {
                         )}
                       </div>
                       <Link
-                        href={`/halo-jurnal/admin/laporan/${rep.id}`}
+                        href={`/jurnal-central/laporan/${rep.id}`}
                         className="text-xs font-semibold text-slate-900 group-hover:text-[#c00015] truncate block transition"
                         title={rep.judul}
                       >
@@ -573,7 +573,7 @@ export default function UnifiedMasterDashboardPage() {
                     </div>
 
                     <Link
-                      href={`/halo-jurnal/admin/laporan/${rep.id}`}
+                      href={`/jurnal-central/laporan/${rep.id}`}
                       className="text-slate-400 group-hover:text-[#c00015] transition shrink-0 p-1"
                       title="Lihat Detail"
                     >
@@ -603,7 +603,7 @@ export default function UnifiedMasterDashboardPage() {
                 </h2>
               </div>
               <Link
-                href="/halo-jurnal/admin/berita"
+                href="/jurnal-central/berita"
                 className="text-[11px] font-semibold text-[#c00015] hover:underline flex items-center gap-1"
               >
                 <span>Kelola Berita</span>
@@ -615,7 +615,7 @@ export default function UnifiedMasterDashboardPage() {
               {latestArticles.map((art) => (
                 <Link
                   key={art.id}
-                  href="/halo-jurnal/admin/berita"
+                  href="/jurnal-central/berita"
                   className="p-1.5 rounded-lg border border-slate-100 hover:border-slate-200 hover:bg-slate-50 transition flex items-center justify-between gap-2.5 group"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
@@ -666,7 +666,7 @@ export default function UnifiedMasterDashboardPage() {
                   </h2>
                 </div>
                 <Link
-                  href="/halo-jurnal/admin/polling"
+                  href="/jurnal-central/polling"
                   className="text-[11px] font-semibold text-[#c00015] hover:underline flex items-center gap-1"
                 >
                   <span>Kelola Polling</span>
@@ -714,7 +714,7 @@ export default function UnifiedMasterDashboardPage() {
                 </h2>
               </div>
               <Link
-                href="/halo-jurnal/admin/reels"
+                href="/jurnal-central/reels"
                 className="text-[11px] font-semibold text-[#c00015] hover:underline flex items-center gap-1"
               >
                 <span>Kelola Reels</span>
@@ -790,7 +790,7 @@ export default function UnifiedMasterDashboardPage() {
                 </h2>
               </div>
               <Link
-                href="/halo-jurnal/admin/loker"
+                href="/jurnal-central/loker"
                 className="text-[11px] font-semibold text-[#c00015] hover:underline flex items-center gap-1"
               >
                 <span>Kelola Loker</span>
@@ -802,7 +802,7 @@ export default function UnifiedMasterDashboardPage() {
               {latestJobs.map((job) => (
                 <Link
                   key={job.id}
-                  href="/halo-jurnal/admin/loker"
+                  href="/jurnal-central/loker"
                   className="p-2 rounded-lg border border-slate-100 hover:border-slate-200 hover:bg-slate-50 transition flex items-center justify-between gap-3 group"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">

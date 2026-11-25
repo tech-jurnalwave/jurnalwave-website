@@ -613,7 +613,7 @@ export default function FloatingAdminChat() {
                     </div>
 
                     <Link
-                      href={`/halo-jurnal/admin/laporan/${currentReport.id}`}
+                      href={`/jurnal-central/laporan/${currentReport.id}`}
                       target="_blank"
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border border-slate-200 text-xs font-semibold transition shadow-2xs shrink-0 cursor-pointer"
                     >

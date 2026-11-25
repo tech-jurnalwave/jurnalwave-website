@@ -55,7 +55,7 @@ export default function SuperadminSecretAuthPage() {
           )
         }
         setTimeout(() => {
-          router.push('/halo-jurnal/admin')
+          router.push('/jurnal-central')
           router.refresh()
         }, 500)
       } else {

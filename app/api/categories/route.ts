@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       revalidatePath('/', 'layout')
       revalidatePath('/berita')
       revalidatePath('/artikel')
-      revalidatePath('/halo-jurnal/admin/berita')
+      revalidatePath('/jurnal-central/berita')
     } catch {}
 
     const updated = await getArticleCategoriesFromDb()

@@ -52,42 +52,42 @@ const AVAILABLE_PERMISSIONS: AdminMenuPermission[] = [
   {
     key: 'dashboard',
     label: 'Dashboard',
-    href: '/halo-jurnal/admin',
+    href: '/jurnal-central',
     description: 'Statistik & performa portal',
     icon: LayoutDashboard,
   },
   {
     key: 'berita',
     label: 'Manajemen Konten',
-    href: '/halo-jurnal/admin/berita',
+    href: '/jurnal-central/berita',
     description: 'Tulis & kelola berita redaksi',
     icon: Newspaper,
   },
   {
     key: 'reels',
     label: 'Wave Reels',
-    href: '/halo-jurnal/admin/reels',
+    href: '/jurnal-central/reels',
     description: 'Kelola feed video reels',
     icon: Film,
   },
   {
     key: 'loker',
     label: 'Lowongan Kerja',
-    href: '/halo-jurnal/admin/loker',
+    href: '/jurnal-central/loker',
     description: 'Kelola loker Sukabumi',
     icon: Briefcase,
   },
   {
     key: 'polling',
     label: 'Polling Pembaca',
-    href: '/halo-jurnal/admin/polling',
+    href: '/jurnal-central/polling',
     description: 'Buat & publikasi polling suara',
     icon: Vote,
   },
   {
     key: 'laporan',
     label: 'Pengaduan Warga',
-    href: '/halo-jurnal/admin/laporan',
+    href: '/jurnal-central/laporan',
     description: 'Moderasi aduan & chat pelapor',
     icon: FileText,
   },
@@ -224,7 +224,7 @@ export default function AdminTimRedaksiPage() {
           if (!isSuper) {
             setIsSuperadmin(false)
             setTimeout(() => {
-              router.replace('/halo-jurnal/admin')
+              router.replace('/jurnal-central')
             }, 800)
             return
           }

@@ -12,7 +12,7 @@ export default function HaloJurnalShell({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
-  const isAdmin = pathname?.startsWith('/halo-jurnal/admin')
+  const isAdmin = pathname?.startsWith('/jurnal-central') || pathname?.startsWith('/halo-jurnal/admin')
 
   // Jika di halaman admin, tampilkan dengan latar surface bersih khas JurnalWave
   if (isAdmin) {

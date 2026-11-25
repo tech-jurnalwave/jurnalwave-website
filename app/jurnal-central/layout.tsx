@@ -20,7 +20,7 @@ export default function AdminLayout({
   // Status autentikasi konsisten null pada initial render untuk mencegah hydration mismatch
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
 
-  const isLoginPage = pathname === '/halo-jurnal/admin/login'
+  const isLoginPage = false
 
   useEffect(() => {
     // Jika sedang di halaman login, tidak perlu cek autentikasi di layout
@@ -120,7 +120,7 @@ export default function AdminLayout({
           localStorage.removeItem('jurnal_wave_admin_user')
           setIsAuthenticated(false)
           router.replace(
-            `/halo-jurnal/admin/login?reason=${isAccountFrozen ? 'frozen' : 'revoked'}`
+            `/jw-gate-781?reason=${isAccountFrozen ? 'frozen' : 'revoked'}`
           )
         }
       } catch {}
