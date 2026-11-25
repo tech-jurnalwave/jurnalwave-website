@@ -99,7 +99,7 @@ async function checkAudioExists(articleId) {
 async function uploadToCloudinary(buffer, articleId) {
   const timestamp = Math.floor(Date.now() / 1000);
   const publicId = `jurnalwave-audio/${articleId}`;
-  const strToSign = `overwrite=true&public_id=${publicId}&timestamp=${timestamp}${API_SECRET}`;
+  const strToSign = `invalidate=true&overwrite=true&public_id=${publicId}&timestamp=${timestamp}${API_SECRET}`;
   const signature = crypto.createHash('sha1').update(strToSign).digest('hex');
 
   const formData = new FormData();
@@ -109,6 +109,7 @@ async function uploadToCloudinary(buffer, articleId) {
   formData.append('timestamp', String(timestamp));
   formData.append('public_id', publicId);
   formData.append('overwrite', 'true');
+  formData.append('invalidate', 'true');
   formData.append('signature', signature);
 
   const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/upload`, {

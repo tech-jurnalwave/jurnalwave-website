@@ -154,10 +154,14 @@ export function ArticleDetailView({
 
   // URL Audio Berita Presenter Pria Resmi JurnalWave dari Cloudinary CDN (Instant Load, 0 Timeout, Bebas Kuota)
   const audioCloudinaryUrl = useMemo(() => {
-    return article?.id
-      ? `https://res.cloudinary.com/bqnyd49z/video/upload/jurnalwave-audio/${encodeURIComponent(article.id)}.mp3`
-      : '';
-  }, [article?.id]);
+    if (!article?.id) return '';
+    const versionNum = article.updatedAt
+      ? Math.floor(new Date(article.updatedAt).getTime() / 1000)
+      : article.createdAt
+      ? Math.floor(new Date(article.createdAt).getTime() / 1000)
+      : 1;
+    return `https://res.cloudinary.com/bqnyd49z/video/upload/v${versionNum}/jurnalwave-audio/${encodeURIComponent(article.id)}.mp3`;
+  }, [article?.id, article?.updatedAt, article?.createdAt]);
 
   // Eksekusi pemutaran audio murni presenter berita resmi JurnalWave
   const handlePlayToggle = async () => {

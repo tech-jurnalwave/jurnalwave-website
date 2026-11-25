@@ -32,7 +32,7 @@ jobs:
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
 
       - name: Generate Presenter Audio & Upload to Cloudinary
-        run: node scripts/generate-audio.mjs
+        run: node scripts/generate-audio.mjs --force
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
