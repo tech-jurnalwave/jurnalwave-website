@@ -168,34 +168,62 @@ function LaporForm() {
 
     setLoading(true)
     try {
-      // Hitung urutan nomor tiket HJ secara berurutan
-      let maxSeq = 8
-      if (typeof window !== 'undefined') {
-        try {
-          const userReports = JSON.parse(localStorage.getItem('halo_jurnal_user_reports') || '[]')
-          if (Array.isArray(userReports)) {
-            userReports.forEach((r: any) => {
-              const numStr = (r.nomor_tiket || r.ticket_number || '').replace('HJ-', '')
-              const num = parseInt(numStr, 10)
-              if (!isNaN(num) && num > maxSeq) {
-                maxSeq = num
-              }
-            })
-          }
-        } catch {}
-      }
-      const nextSeq = maxSeq + 1
-      const ticketNumber = `HJ-${String(nextSeq).padStart(3, '0')}`
-
       const finalKategori = 'Pengaduan Warga'
-      const newReportId = `lap-sukabumi-${Date.now()}`
       const pelaporDisplayName = user?.user_metadata?.full_name || user?.full_name || user?.name || 'Warga Sukabumi'
       const pelaporDomisili = user?.alamat_domisili || user?.detail_alamat || 'Sukabumi'
 
-      const newReportData = {
-        id: newReportId,
-        ticket_number: ticketNumber,
-        nomor_tiket: ticketNumber,
+      let assignedTicket = ''
+      let finalReportId = `lap-sukabumi-${Date.now()}`
+      let savedReportData: any = null
+
+      // Kirim laporan ke database via API
+      try {
+        const res = await fetch('/api/reports', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: title.trim(),
+            description: description.trim(),
+            reportType: finalKategori,
+            category: finalKategori,
+            kategori: finalKategori,
+            jenis: 'pengaduan',
+            address: pelaporDomisili,
+            latitude: null,
+            longitude: null,
+            pelaporName: pelaporDisplayName,
+            nama_pelapor: pelaporDisplayName,
+            pelaporPhone: user?.phone || user?.phone_number || '',
+            telepon: user?.phone || user?.phone_number || '',
+            pelaporEmail: user?.email || '',
+            email: user?.email || '',
+            previewUrl: previewUrl || '',
+            attachments: previewUrl
+              ? [{ file_url: previewUrl, file_type: file?.type || (previewUrl.startsWith('data:video') ? 'video/mp4' : 'image/jpeg') }]
+              : [],
+            isAnonymous,
+            legalAgreement: true,
+            domisili: pelaporDomisili,
+          }),
+        })
+        const resJson = await res.json()
+        if (resJson.success && resJson.data) {
+          assignedTicket = resJson.ticketNumber || resJson.data.nomor_tiket || resJson.data.ticketNumber
+          finalReportId = resJson.data.id || finalReportId
+          savedReportData = resJson.data
+        }
+      } catch (err) {
+        console.warn('Gagal simpan ke database, tetap menyimpan ke local cache:', err)
+      }
+
+      if (!assignedTicket) {
+        assignedTicket = `HJ-${Date.now().toString().slice(-4)}`
+      }
+
+      const newReportData = savedReportData || {
+        id: finalReportId,
+        ticket_number: assignedTicket,
+        nomor_tiket: assignedTicket,
         user_id: user?.id || 'warga-anon',
         user_email: user?.email || '',
         email: user?.email || '',
@@ -242,41 +270,6 @@ function LaporForm() {
         ],
       }
 
-      // Kirim laporan ke database via API
-      try {
-        await fetch('/api/reports', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ticketNumber,
-            title: title.trim(),
-            description: description.trim(),
-            reportType: finalKategori,
-            category: finalKategori,
-            kategori: finalKategori,
-            jenis: 'pengaduan',
-            address: pelaporDomisili,
-            latitude: null,
-            longitude: null,
-            pelaporName: pelaporDisplayName,
-            nama_pelapor: pelaporDisplayName,
-            pelaporPhone: user?.phone || user?.phone_number || '',
-            telepon: user?.phone || user?.phone_number || '',
-            pelaporEmail: user?.email || '',
-            email: user?.email || '',
-            previewUrl: previewUrl || '',
-            attachments: previewUrl
-              ? [{ file_url: previewUrl, file_type: file?.type || (previewUrl.startsWith('data:video') ? 'video/mp4' : 'image/jpeg') }]
-              : [],
-            isAnonymous,
-            legalAgreement: true,
-            domisili: pelaporDomisili,
-          }),
-        })
-      } catch (err) {
-        console.warn('Gagal simpan ke database, tetap menyimpan ke local cache:', err)
-      }
-
       // Sinkronkan ke local storage
       try {
         if (typeof window !== 'undefined') {
@@ -290,7 +283,7 @@ function LaporForm() {
       try {
         const welcomeMessage = {
           id: `msg-welcome-${Date.now()}`,
-          ticketNumber,
+          ticketNumber: assignedTicket,
           sender: 'Redaksi Hallo Jurnal',
           sender_name: 'Redaksi Hallo Jurnal',
           role: 'admin',
@@ -300,11 +293,11 @@ function LaporForm() {
           timestamp: 'Baru saja',
           isSystem: true,
         }
-        localStorage.setItem(`halo_jurnal_chat_${ticketNumber}`, JSON.stringify([welcomeMessage]))
-        localStorage.setItem(`halo_jurnal_chat_${newReportId}`, JSON.stringify([welcomeMessage]))
+        localStorage.setItem(`halo_jurnal_chat_${assignedTicket}`, JSON.stringify([welcomeMessage]))
+        localStorage.setItem(`halo_jurnal_chat_${finalReportId}`, JSON.stringify([welcomeMessage]))
       } catch {}
 
-      router.push(`/halo-jurnal/laporan/${newReportId}?sukses=1#chat`)
+      router.push(`/halo-jurnal/laporan/${finalReportId}?sukses=1#chat`)
     } catch (error: any) {
       console.error(error)
       setLoading(false)

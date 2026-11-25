@@ -1,6 +1,6 @@
 /**
  * Modul Pengiriman Pesan WhatsApp Resmi (Fonnte API Gateway)
- * Mendukung free tier Fonnte (https://fonnte.com)
+ * Mode Ketat (Strict): OTP 100% Asli Dikirimkan ke WhatsApp Warga
  */
 
 export interface WhatsAppSendResult {
@@ -33,12 +33,10 @@ export async function sendWhatsAppOtp(
 ): Promise<WhatsAppSendResult> {
   const token = process.env.FONNTE_TOKEN?.trim()
 
-  // Jika token belum diisi di .env, aktifkan fallback simulasi
   if (!token || token === 'your_fonnte_token_here') {
     return {
-      success: true,
-      message: 'Mode simulasi: token FONNTE_TOKEN belum diatur di .env',
-      detail: { simulation: true },
+      success: false,
+      message: 'Token FONNTE_TOKEN belum diatur di file .env.',
     }
   }
 
@@ -69,10 +67,10 @@ export async function sendWhatsAppOtp(
         detail: data,
       }
     } else {
-      console.warn('Fonnte send notice:', data)
+      console.warn('Fonnte send response:', data)
       return {
         success: false,
-        message: data.reason || data.detail || 'Gagal mengirim pesan WhatsApp via Fonnte.',
+        message: data.reason || data.detail || 'Gagal mengirim pesan WhatsApp. Pastikan perangkat WhatsApp gateway aktif.',
         detail: data,
       }
     }

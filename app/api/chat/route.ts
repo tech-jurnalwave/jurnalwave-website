@@ -34,16 +34,19 @@ function parseAttachment(rawMessage: string) {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const ticketNumber = searchParams.get('ticketNumber')
+    const ticketNumber = searchParams.get('ticketNumber')?.trim()
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: any = {}
-    if (ticketNumber) {
-      where.ticketNumber = ticketNumber
+    // Jika nomor tiket kosong atau tidak valid, jangan kembalikan seluruh database
+    if (!ticketNumber || ticketNumber === 'undefined' || ticketNumber === 'null') {
+      return NextResponse.json({
+        success: true,
+        source: 'database',
+        data: [],
+      })
     }
 
     const messages = await prisma.chatMessage.findMany({
-      where,
+      where: { ticketNumber },
       orderBy: { createdAt: 'asc' },
     })
 

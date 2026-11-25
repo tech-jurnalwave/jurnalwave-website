@@ -14,7 +14,6 @@ import {
   ArrowLeft,
   CheckCircle2,
   ShieldCheck,
-  Sparkles,
 } from 'lucide-react'
 
 export default function DaftarPage() {
@@ -33,7 +32,6 @@ export default function DaftarPage() {
   const [otpSending, setOtpSending] = useState(false)
   const [otpVerifying, setOtpVerifying] = useState(false)
   const [countdown, setCountdown] = useState(0)
-  const [demoOtpCode, setDemoOtpCode] = useState('')
 
   // Global UI State
   const [loading, setLoading] = useState(false)
@@ -50,7 +48,7 @@ export default function DaftarPage() {
     return () => clearTimeout(timer)
   }, [countdown])
 
-  // Kirim Kode OTP ke WhatsApp
+  // Kirim Kode OTP Asli ke WhatsApp Warga via Fonnte
   const handleSendOtp = async () => {
     setError('')
     setInfoMessage('')
@@ -76,22 +74,13 @@ export default function DaftarPage() {
       const data = await res.json()
 
       if (!res.ok || !data.success) {
-        setError(data.message || 'Gagal mengirim kode OTP. Periksa nomor Anda.')
+        setError(data.message || 'Gagal mengirim kode OTP ke WhatsApp Anda. Pastikan nomor aktif.')
         return
       }
 
       setOtpSent(true)
       setOtpVerified(false)
       setCountdown(60) // Cooldown 60 detik
-
-      const fallbackOtp = data.otpCode || data.otpDemo
-      if (fallbackOtp) {
-        setDemoOtpCode(fallbackOtp)
-        setOtpCode(fallbackOtp)
-      } else {
-        setDemoOtpCode('')
-      }
-
       setInfoMessage(data.message || `Kode verifikasi OTP telah dikirimkan ke WhatsApp ${cleanPhone}.`)
     } catch {
       setError('Terjadi kendala jaringan saat mengirim kode OTP ke WhatsApp.')
@@ -100,13 +89,13 @@ export default function DaftarPage() {
     }
   }
 
-  // Verifikasi Kode OTP yang dimasukkan
+  // Verifikasi Kode OTP yang dimasukkan Warga
   const handleVerifyOtp = async (codeToVerify?: string) => {
     const targetOtp = (codeToVerify || otpCode).trim()
     const cleanPhone = phone.replace(/[^0-9]/g, '')
 
     if (!targetOtp || targetOtp.length < 6) {
-      setError('Masukkan 6 digit kode OTP verifikasi WhatsApp.')
+      setError('Masukkan 6 digit kode OTP yang diterima di WhatsApp Anda.')
       return
     }
 
@@ -128,7 +117,7 @@ export default function DaftarPage() {
       const data = await res.json()
 
       if (!res.ok || !data.success) {
-        setError(data.message || 'Kode OTP tidak cocok atau sudah kadaluwarsa.')
+        setError(data.message || 'Kode OTP tidak cocok atau sudah kedaluwarsa.')
         return
       }
 
@@ -160,8 +149,17 @@ export default function DaftarPage() {
       return
     }
 
+    if (!otpSent) {
+      setError('Mohon klik "Kirim OTP" untuk menerima kode verifikasi di WhatsApp Anda.')
+      return
+    }
+
     if (!otpVerified) {
-      setError('Mohon klik "Kirim OTP" dan verifikasi nomor WhatsApp Anda terlebih dahulu.')
+      if (!otpCode || otpCode.length < 6) {
+        setError('Mohon masukkan 6 digit kode OTP yang dikirimkan ke WhatsApp Anda.')
+        return
+      }
+      handleVerifyOtp(otpCode)
       return
     }
 
@@ -179,7 +177,7 @@ export default function DaftarPage() {
           action: 'register-wa',
           fullName: cleanName,
           phone: cleanPhone,
-          otpCode: otpCode.trim() || '123456',
+          otpCode: otpCode.trim(),
           password,
           domisili: 'Sukabumi',
         }),
@@ -304,7 +302,7 @@ export default function DaftarPage() {
                   Daftar Akun Warga
                 </h1>
                 <p className="text-xs sm:text-sm text-secondary font-medium tracking-tight mb-4">
-                  Daftar akun pelapor terverifikasi dengan Nomor WhatsApp Anda.
+                  Daftar akun pelapor terverifikasi resmi dengan Nomor WhatsApp Anda.
                 </p>
 
                 {error && (
@@ -321,7 +319,7 @@ export default function DaftarPage() {
                   </div>
                 )}
 
-                {/* FORMULIR PENDAFTARAN WHATSAPP + OTP */}
+                {/* FORMULIR PENDAFTARAN MURNI WHATSAPP + STRICT OTP */}
                 <form onSubmit={handleRegister} className="space-y-3.5">
                   {/* Kolom 1: Nama Lengkap */}
                   <div>
@@ -405,27 +403,14 @@ export default function DaftarPage() {
                     </div>
                   </div>
 
-                  {/* Kolom 3: Input Kode OTP (Muncul saat OTP dikirim & belum terverifikasi) */}
+                  {/* Kolom 3: Input Kode OTP WhatsApp (Muncul saat OTP dikirim & belum terverifikasi) */}
                   {otpSent && !otpVerified && (
                     <div className="p-3 rounded-xl bg-surface-container border border-primary/20 space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
                       <div className="flex items-center justify-between">
                         <label className="text-xs font-semibold text-primary flex items-center gap-1.5">
                           <ShieldCheck className="w-3.5 h-3.5" />
-                          <span>Masukkan 6 Digit Kode OTP</span>
+                          <span>Masukkan 6 Digit Kode OTP WhatsApp</span>
                         </label>
-                        {demoOtpCode && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setOtpCode(demoOtpCode)
-                              handleVerifyOtp(demoOtpCode)
-                            }}
-                            className="text-[10px] text-amber-600 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
-                          >
-                            <Sparkles className="w-2.5 h-2.5" />
-                            <span>Pakai kode: {demoOtpCode}</span>
-                          </button>
-                        )}
                       </div>
 
                       <div className="relative flex items-center gap-2">
@@ -457,20 +442,9 @@ export default function DaftarPage() {
                           )}
                         </button>
                       </div>
-                      {demoOtpCode ? (
-                        <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex items-center justify-between">
-                          <span>
-                            Kode Smart OTP: <strong className="font-bold text-sm tracking-wider text-primary">{demoOtpCode}</strong>
-                          </span>
-                          <span className="text-[10px] text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/60 px-1.5 py-0.5 rounded font-medium">
-                            Otomatis Terisi
-                          </span>
-                        </div>
-                      ) : (
-                        <p className="text-[10px] text-secondary">
-                          Kode verifikasi 6 digit telah dikirimkan ke WhatsApp Anda. Berlaku selama 10 menit.
-                        </p>
-                      )}
+                      <p className="text-[10px] text-secondary">
+                        Kode verifikasi 6 digit telah dikirimkan ke pesan WhatsApp Anda. Berlaku selama 10 menit.
+                      </p>
                     </div>
                   )}
 
@@ -504,7 +478,7 @@ export default function DaftarPage() {
                   <div className="p-2.5 rounded-xl bg-surface-container-low/80 border border-outline-variant/50 text-[11px] text-secondary flex items-start gap-2">
                     <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                     <p className="leading-relaxed">
-                      <strong className="text-on-surface">Privasi Aman:</strong> Nomor WhatsApp hanya digunakan redaksi untuk verifikasi aduan darurat. Anda selalu dapat memilih opsi <span className="font-semibold text-primary">&quot;Laporkan Anonim&quot;</span> saat mengirim aduan.
+                      <strong className="text-on-surface">Privasi Aman:</strong> Nomor WhatsApp hanya digunakan untuk verifikasi aduan warga. Anda selalu dapat memilih opsi <span className="font-semibold text-primary">&quot;Laporkan Anonim&quot;</span> saat mengirim aduan.
                     </p>
                   </div>
 
