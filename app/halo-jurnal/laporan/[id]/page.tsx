@@ -104,15 +104,7 @@ export default function HaloJurnalLaporanDetailPage() {
             setUser(null)
           }
         } else {
-          // Fallback akun warga aktif jika belum tersimpan di tab ini
-          const defaultWarga = {
-            id: 'warga-demo-sukabumi',
-            email: 'ahmad.fauzi@gmail.com',
-            phone: '081234567890',
-            full_name: 'Ahmad Fauzi',
-            role: 'warga',
-          }
-          setUser(defaultWarga)
+          setUser(null)
         }
       }
     }
@@ -125,15 +117,11 @@ export default function HaloJurnalLaporanDetailPage() {
     if (typeof window !== 'undefined' && (id || report)) {
       try {
         const localList = JSON.parse(localStorage.getItem('halo_jurnal_user_reports') || '[]')
-        const targetId = id
-        const targetTicket = report?.nomor_tiket || report?.ticket_number || report?.ticketNumber
+        const targetId = report?.id || id
 
-        const isOwner = localList.some((r: any) => {
-          if (r.id && (r.id === targetId || r.id === targetTicket)) return true
-          if (r.nomor_tiket && (r.nomor_tiket === targetId || r.nomor_tiket === targetTicket)) return true
-          if (r.ticket_number && (r.ticket_number === targetId || r.ticket_number === targetTicket)) return true
-          if (r.ticketNumber && (r.ticketNumber === targetId || r.ticketNumber === targetTicket)) return true
-          return false
+        // HANYA dianggap pemilik jika ID laporan lokal sama persis (bukan sekadar nomor tiket untuk mencegah kebocoran antar aduan)
+        const isOwner = Array.isArray(localList) && localList.some((r: any) => {
+          return r && r.id && targetId && String(r.id) === String(targetId)
         })
         setIsLocalAuthor(isOwner)
       } catch {
@@ -146,6 +134,7 @@ export default function HaloJurnalLaporanDetailPage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      window.scrollTo(0, 0)
       if (window.location.search.includes('sukses=1')) {
         setShowSuccessBanner(true)
         setMobileTab('chat')
@@ -725,16 +714,26 @@ export default function HaloJurnalLaporanDetailPage() {
   const reportEmail = (report?.email || report?.user_email || report?.pelapor_email || report?.pelaporEmail || '').toLowerCase().trim()
   const reportPhone = (report?.telepon || report?.phone || report?.pelaporPhone || report?.citizenPhone || '').replace(/\D/g, '')
 
+  const normalizePhone = (p?: string) => {
+    if (!p) return ''
+    let cleaned = p.replace(/\D/g, '')
+    if (cleaned.startsWith('62')) cleaned = '0' + cleaned.slice(2)
+    return cleaned
+  }
+  const normUserPhone = normalizePhone(currentUserPhone)
+  const normReportPhone = normalizePhone(reportPhone)
+
   const isUserIdMatch = Boolean(currentUserId && reportUserId && String(reportUserId) === String(currentUserId))
   const isEmailMatch = Boolean(currentUserEmail && reportEmail && currentUserEmail === reportEmail)
-  const isPhoneMatch = Boolean(currentUserPhone && reportPhone && currentUserPhone === reportPhone)
+  const isPhoneMatch = Boolean(normUserPhone && normReportPhone && normUserPhone === normReportPhone)
 
+  // Pengguna HANYA diizinkan mengakses chat jika terbukti sah pemilik aduan ini atau Admin Redaksi
   const isAuthor = Boolean(
     report && (
-      isLocalAuthor ||
       isUserIdMatch ||
       isEmailMatch ||
-      isPhoneMatch
+      isPhoneMatch ||
+      (isLocalAuthor && !reportPhone && !reportEmail)
     )
   )
   const isAdmin = Boolean(user && (user.role === 'admin' || user.email?.toLowerCase().includes('admin')))

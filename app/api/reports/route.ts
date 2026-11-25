@@ -220,12 +220,34 @@ export async function POST(request: NextRequest) {
     const title = data.title
     const description = data.description || title
 
-    // Nomor tiket unik
-    const ticketNumber =
-      data.ticketNumber ||
-      body.ticket_number ||
-      body.nomor_tiket ||
-      `HJ-${String(Math.floor(100 + Math.random() * 900))}`
+    // Generate nomor tiket unik anti-tabrakan
+    let ticketNumber = (data.ticketNumber || body.ticket_number || body.nomor_tiket || '').trim()
+
+    // Cek apakah nomor tiket sudah digunakan di database atau belum disediakan
+    const existingReports = await prisma.report.findMany({
+      select: { ticketNumber: true },
+    })
+    const usedTickets = new Set(existingReports.map((r) => r.ticketNumber.toUpperCase()))
+
+    if (!ticketNumber || usedTickets.has(ticketNumber.toUpperCase())) {
+      let maxNum = 9
+      for (const r of existingReports) {
+        const match = r.ticketNumber.match(/HJ-(\d+)/i)
+        if (match) {
+          const num = parseInt(match[1], 10)
+          if (!isNaN(num) && num > maxNum) {
+            maxNum = num
+          }
+        }
+      }
+      let nextNum = maxNum + 1
+      let candidate = `HJ-${String(nextNum).padStart(3, '0')}`
+      while (usedTickets.has(candidate.toUpperCase())) {
+        nextNum++
+        candidate = `HJ-${String(nextNum).padStart(3, '0')}`
+      }
+      ticketNumber = candidate
+    }
 
     // Lampiran berkas (foto/video) jika ada (dengan deduplikasi pencegah upload ganda)
     const attachmentItems: { fileUrl: string; fileType: string }[] = []
