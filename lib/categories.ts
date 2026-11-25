@@ -105,6 +105,29 @@ export async function getArticleCategoriesFromDb(): Promise<CategoryItem[]> {
 }
 
 /**
+ * Helper untuk mengambil label nama resmi kategori dari Database Neon
+ * Dipakai oleh seluruh halaman kategori, judul menu, dan metadata
+ */
+export async function getCategoryLabelFromDb(slug: string): Promise<string> {
+  const categories = await getArticleCategoriesFromDb()
+  const found = categories.find((c) => c.value.toLowerCase() === slug.toLowerCase())
+  if (found) return found.label
+  const fallback = DEFAULT_CATEGORIES.find((c) => c.value.toLowerCase() === slug.toLowerCase())
+  return fallback ? fallback.label : (slug.charAt(0).toUpperCase() + slug.slice(1))
+}
+
+/**
+ * Helper sinkron untuk mengambil label nama kategori dari RAM memori/default
+ */
+export function getCategoryLabel(slug: string): string {
+  const list = globalThis.__jurnalWaveGlobalCategories || DEFAULT_CATEGORIES
+  const found = list.find((c) => c.value.toLowerCase() === slug.toLowerCase())
+  if (found) return found.label
+  const def = DEFAULT_CATEGORIES.find((c) => c.value.toLowerCase() === slug.toLowerCase())
+  return def ? def.label : (slug.charAt(0).toUpperCase() + slug.slice(1))
+}
+
+/**
  * Menyimpan pembaruan kategori secara permanen ke Database Neon
  */
 export async function saveArticleCategoriesToDb(categories: CategoryItem[]): Promise<boolean> {

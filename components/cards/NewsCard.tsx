@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Article } from '@/types';
 import { formatIndoDate } from '@/lib/utils';
+import { getCategoryLabel } from '@/lib/categories';
 
 interface NewsCardProps {
   article: Article;
@@ -13,14 +14,16 @@ interface NewsCardProps {
 const FALLBACK_IMAGE = '/hero-banner.webp';
 
 export const NewsCard: React.FC<NewsCardProps> = ({ article, variant = 'row' }) => {
-  const rawLabel = (article.categoryLabel || article.category || 'BERITA').toUpperCase();
-  const displayCategory = rawLabel === 'INFRASTRUKTUR' ? 'BERITA' : rawLabel === 'WISATA' ? 'TRAVELING' : rawLabel;
+  const catKey = (article.category || '').toLowerCase();
+  const dbLabel = catKey ? getCategoryLabel(catKey) : '';
+  const rawLabel = (dbLabel || article.categoryLabel || article.category || 'BERITA').toUpperCase();
+  const displayCategory = rawLabel === 'INFRASTRUKTUR' ? 'BERITA' : rawLabel;
 
   const validImage =
     article.imageUrl &&
-    (article.imageUrl.startsWith('http') ||
-      article.imageUrl.startsWith('/') ||
-      article.imageUrl.startsWith('data:image/'))
+      (article.imageUrl.startsWith('http') ||
+        article.imageUrl.startsWith('/') ||
+        article.imageUrl.startsWith('data:image/'))
       ? article.imageUrl
       : FALLBACK_IMAGE;
 
@@ -83,20 +86,20 @@ export const NewsCard: React.FC<NewsCardProps> = ({ article, variant = 'row' }) 
         href={`/artikel/${articleSlug}`}
         className="relative w-28 sm:w-40 md:w-44 aspect-[4/3] sm:aspect-video rounded-xl overflow-hidden shrink-0 block bg-slate-100 dark:bg-slate-800"
       >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={validImage}
-            alt={article.imageAlt || article.title}
-            loading="lazy"
-            decoding="async"
-            onError={(e) => {
-              const target = e.currentTarget;
-              if (target.src !== window.location.origin + FALLBACK_IMAGE) {
-                target.src = FALLBACK_IMAGE;
-              }
-            }}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={validImage}
+          alt={article.imageAlt || article.title}
+          loading="lazy"
+          decoding="async"
+          onError={(e) => {
+            const target = e.currentTarget;
+            if (target.src !== window.location.origin + FALLBACK_IMAGE) {
+              target.src = FALLBACK_IMAGE;
+            }
+          }}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+        />
       </Link>
       <div className="flex flex-col gap-1 justify-center flex-1 min-w-0">
         <span className="text-[#c00015] font-bold text-[10px] sm:text-[11px] uppercase tracking-wider">

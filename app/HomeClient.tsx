@@ -9,6 +9,7 @@ import { HomeCategorySection } from '@/components/cards/HomeCategorySection';
 import { ReelsSection } from '@/components/cards/ReelsSection';
 import { HalloJurnalBanner } from '@/components/cards/HalloJurnalBanner';
 import { PollingWidget } from '@/components/widgets/PollingWidget';
+import { getCategoryLabel } from '@/lib/categories';
 import { Article, Reel } from '@/types';
 
 interface HomeClientProps {
@@ -194,7 +195,7 @@ export function HomeClient({ initialArticles = [], initialReels = [] }: HomeClie
 
         {/* 3. Kategori 1: BERITA */}
         <HomeCategorySection
-          title="BERITA"
+          title={getCategoryLabel('berita').toUpperCase()}
           href="/berita"
           articles={beritaArticles}
           reverseLayout={false}
@@ -202,7 +203,7 @@ export function HomeClient({ initialArticles = [], initialReels = [] }: HomeClie
 
         {/* 4. Kategori 2: KULINER (Layout Seling: Kartu Kecil di Kiri, 1 Besar di Kanan) */}
         <HomeCategorySection
-          title="KULINER"
+          title={getCategoryLabel('kuliner').toUpperCase()}
           href="/kuliner"
           articles={kulinerArticles}
           reverseLayout={true}
@@ -210,7 +211,7 @@ export function HomeClient({ initialArticles = [], initialReels = [] }: HomeClie
 
         {/* 5. Kategori 3: WISATA */}
         <HomeCategorySection
-          title="WISATA"
+          title={getCategoryLabel('wisata').toUpperCase()}
           href="/wisata"
           articles={wisataArticles}
           reverseLayout={false}
@@ -218,7 +219,7 @@ export function HomeClient({ initialArticles = [], initialReels = [] }: HomeClie
 
         {/* 6. Kategori 4: HIBURAN (Layout Seling) */}
         <HomeCategorySection
-          title="HIBURAN"
+          title={getCategoryLabel('hiburan').toUpperCase()}
           href="/hiburan"
           articles={hiburanArticles}
           reverseLayout={true}
@@ -230,17 +231,17 @@ export function HomeClient({ initialArticles = [], initialReels = [] }: HomeClie
         {/* 8. Hallo Jurnal Action Banner (Pemisah ritme visual di tengah halaman) */}
         <HalloJurnalBanner />
 
-        {/* 9. Kategori 5: TECH & GAME */}
+        {/* 9. Kategori 5: TECH */}
         <HomeCategorySection
-          title="TECH & GAME"
+          title={getCategoryLabel('tech').toUpperCase()}
           href="/tech"
           articles={techArticles}
           reverseLayout={false}
         />
 
-        {/* 10. Kategori 6: SPORT (Layout Seling) */}
+        {/* 10. Kategori 6: SPORT & E-SPORT (Layout Seling) */}
         <HomeCategorySection
-          title="SPORT"
+          title={getCategoryLabel('sport').toUpperCase()}
           href="/sport"
           articles={sportArticles}
           reverseLayout={true}
@@ -248,7 +249,7 @@ export function HomeClient({ initialArticles = [], initialReels = [] }: HomeClie
 
         {/* 11. Kategori 7: INSPIRASI */}
         <HomeCategorySection
-          title="INSPIRASI"
+          title={getCategoryLabel('inspirasi').toUpperCase()}
           href="/inspirasi"
           articles={inspirasiArticles}
           reverseLayout={false}

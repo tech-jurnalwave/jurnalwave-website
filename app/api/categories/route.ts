@@ -27,7 +27,7 @@ export async function GET() {
   }
 }
 
-// POST: Menyimpan pembaruan kategori dari admin dan menyinkronkan secara global ke database
+// POST: Menyimpan pembaruan kategori dari admin dan menyinkronkan secara global
 export async function POST(request: NextRequest) {
   try {
     let body: any = null

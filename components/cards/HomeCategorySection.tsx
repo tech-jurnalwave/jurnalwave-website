@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ChevronRight, Newspaper } from 'lucide-react';
 import { Article } from '@/types';
 import { formatIndoDate } from '@/lib/utils';
+import { getCategoryLabel as getDynamicCategoryLabel } from '@/lib/categories';
 
 interface HomeCategorySectionProps {
   title: string;
@@ -34,9 +35,10 @@ export const HomeCategorySection: React.FC<HomeCategorySectionProps> = ({
   };
 
   const getCategoryLabel = (art: Article) => {
-    const raw = (art.categoryLabel || art.category || 'BERITA').toUpperCase();
+    const catKey = (art.category || '').toLowerCase();
+    const dbLabel = catKey ? getDynamicCategoryLabel(catKey) : '';
+    const raw = (dbLabel || art.categoryLabel || art.category || 'BERITA').toUpperCase();
     if (raw === 'INFRASTRUKTUR') return 'BERITA';
-    if (raw === 'TRAVELING') return 'WISATA';
     return raw;
   };
 
