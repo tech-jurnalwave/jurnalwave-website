@@ -66,7 +66,14 @@ export default function AdminStaffSecretLoginPage() {
         body: JSON.stringify({ email: email.trim(), password, teamMembers }),
       })
 
-      const json = await res.json()
+      const rawText = await res.text()
+      let json: any = {}
+      try {
+        json = JSON.parse(rawText)
+      } catch {
+        setErrorMsg(`Respons server tidak valid (${res.status}). Silakan coba lagi.`)
+        return
+      }
 
       if (res.ok && json.success) {
         setSuccessMsg(json.message || 'Login berhasil! Mengalihkan ke meja redaksi...')

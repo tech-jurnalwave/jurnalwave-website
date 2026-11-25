@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 2. Proteksi Mutlak: Hanya email resmi yang diizinkan!
+    // 2. Proteksi Mutlak: Hanya email resmi tech.jurnalwave@gmail.com yang diizinkan!
     if (email !== SUPERADMIN_OFFICIAL_EMAIL) {
       return NextResponse.json(
         {
