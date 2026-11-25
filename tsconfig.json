@@ -30,5 +30,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "halo-jurnal-app", "scripts"]
+  "exclude": ["node_modules", "halo-jurnal-app", "scripts", "tech-jurnalwave-*"]
 }

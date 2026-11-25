@@ -175,7 +175,7 @@ export function HomeClient({ initialArticles = [], initialReels = [] }: HomeClie
 
           {displayArticles.length > 0 ? (
             <div className="flex flex-col divide-y divide-slate-100 dark:divide-zinc-800/80">
-              {displayArticles.slice(0, 8).map(article => (
+              {displayArticles.slice(0, 4).map(article => (
                 <NewsCard key={article.id} article={article} variant="row" />
               ))}
             </div>
