@@ -207,6 +207,29 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       return r
     })
 
+    // Sinkronisasi percakapan chat dari DB untuk menghitung unread badge
+    try {
+      const chatRes = await fetch('/api/chat?all=true', { cache: 'no-store' })
+      if (chatRes.ok) {
+        const chatJson = await chatRes.json()
+        if (chatJson.success && Array.isArray(chatJson.data) && typeof window !== 'undefined') {
+          const chatsByTicket: Record<string, any[]> = {}
+          chatJson.data.forEach((m: any) => {
+            const key = m.ticketNumber
+            if (key) {
+              if (!chatsByTicket[key]) chatsByTicket[key] = []
+              chatsByTicket[key].push(m)
+            }
+          })
+          Object.entries(chatsByTicket).forEach(([ticket, list]) => {
+            try {
+              localStorage.setItem(`halo_jurnal_chat_${ticket}`, JSON.stringify(list))
+            } catch {}
+          })
+        }
+      }
+    } catch {}
+
     setReports(finalReports)
     setCachedAdminReports(finalReports)
     syncCounts(finalReports, articlesRef.current)

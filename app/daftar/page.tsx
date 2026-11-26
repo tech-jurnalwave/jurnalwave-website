@@ -81,7 +81,11 @@ export default function DaftarPage() {
       setOtpSent(true)
       setOtpVerified(false)
       setCountdown(60) // Cooldown 60 detik
-      setInfoMessage(data.message || `Kode verifikasi OTP telah dikirimkan ke WhatsApp ${cleanPhone}.`)
+      if (data.otpDemo) {
+        setInfoMessage(`${data.message || 'Kode OTP berhasil dibuat.'} (Mode Pengujian: Gunakan kode verifikasi ${data.otpDemo})`)
+      } else {
+        setInfoMessage(data.message || `Kode verifikasi OTP telah dikirimkan ke WhatsApp ${cleanPhone}.`)
+      }
     } catch {
       setError('Terjadi kendala jaringan saat mengirim kode OTP ke WhatsApp.')
     } finally {

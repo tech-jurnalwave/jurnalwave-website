@@ -30,11 +30,37 @@ function parseAttachment(rawMessage: string) {
   return { message: rawMessage, file_url: null, file_type: null }
 }
 
-// 1. GET: Ambil riwayat chat berdasarkan nomor tiket
+// 1. GET: Ambil riwayat chat berdasarkan nomor tiket atau seluruh ringkasan chat
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const ticketNumber = searchParams.get('ticketNumber')?.trim()
+    const getAll = searchParams.get('all') === 'true'
+
+    if (getAll) {
+      const allMessages = await prisma.chatMessage.findMany({
+        orderBy: { createdAt: 'asc' },
+      })
+      return NextResponse.json({
+        success: true,
+        source: 'database',
+        data: allMessages.map((m) => {
+          const parsed = parseAttachment(m.message)
+          return {
+            id: m.id,
+            ticketNumber: m.ticketNumber,
+            sender_id: m.senderId,
+            sender_name: m.senderName,
+            role: m.role,
+            message: parsed.message,
+            raw_message: m.message,
+            file_url: parsed.file_url,
+            file_type: parsed.file_type,
+            created_at: m.createdAt.toISOString(),
+          }
+        }),
+      })
+    }
 
     // Jika nomor tiket kosong atau tidak valid, jangan kembalikan seluruh database
     if (!ticketNumber || ticketNumber === 'undefined' || ticketNumber === 'null') {
@@ -45,8 +71,25 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // Resolusi nomor tiket: periksa apakah ticketNumber adalah CUID id laporan atau nomor tiket resmi (HJ-xxx)
+    const report = await prisma.report.findFirst({
+      where: {
+        OR: [
+          { ticketNumber: { equals: ticketNumber, mode: 'insensitive' } },
+          { id: ticketNumber },
+        ],
+      },
+      select: { ticketNumber: true, id: true },
+    })
+
+    const targetKeys = report
+      ? Array.from(new Set([report.ticketNumber, report.id, ticketNumber]))
+      : [ticketNumber]
+
     const messages = await prisma.chatMessage.findMany({
-      where: { ticketNumber },
+      where: {
+        ticketNumber: { in: targetKeys },
+      },
       orderBy: { createdAt: 'asc' },
     })
 
@@ -111,6 +154,25 @@ export async function POST(request: NextRequest) {
     let senderName = validation.data.senderName || 'Warga Sukabumi'
     let senderId = validation.data.senderId || 'warga'
 
+    // Resolusi nomor tiket kanonikal (jika client mengirim ID laporan CUID atau lowercase)
+    let canonicalTicketNumber = ticketNumber
+    try {
+      const report = await prisma.report.findFirst({
+        where: {
+          OR: [
+            { ticketNumber: { equals: ticketNumber, mode: 'insensitive' } },
+            { id: ticketNumber },
+          ],
+        },
+        select: { ticketNumber: true },
+      })
+      if (report?.ticketNumber) {
+        canonicalTicketNumber = report.ticketNumber
+      }
+    } catch (lookupErr) {
+      console.warn('API Chat POST report lookup notice:', lookupErr)
+    }
+
     // Jika pesan dikirim atas nama Redaksi / Admin, wajib diverifikasi sesinya
     if (requestedRole === 'admin' || requestedRole === 'redaksi') {
       const session = await getAdminSession(request)
@@ -130,7 +192,7 @@ export async function POST(request: NextRequest) {
 
     const created = await prisma.chatMessage.create({
       data: {
-        ticketNumber,
+        ticketNumber: canonicalTicketNumber,
         senderId,
         senderName,
         role,

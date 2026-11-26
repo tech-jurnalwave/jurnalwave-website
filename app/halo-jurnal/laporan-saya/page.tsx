@@ -107,22 +107,63 @@ export default function HaloJurnalLaporanSayaPage() {
     const allCombined = [...localUserReports, ...dbReports]
     const uniqueMap = new Map<string, any>()
     allCombined.forEach((item) => {
-      const key = item.ticketNumber || item.nomor_tiket || item.ticket_number || item.id
-      if (key && !uniqueMap.has(key)) {
+      const key = String(item.ticketNumber || item.nomor_tiket || item.ticket_number || item.id || '').toUpperCase()
+      if (!key) return
+      if (!uniqueMap.has(key)) {
         uniqueMap.set(key, item)
+      } else {
+        const existing = uniqueMap.get(key)
+        uniqueMap.set(key, { ...existing, ...item })
       }
+    })
+
+    const normalizePhoneDigits = (p?: string) => {
+      if (!p) return ''
+      let cleaned = p.replace(/\D/g, '')
+      if (cleaned.startsWith('62')) cleaned = '0' + cleaned.slice(2)
+      return cleaned
+    }
+
+    const cleanUserPhone = normalizePhoneDigits(currentUserPhone)
+
+    // Simpan semua ID dan nomor tiket yang pernah dibuat oleh user di browser lokal
+    const localUserTicketKeys = new Set<string>()
+    localUserReports.forEach((item) => {
+      if (item.ticketNumber) localUserTicketKeys.add(String(item.ticketNumber).toUpperCase())
+      if (item.nomor_tiket) localUserTicketKeys.add(String(item.nomor_tiket).toUpperCase())
+      if (item.ticket_number) localUserTicketKeys.add(String(item.ticket_number).toUpperCase())
+      if (item.id) localUserTicketKeys.add(String(item.id))
     })
 
     // Saring laporan milik akun yang sedang login
     let baseReports = Array.from(uniqueMap.values()).filter((r: any) => {
-      if (!currentUserId && !currentUserEmail && !currentUserPhone) return false
-      const reportUserId = r.user_id || r.userId
-      const reportEmail = (r.email || r.user_email || r.pelaporEmail || r.pelapor_email || '').toLowerCase().trim()
-      const reportPhone = (r.telepon || r.phone || r.pelaporPhone || r.citizenPhone || '').trim()
+      const ticketKey = String(r.ticketNumber || r.nomor_tiket || r.ticket_number || '').toUpperCase()
+      const reportId = r.id ? String(r.id) : ''
 
+      // 1. Jika tiket ada di riwayat laporan lokal user -> PASTI MILIK USER
+      if (ticketKey && localUserTicketKeys.has(ticketKey)) return true
+      if (reportId && localUserTicketKeys.has(reportId)) return true
+
+      // 2. Cek User ID
+      const reportUserId = r.user_id || r.userId
       if (currentUserId && reportUserId && String(reportUserId) === String(currentUserId)) return true
+
+      // 3. Cek Nomor Telepon (Normalisasi 08xxx vs 62xxx)
+      const reportPhone = normalizePhoneDigits(r.telepon || r.phone || r.pelaporPhone || r.citizenPhone)
+      if (cleanUserPhone && reportPhone && cleanUserPhone === reportPhone) return true
+
+      // 4. Cek Email (termasuk email dummy berbasis nomor HP)
+      const reportEmail = (r.email || r.user_email || r.pelaporEmail || r.pelapor_email || '').toLowerCase().trim()
       if (currentUserEmail && reportEmail && reportEmail === currentUserEmail) return true
-      if (currentUserPhone && reportPhone && reportPhone === currentUserPhone) return true
+      if (cleanUserPhone && reportEmail) {
+        if (
+          reportEmail === `${cleanUserPhone}@warga.jurnalwave.id` ||
+          reportEmail === `62${cleanUserPhone.slice(1)}@warga.jurnalwave.id`
+        ) {
+          return true
+        }
+      }
+
       return false
     })
 

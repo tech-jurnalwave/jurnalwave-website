@@ -37,7 +37,7 @@ function LoginPageContent() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!identifier || !password) {
-      setError('Mohon masukkan email atau nomor HP dan kata sandi Anda.')
+      setError('Mohon masukkan nomor WhatsApp / HP dan kata sandi Anda.')
       return
     }
     if (password.length < 6) {
@@ -170,7 +170,7 @@ function LoginPageContent() {
               Masuk ke Akun
             </h1>
             <p className="text-xs sm:text-sm text-secondary font-medium tracking-tight mb-5">
-              Gunakan Email atau Nomor WhatsApp dan kata sandi Anda untuk masuk.
+              Gunakan Nomor WhatsApp dan kata sandi Anda untuk masuk.
             </p>
 
             {/* Error Alert */}
@@ -191,18 +191,19 @@ function LoginPageContent() {
 
             {/* Form Login Manual */}
             <form onSubmit={handleLogin} className="space-y-4">
-              {/* Email / Nomor WhatsApp */}
+              {/* Nomor WhatsApp */}
               <div>
                 <label className="block text-xs font-semibold text-on-surface mb-1.5">
-                  Email atau Nomor WhatsApp
+                  Nomor WhatsApp / HP
                 </label>
                 <div className="relative">
                   <Phone className="w-4 h-4 text-secondary absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
-                    type="text"
+                    type="tel"
+                    inputMode="numeric"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="nama@gmail.com atau 081234567890"
+                    placeholder="Contoh: 081234567890"
                     required
                     className="w-full pl-10 pr-3.5 py-2.5 text-xs sm:text-sm bg-surface-container-low border border-outline-variant/80 rounded-lg text-on-surface placeholder:text-secondary focus:bg-surface-container-lowest focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                   />

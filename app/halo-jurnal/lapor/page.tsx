@@ -44,7 +44,7 @@ function LaporForm() {
       if (stored) {
         try {
           const parsed = JSON.parse(stored)
-          if (parsed && (parsed.id || parsed.email)) {
+          if (parsed && (parsed.id || parsed.phone || parsed.phone_number || parsed.full_name || parsed.name || parsed.email)) {
             setUser(parsed)
           } else {
             setUser(null)
@@ -153,8 +153,8 @@ function LaporForm() {
           overrides[uId] === false ||
           (uPhone && overrides[uPhone] === false) ||
           (uEmail && overrides[uEmail] === false) ||
-          user?.isVerified === false ||
-          user?.status === 'ditangguhkan'
+          user?.status === 'ditangguhkan' ||
+          (user?.isVerified === false && user?.is_verified === false)
         ) {
           isUserSuspended = true
         }
@@ -202,6 +202,7 @@ function LaporForm() {
               ? [{ file_url: previewUrl, file_type: file?.type || (previewUrl.startsWith('data:video') ? 'video/mp4' : 'image/jpeg') }]
               : [],
             isAnonymous,
+            isPublic: true,
             legalAgreement: true,
             domisili: pelaporDomisili,
           }),
@@ -220,16 +221,23 @@ function LaporForm() {
         assignedTicket = `HJ-${Date.now().toString().slice(-4)}`
       }
 
-      const newReportData = savedReportData || {
+      const newReportData = {
+        ...(savedReportData || {}),
         id: finalReportId,
         ticket_number: assignedTicket,
         nomor_tiket: assignedTicket,
-        user_id: user?.id || 'warga-anon',
+        ticketNumber: assignedTicket,
+        user_id: user?.id || 'warga',
+        userId: user?.id || 'warga',
         user_email: user?.email || '',
         email: user?.email || '',
         pelaporEmail: user?.email || '',
         pelapor_email: user?.email || '',
         pelaporName: pelaporDisplayName,
+        nama_pelapor: pelaporDisplayName,
+        pelaporPhone: user?.phone || user?.phone_number || '',
+        telepon: user?.phone || user?.phone_number || '',
+        phone: user?.phone || user?.phone_number || '',
         alamat_domisili: pelaporDomisili,
         is_anonim: isAnonymous,
         is_anonymous: isAnonymous,
@@ -238,18 +246,17 @@ function LaporForm() {
         jenis: 'pengaduan',
         kategori: finalKategori,
         judul: title.trim(),
+        title: title.trim(),
         deskripsi: description.trim(),
+        description: description.trim(),
         lokasi: pelaporDomisili,
-        latitude: null,
-        longitude: null,
-        instansi_tujuan: null,
-        jenis_informasi: null,
-        status: 'diterima',
-        is_public: false,
-        dukungan_count: 0,
+        status: savedReportData?.status || 'diterima',
+        is_public: true,
+        isPublic: true,
+        dukungan_count: savedReportData?.dukungan_count || 0,
         komentar_count: 0,
-        created_at: new Date().toISOString(),
-        laporan_lampiran: previewUrl
+        created_at: savedReportData?.created_at || new Date().toISOString(),
+        laporan_lampiran: savedReportData?.laporan_lampiran || (previewUrl
           ? [{
               id: `lamp-${Date.now()}`,
               file_url: previewUrl,
@@ -259,8 +266,8 @@ function LaporForm() {
                 ? 'video/mp4'
                 : file?.type || 'image/jpeg',
             }]
-          : [],
-        status_log: [
+          : []),
+        status_log: savedReportData?.status_log || [
           {
             id: `log-${Date.now()}`,
             status: 'diterima',

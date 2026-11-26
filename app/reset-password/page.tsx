@@ -91,7 +91,11 @@ export default function ResetPasswordPage() {
       setTimer(60)
       setCanResend(false)
       setOtpCode(['', '', '', '', '', ''])
-      setInfoMessage(data.message || 'Kode OTP telah dikirimkan ke email Anda.')
+      if (data.otpDemo) {
+        setInfoMessage(`${data.message || 'Kode OTP dibuat.'} (Mode Pengujian: Gunakan kode verifikasi ${data.otpDemo})`)
+      } else {
+        setInfoMessage(data.message || `Kode verifikasi OTP telah dikirimkan ke nomor WhatsApp ${cleanPhone}.`)
+      }
       setTimeout(() => {
         otpInputRefs.current[0]?.focus()
       }, 200)
@@ -168,7 +172,9 @@ export default function ResetPasswordPage() {
       setCanResend(false)
       setOtpCode(['', '', '', '', '', ''])
       if (data.otpDemo) {
-        setInfoMessage(`(Mode Demo: Gunakan kode verifikasi ${data.otpDemo})`)
+        setInfoMessage(`${data.message || 'Kode OTP dikirim ulang.'} (Mode Pengujian: Gunakan kode verifikasi ${data.otpDemo})`)
+      } else {
+        setInfoMessage(data.message || `Kode verifikasi OTP telah dikirimkan ulang ke nomor WhatsApp ${cleanPhone}.`)
       }
       otpInputRefs.current[0]?.focus()
     } catch {

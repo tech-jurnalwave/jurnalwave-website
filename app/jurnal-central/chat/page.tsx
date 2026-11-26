@@ -58,82 +58,109 @@ function ChatDeskContent() {
   }, [initialTicketParam, reports, selectedTicketId])
 
   // Scan metadata percakapan untuk seluruh tiket
-  const scanAllTicketChats = () => {
-    if (typeof window !== 'undefined') {
+  const scanAllTicketChats = async () => {
+    try {
+      // 1. Ambil seluruh pesan obrolan dari database
+      let dbAllMessages: any[] = []
       try {
-        const readSet = new Set<string>(
-          JSON.parse(localStorage.getItem('halo_jurnal_read_chats') || '[]')
-        )
-        const newMeta: Record<string, any> = {}
-
-        reports.forEach((rep) => {
-          const keyId = rep.id
-          const keyTicket = rep.nomor_tiket
-          const localId = localStorage.getItem(`halo_jurnal_chat_${keyId}`)
-          const localTicket = keyTicket
-            ? localStorage.getItem(`halo_jurnal_chat_${keyTicket}`)
-            : null
-          const raw = localId || localTicket || '[]'
-
-          let chatList: any[] = []
-          try {
-            chatList = JSON.parse(raw)
-          } catch {}
-
-          if (Array.isArray(chatList) && chatList.length > 0) {
-            const sorted = [...chatList].sort(
-              (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-            )
-            const lastMsg = sorted[sorted.length - 1]
-            const isWargaLast =
-              lastMsg.role !== 'admin' &&
-              lastMsg.role !== 'redaksi' &&
-              lastMsg.sender_id !== 'admin-redaksi' &&
-              lastMsg.sender_id !== 'dev-admin' &&
-              lastMsg.sender_id !== 'admin' &&
-              lastMsg.profiles?.role !== 'admin' &&
-              lastMsg.profiles?.role !== 'redaksi' &&
-              !(lastMsg.sender_name && lastMsg.sender_name.toLowerCase().includes('redaksi'))
-
-            const unread = sorted.filter(
-              (m) =>
-                m.role !== 'admin' &&
-                m.role !== 'redaksi' &&
-                m.sender_id !== 'admin-redaksi' &&
-                m.sender_id !== 'dev-admin' &&
-                m.sender_id !== 'admin' &&
-                m.profiles?.role !== 'admin' &&
-                m.profiles?.role !== 'redaksi' &&
-                !(m.sender_name && m.sender_name.toLowerCase().includes('redaksi')) &&
-                !readSet.has(m.id)
-            ).length
-
-            const metaPayload = {
-              lastMessage: lastMsg.message || 'Mengirim berkas lampiran',
-              lastTime: lastMsg.created_at,
-              unreadCount: unread,
-              isWaitingAdmin: isWargaLast,
-              messageCount: sorted.length,
-            }
-            newMeta[rep.id] = metaPayload
-            if (rep.nomor_tiket) newMeta[rep.nomor_tiket] = metaPayload
-          } else {
-            const defaultMeta = {
-              lastMessage: 'Belum ada percakapan langsung',
-              lastTime: rep.created_at,
-              unreadCount: 0,
-              isWaitingAdmin: false,
-              messageCount: 0,
-            }
-            newMeta[rep.id] = defaultMeta
-            if (rep.nomor_tiket) newMeta[rep.nomor_tiket] = defaultMeta
+        const res = await fetch('/api/chat?all=true', { cache: 'no-store' })
+        if (res.ok) {
+          const json = await res.json()
+          if (json.success && Array.isArray(json.data)) {
+            dbAllMessages = json.data
           }
-        })
-
-        setTicketMeta(newMeta)
-      } catch (err) {
-        console.error('Error scanning ticket chats:', err)
+        }
+      } catch (apiErr) {
+        console.warn('Notice chat API scan error:', apiErr)
       }
+
+      // Kelompokkan chat DB berdasarkan nomor tiket
+      const messagesByTicket: Record<string, any[]> = {}
+      dbAllMessages.forEach((m) => {
+        const key = String(m.ticketNumber || '').toUpperCase()
+        if (!messagesByTicket[key]) messagesByTicket[key] = []
+        messagesByTicket[key].push(m)
+      })
+
+      const readSet = new Set<string>(
+        typeof window !== 'undefined'
+          ? JSON.parse(localStorage.getItem('halo_jurnal_read_chats') || '[]')
+          : []
+      )
+      const newMeta: Record<string, any> = {}
+
+      reports.forEach((rep) => {
+        const keyId = rep.id
+        const keyTicket = rep.nomor_tiket ? String(rep.nomor_tiket).toUpperCase() : null
+
+        // Ambil pesan dari DB
+        const dbList = (keyTicket && messagesByTicket[keyTicket]) || (keyId && messagesByTicket[String(keyId).toUpperCase()]) || []
+
+        // Ambil pesan lokal jika ada
+        let localList: any[] = []
+        if (typeof window !== 'undefined') {
+          const localId = localStorage.getItem(`halo_jurnal_chat_${keyId}`)
+          const localTicket = rep.nomor_tiket ? localStorage.getItem(`halo_jurnal_chat_${rep.nomor_tiket}`) : null
+          try {
+            localList = JSON.parse(localId || localTicket || '[]')
+          } catch {}
+        }
+
+        const combined = dbList.length > 0 ? dbList : localList
+
+        if (Array.isArray(combined) && combined.length > 0) {
+          const sorted = [...combined].sort(
+            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          )
+          const lastMsg = sorted[sorted.length - 1]
+          const isWargaLast =
+            lastMsg.role !== 'admin' &&
+            lastMsg.role !== 'redaksi' &&
+            lastMsg.sender_id !== 'admin-redaksi' &&
+            lastMsg.sender_id !== 'dev-admin' &&
+            lastMsg.sender_id !== 'admin' &&
+            lastMsg.profiles?.role !== 'admin' &&
+            lastMsg.profiles?.role !== 'redaksi' &&
+            !(lastMsg.sender_name && lastMsg.sender_name.toLowerCase().includes('redaksi'))
+
+          const unread = sorted.filter(
+            (m) =>
+              m.role !== 'admin' &&
+              m.role !== 'redaksi' &&
+              m.sender_id !== 'admin-redaksi' &&
+              m.sender_id !== 'dev-admin' &&
+              m.sender_id !== 'admin' &&
+              m.profiles?.role !== 'admin' &&
+              m.profiles?.role !== 'redaksi' &&
+              !(m.sender_name && m.sender_name.toLowerCase().includes('redaksi')) &&
+              !readSet.has(m.id)
+          ).length
+
+          const metaPayload = {
+            lastMessage: lastMsg.message || 'Mengirim berkas lampiran',
+            lastTime: lastMsg.created_at,
+            unreadCount: unread,
+            isWaitingAdmin: isWargaLast,
+            messageCount: sorted.length,
+          }
+          newMeta[rep.id] = metaPayload
+          if (rep.nomor_tiket) newMeta[rep.nomor_tiket] = metaPayload
+        } else {
+          const defaultMeta = {
+            lastMessage: 'Belum ada percakapan langsung',
+            lastTime: rep.created_at,
+            unreadCount: 0,
+            isWaitingAdmin: false,
+            messageCount: 0,
+          }
+          newMeta[rep.id] = defaultMeta
+          if (rep.nomor_tiket) newMeta[rep.nomor_tiket] = defaultMeta
+        }
+      })
+
+      setTicketMeta(newMeta)
+    } catch (err) {
+      console.error('Error scanning ticket chats:', err)
     }
   }
 

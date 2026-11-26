@@ -57,7 +57,8 @@ function mapReportFromDb(item: any, supportCount = 0) {
     pelaporPhone: (item as any).pelaporPhone || '',
     email: (item as any).pelaporEmail || (item as any).citizenEmail || '',
     status: item.status || 'diterima',
-    is_public: Boolean(item.isPublic),
+    is_public: Boolean(item.isPublic !== false),
+    isPublic: Boolean(item.isPublic !== false),
     dukungan_count: supportCount,
     komentar_count: 0,
     created_at: item.createdAt ? new Date(item.createdAt).toISOString() : new Date().toISOString(),
@@ -134,9 +135,10 @@ export async function GET(request: NextRequest) {
       where.status = status
     }
     if (ticket) {
+      const cleanTicket = ticket.trim()
       where.OR = [
-        { ticketNumber: ticket },
-        { id: ticket },
+        { ticketNumber: { equals: cleanTicket, mode: 'insensitive' } },
+        { id: cleanTicket },
       ]
     }
 
@@ -309,7 +311,7 @@ export async function POST(request: NextRequest) {
         pelaporPhone: data.pelaporPhone || null,
         pelaporEmail: data.pelaporEmail || null,
         status: 'diterima',
-        isPublic: data.isPublic !== undefined ? Boolean(data.isPublic) : false,
+        isPublic: data.isPublic !== undefined ? Boolean(data.isPublic) : true,
         attachments: {
           create: attachmentItems.map((att) => ({
             fileUrl: att.fileUrl,

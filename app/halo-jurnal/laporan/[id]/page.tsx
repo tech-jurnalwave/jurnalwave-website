@@ -117,11 +117,17 @@ export default function HaloJurnalLaporanDetailPage() {
     if (typeof window !== 'undefined' && (id || report)) {
       try {
         const localList = JSON.parse(localStorage.getItem('halo_jurnal_user_reports') || '[]')
-        const targetId = report?.id || id
+        const targetId = String(report?.id || id || '').toLowerCase()
+        const targetTicket = String(report?.nomor_tiket || report?.ticket_number || report?.ticketNumber || id || '').toLowerCase()
 
-        // HANYA dianggap pemilik jika ID laporan lokal sama persis (bukan sekadar nomor tiket untuk mencegah kebocoran antar aduan)
         const isOwner = Array.isArray(localList) && localList.some((r: any) => {
-          return r && r.id && targetId && String(r.id) === String(targetId)
+          if (!r) return false
+          const rId = String(r.id || '').toLowerCase()
+          const rTicket = String(r.nomor_tiket || r.ticket_number || r.ticketNumber || '').toLowerCase()
+          return (
+            (rId && (rId === targetId || rId === targetTicket)) ||
+            (rTicket && (rTicket === targetTicket || rTicket === targetId))
+          )
         })
         setIsLocalAuthor(isOwner)
       } catch {
@@ -724,7 +730,15 @@ export default function HaloJurnalLaporanDetailPage() {
   const normReportPhone = normalizePhone(reportPhone)
 
   const isUserIdMatch = Boolean(currentUserId && reportUserId && String(reportUserId) === String(currentUserId))
-  const isEmailMatch = Boolean(currentUserEmail && reportEmail && currentUserEmail === reportEmail)
+  const isEmailMatch = Boolean(
+    currentUserEmail && reportEmail && (
+      currentUserEmail === reportEmail ||
+      (normUserPhone && (
+        reportEmail === `${normUserPhone}@warga.jurnalwave.id` ||
+        reportEmail === `62${normUserPhone.slice(1)}@warga.jurnalwave.id`
+      ))
+    )
+  )
   const isPhoneMatch = Boolean(normUserPhone && normReportPhone && normUserPhone === normReportPhone)
 
   // Pengguna HANYA diizinkan mengakses chat jika terbukti sah pemilik aduan ini atau Admin Redaksi
@@ -733,7 +747,7 @@ export default function HaloJurnalLaporanDetailPage() {
       isUserIdMatch ||
       isEmailMatch ||
       isPhoneMatch ||
-      (isLocalAuthor && !reportPhone && !reportEmail)
+      isLocalAuthor
     )
   )
   const isAdmin = Boolean(user && (user.role === 'admin' || user.email?.toLowerCase().includes('admin')))

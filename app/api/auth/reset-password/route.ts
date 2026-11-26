@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { hashPassword } from '@/lib/auth'
 import { sendResetPasswordOtp } from '@/lib/mail'
+import { sendWhatsAppOtp } from '@/lib/whatsapp'
 
 // In-Memory store untuk ketahanan OTP pemulihan kata sandi
 declare global {
@@ -15,6 +16,21 @@ if (!globalThis.__haloJurnalOtpStore) {
 
 const otpStore = globalThis.__haloJurnalOtpStore
 
+function normalizeIndonesianPhone(phone: string): { phone08: string; phone62: string; clean: string } {
+  const clean = phone.replace(/[^0-9]/g, '')
+  let phone08 = clean
+  let phone62 = clean
+  if (clean.startsWith('62')) {
+    phone08 = '0' + clean.substring(2)
+  } else if (clean.startsWith('0')) {
+    phone62 = '62' + clean.substring(1)
+  } else {
+    phone08 = '0' + clean
+    phone62 = '62' + clean
+  }
+  return { phone08, phone62, clean }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -26,9 +42,10 @@ export async function POST(request: NextRequest) {
     const isPhone = cleanPhone.length >= 10 && cleanPhone.length <= 14
     const isEmail = rawIdentifier.includes('@')
     const key = isPhone ? cleanPhone : rawIdentifier.toLowerCase()
+    const { phone08, phone62 } = normalizeIndonesianPhone(cleanPhone)
 
     // ==========================================
-    // 1. REQUEST OTP (Kirim OTP via WhatsApp / Nomor HP)
+    // 1. REQUEST OTP (Kirim OTP via WhatsApp)
     // ==========================================
     if (action === 'request-otp') {
       if (!isPhone && !isEmail) {
@@ -49,9 +66,12 @@ export async function POST(request: NextRequest) {
             OR: [
               ...(isPhone
                 ? [
+                    { phone: phone08 },
+                    { phone: phone62 },
                     { phone: cleanPhone },
                     { phone: rawIdentifier },
-                    { email: `${cleanPhone}@warga.jurnalwave.id` },
+                    { email: `${phone08}@warga.jurnalwave.id` },
+                    { email: `${phone62}@warga.jurnalwave.id` },
                   ]
                 : []),
               ...(isEmail ? [{ email: rawIdentifier.toLowerCase() }] : []),
@@ -65,8 +85,9 @@ export async function POST(request: NextRequest) {
       // Akun demo / fallback untuk kemudahan pengujian
       const isDemoCitizen =
         cleanPhone === '081234567890' ||
-        rawIdentifier.toLowerCase() === 'warga@jurnalwave.com' ||
-        rawIdentifier.toLowerCase() === 'ahmad.fauzi@gmail.com'
+        phone08 === '081234567890' ||
+        phone62 === '6281234567890' ||
+        rawIdentifier.toLowerCase() === 'demo'
 
       if (!user && !isDemoCitizen) {
         return NextResponse.json(
@@ -78,30 +99,46 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Generate 6 digit kode OTP
-      const otpCode = '123456' // Kode default demo & uji cepat
-      const expiresAtMs = Date.now() + 10 * 60 * 1000 // 10 menit
+      // Generate 6 digit kode OTP acak
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString()
+      const expiresAtMs = Date.now() + 15 * 60 * 1000 // 15 menit
       const expiresAtDate = new Date(expiresAtMs)
 
       // Simpan ke in-memory cache
       otpStore.set(key, { otp: otpCode, expiresAt: expiresAtMs })
+      if (isPhone) {
+        otpStore.set(phone08, { otp: otpCode, expiresAt: expiresAtMs })
+        otpStore.set(phone62, { otp: otpCode, expiresAt: expiresAtMs })
+      }
 
-      // Simpan ke tabel PostgreSQL jika skema tabel tersedia
+      // Simpan ke tabel PostgreSQL password_reset_otps
       try {
-        await prisma.$executeRawUnsafe(
-          `DELETE FROM password_reset_otps WHERE email = $1`,
-          key
-        )
-        const id = 'otp-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6)
-        await prisma.$executeRawUnsafe(
-          `INSERT INTO password_reset_otps (id, email, "otpCode", "expiresAt", "createdAt") VALUES ($1, $2, $3, $4, NOW())`,
-          id,
-          key,
-          otpCode,
-          expiresAtDate
-        )
+        await prisma.passwordResetOtp.deleteMany({
+          where: {
+            email: {
+              in: isPhone ? [phone08, phone62, key] : [key],
+            },
+          },
+        })
+        await prisma.passwordResetOtp.create({
+          data: {
+            email: isPhone ? phone08 : key,
+            otpCode,
+            expiresAt: expiresAtDate,
+          },
+        })
       } catch (dbErr) {
         console.warn('Pemberitahuan simpan OTP ke DB:', dbErr)
+      }
+
+      // Kirim via WhatsApp Gateway
+      let waSuccess = false
+      let waMessage = ''
+      if (isPhone) {
+        const recipientName = user?.fullName || 'Warga Sukabumi'
+        const waResult = await sendWhatsAppOtp(phone62, otpCode, recipientName)
+        waSuccess = waResult.success
+        waMessage = waResult.message
       }
 
       // Jika user punya email riil, kirimkan juga salinan email sebagai redundansi
@@ -113,13 +150,49 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      return NextResponse.json({
-        success: true,
-        message: isPhone
-          ? `Kode verifikasi OTP 6 digit berhasil dikirimkan ke WhatsApp nomor ${cleanPhone}.`
-          : `Kode verifikasi OTP 6 digit berhasil dikirimkan ke ${rawIdentifier}.`,
-        otpDemo: otpCode,
-      })
+      const isFonnteConfigured = Boolean(
+        process.env.FONNTE_TOKEN && process.env.FONNTE_TOKEN !== 'your_fonnte_token_here'
+      )
+
+      if (waSuccess) {
+        return NextResponse.json({
+          success: true,
+          message: `Kode verifikasi OTP 6 digit berhasil dikirimkan ke WhatsApp nomor ${phone08}.`,
+        })
+      }
+
+      if (isFonnteConfigured && !waSuccess) {
+        const isDisconnected = waMessage?.toLowerCase().includes('disconnect')
+        const errorMsg = isDisconnected
+          ? 'Perangkat WhatsApp Hallo Jurnal di Fonnte sedang terputus (Disconnect). Silakan scan QR code di dashboard Fonnte agar WhatsApp dapat mengirim pesan.'
+          : (waMessage || 'Gagal mengirim pesan WhatsApp. Pastikan perangkat gateway aktif.')
+
+        return NextResponse.json(
+          {
+            success: false,
+            message: errorMsg,
+            otpDemo: process.env.NODE_ENV !== 'production' ? otpCode : undefined,
+          },
+          { status: 502 }
+        )
+      }
+
+      // Fallback ramah jika token WhatsApp gateway belum diatur atau dalam lingkungan dev
+      if (!isFonnteConfigured || process.env.NODE_ENV !== 'production') {
+        return NextResponse.json({
+          success: true,
+          message: `Kode verifikasi OTP telah dibuat untuk WhatsApp nomor ${phone08}.`,
+          otpDemo: otpCode,
+        })
+      }
+
+      return NextResponse.json(
+        {
+          success: false,
+          message: waMessage || 'Gagal mengirim kode verifikasi ke WhatsApp. Pastikan nomor aktif di WhatsApp.',
+        },
+        { status: 502 }
+      )
     }
 
     // ==========================================
@@ -138,7 +211,10 @@ export async function POST(request: NextRequest) {
       let isValid = false
 
       // Cek in-memory store atau bypass demo 123456
-      const cached = otpStore.get(key)
+      const cached =
+        otpStore.get(key) ||
+        (isPhone ? otpStore.get(phone08) || otpStore.get(phone62) : undefined)
+
       if (cached && cached.otp === otpCode && cached.expiresAt > Date.now()) {
         isValid = true
       } else if (otpCode === '123456') {
@@ -148,17 +224,18 @@ export async function POST(request: NextRequest) {
       // Cek database PostgreSQL jika di cache belum valid
       if (!isValid) {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const rows: any = await prisma.$queryRawUnsafe(
-            `SELECT * FROM password_reset_otps WHERE email = $1 AND "otpCode" = $2 AND "expiresAt" > NOW() LIMIT 1`,
-            key,
-            otpCode
-          )
-          if (Array.isArray(rows) && rows.length > 0) {
+          const dbOtp = await prisma.passwordResetOtp.findFirst({
+            where: {
+              email: { in: isPhone ? [phone08, phone62, key] : [key] },
+              otpCode: otpCode,
+              expiresAt: { gt: new Date() },
+            },
+          })
+          if (dbOtp) {
             isValid = true
           }
         } catch (err) {
-          console.warn('DB OTP lookup notice:', err)
+          console.warn('DB OTP lookup notice in verify-otp:', err)
         }
       }
 
@@ -166,10 +243,16 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             success: false,
-            message: 'Kode OTP tidak cocok atau sudah kadaluwarsa (melewati 10 menit).',
+            message: 'Kode OTP tidak cocok atau sudah kadaluwarsa (berlaku 15 menit).',
           },
           { status: 400 }
         )
+      }
+
+      // Tandai nomor ini telah terverifikasi untuk reset password
+      if (isPhone) {
+        otpStore.set(`verified_${phone08}`, { otp: 'VERIFIED', expiresAt: Date.now() + 15 * 60 * 1000 })
+        otpStore.set(`verified_${phone62}`, { otp: 'VERIFIED', expiresAt: Date.now() + 15 * 60 * 1000 })
       }
 
       return NextResponse.json({
@@ -201,27 +284,42 @@ export async function POST(request: NextRequest) {
 
       let isValid = false
 
-      // Validasi OTP
-      const cached = otpStore.get(key)
-      if (cached && cached.otp === otpCode && cached.expiresAt > Date.now()) {
+      // Cek apakah nomor sudah terverifikasi sebelumnya
+      const verifiedSession = isPhone
+        ? otpStore.get(`verified_${phone08}`) || otpStore.get(`verified_${phone62}`)
+        : undefined
+
+      if (verifiedSession && verifiedSession.otp === 'VERIFIED' && verifiedSession.expiresAt > Date.now()) {
         isValid = true
-      } else if (otpCode === '123456') {
-        isValid = true
+      }
+
+      // Validasi OTP langsung
+      if (!isValid) {
+        const cached =
+          otpStore.get(key) ||
+          (isPhone ? otpStore.get(phone08) || otpStore.get(phone62) : undefined)
+
+        if (cached && cached.otp === otpCode && cached.expiresAt > Date.now()) {
+          isValid = true
+        } else if (otpCode === '123456') {
+          isValid = true
+        }
       }
 
       if (!isValid) {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const rows: any = await prisma.$queryRawUnsafe(
-            `SELECT * FROM password_reset_otps WHERE email = $1 AND "otpCode" = $2 AND "expiresAt" > NOW() LIMIT 1`,
-            key,
-            otpCode
-          )
-          if (Array.isArray(rows) && rows.length > 0) {
+          const dbOtp = await prisma.passwordResetOtp.findFirst({
+            where: {
+              email: { in: isPhone ? [phone08, phone62, key] : [key] },
+              otpCode: otpCode,
+              expiresAt: { gt: new Date() },
+            },
+          })
+          if (dbOtp) {
             isValid = true
           }
         } catch (err) {
-          console.warn('DB OTP lookup notice:', err)
+          console.warn('DB OTP lookup notice in reset-password:', err)
         }
       }
 
@@ -245,9 +343,12 @@ export async function POST(request: NextRequest) {
             OR: [
               ...(isPhone
                 ? [
+                    { phone: phone08 },
+                    { phone: phone62 },
                     { phone: cleanPhone },
                     { phone: rawIdentifier },
-                    { email: `${cleanPhone}@warga.jurnalwave.id` },
+                    { email: `${phone08}@warga.jurnalwave.id` },
+                    { email: `${phone62}@warga.jurnalwave.id` },
                   ]
                 : []),
               ...(isEmail ? [{ email: rawIdentifier.toLowerCase() }] : []),
@@ -261,11 +362,18 @@ export async function POST(request: NextRequest) {
 
       // Hapus OTP yang sudah dipakai
       otpStore.delete(key)
+      if (isPhone) {
+        otpStore.delete(phone08)
+        otpStore.delete(phone62)
+        otpStore.delete(`verified_${phone08}`)
+        otpStore.delete(`verified_${phone62}`)
+      }
       try {
-        await prisma.$executeRawUnsafe(
-          `DELETE FROM password_reset_otps WHERE email = $1`,
-          key
-        )
+        await prisma.passwordResetOtp.deleteMany({
+          where: {
+            email: { in: isPhone ? [phone08, phone62, key] : [key] },
+          },
+        })
       } catch {}
 
       return NextResponse.json({
