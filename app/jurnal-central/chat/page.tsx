@@ -33,6 +33,29 @@ function ChatDeskContent() {
   const [mobilePane, setMobilePane] = useState<'inbox' | 'chat'>('inbox')
   const [activePhoto, setActivePhoto] = useState<string | null>(null)
   const chatScrollRef = useRef<HTMLDivElement>(null)
+  const seenAdminChatIdsRef = useRef<Set<string>>(new Set())
+  const hasInitializedAdminChatRef = useRef(false)
+
+  // Web Audio API notification chime untuk admin saat ada pesan masuk dari warga
+  const playNotificationChime = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
+      if (!AudioCtx) return
+      const ctx = new AudioCtx()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.type = 'sine'
+      // Dual tone ramah dan jelas untuk admin: F5 (698.46Hz) ke C6 (1046.5Hz)
+      osc.frequency.setValueAtTime(698.46, ctx.currentTime)
+      osc.frequency.setValueAtTime(1046.5, ctx.currentTime + 0.1)
+      gain.gain.setValueAtTime(0.15, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35)
+      osc.start()
+      osc.stop(ctx.currentTime + 0.35)
+    } catch {}
+  }
 
   // Map ringkasan pesan terakhir per tiket
   const [ticketMeta, setTicketMeta] = useState<
@@ -76,11 +99,45 @@ function ChatDeskContent() {
 
       // Kelompokkan chat DB berdasarkan nomor tiket
       const messagesByTicket: Record<string, any[]> = {}
+      let hasNewCitizenMessage = false
       dbAllMessages.forEach((m) => {
         const key = String(m.ticketNumber || '').toUpperCase()
         if (!messagesByTicket[key]) messagesByTicket[key] = []
         messagesByTicket[key].push(m)
+
+        const isCitizen =
+          m.role !== 'admin' &&
+          m.role !== 'redaksi' &&
+          m.sender_id !== 'admin-redaksi' &&
+          m.sender_id !== 'admin' &&
+          m.senderId !== 'admin-redaksi' &&
+          m.senderId !== 'admin' &&
+          m.profiles?.role !== 'admin' &&
+          m.profiles?.role !== 'redaksi' &&
+          !(m.sender_name && m.sender_name.toLowerCase().includes('redaksi'))
+
+        if (isCitizen && m.id) {
+          if (!seenAdminChatIdsRef.current.has(m.id)) {
+            if (hasInitializedAdminChatRef.current) {
+              hasNewCitizenMessage = true
+            }
+            seenAdminChatIdsRef.current.add(m.id)
+          }
+        }
       })
+
+      if (!hasInitializedAdminChatRef.current) {
+        hasInitializedAdminChatRef.current = true
+      } else if (hasNewCitizenMessage) {
+        playNotificationChime()
+        if (typeof document !== 'undefined') {
+          const originalTitle = document.title
+          document.title = '🔔 (Pesan Baru Warga!) ' + originalTitle.replace(/^🔔 \(.*?\)\s*/, '')
+          setTimeout(() => {
+            document.title = originalTitle.replace(/^🔔 \(.*?\)\s*/, '')
+          }, 4000)
+        }
+      }
 
       const readSet = new Set<string>(
         typeof window !== 'undefined'
@@ -186,39 +243,47 @@ function ChatDeskContent() {
       }
     } catch {}
 
-    let merged = dbMessages
+    let merged: any[] = []
     if (typeof window !== 'undefined') {
-      const local = JSON.parse(
-        localStorage.getItem(`halo_jurnal_chat_${targetId}`) ||
-        (targetTicket ? localStorage.getItem(`halo_jurnal_chat_${targetTicket}`) : null) ||
-        '[]'
-      )
-      if (dbMessages.length > 0) {
-        // Gabungkan lampiran berkas dari penyimpanan lokal jika API DB belum menyediakannya
-        merged = dbMessages.map((dbM) => {
-          if (!dbM.file_url && local.length > 0) {
-            const matched = local.find(
-              (loc: any) =>
-                loc.id === dbM.id ||
-                (loc.created_at === dbM.created_at && (loc.sender_id === dbM.sender_id || loc.message === dbM.message))
-            )
-            if (matched && matched.file_url) {
-              return {
-                ...dbM,
-                file_url: matched.file_url,
-                file_type: matched.file_type,
-              }
-            }
-          }
-          return dbM
-        })
-        localStorage.setItem(`halo_jurnal_chat_${targetId}`, JSON.stringify(merged))
-        if (targetTicket) {
-          localStorage.setItem(`halo_jurnal_chat_${targetTicket}`, JSON.stringify(merged))
+      let local: any[] = []
+      try {
+        local = JSON.parse(
+          localStorage.getItem(`halo_jurnal_chat_${targetId}`) ||
+          (targetTicket ? localStorage.getItem(`halo_jurnal_chat_${targetTicket}`) : null) ||
+          '[]'
+        )
+      } catch {}
+
+      const msgMap = new Map<string, any>()
+      // Tambahkan pesan lokal terlebih dahulu
+      local.forEach((m: any) => {
+        const key = m.id || `${m.created_at}_${m.message}`
+        msgMap.set(key, m)
+      })
+
+      // Tambahkan dan sinkronkan dengan database (authoritative)
+      dbMessages.forEach((dbM: any) => {
+        const key = dbM.id || `${dbM.created_at}_${dbM.message}`
+        const matched = msgMap.get(key) || Array.from(msgMap.values()).find(
+          (loc: any) => loc.created_at === dbM.created_at && (loc.sender_id === dbM.sender_id || loc.message === dbM.message)
+        )
+        if (matched && matched.file_url && !dbM.file_url) {
+          dbM.file_url = matched.file_url
+          dbM.file_type = matched.file_type
         }
-      } else {
-        merged = local
+        msgMap.set(key, dbM)
+      })
+
+      merged = Array.from(msgMap.values()).sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      )
+
+      localStorage.setItem(`halo_jurnal_chat_${targetId}`, JSON.stringify(merged))
+      if (targetTicket) {
+        localStorage.setItem(`halo_jurnal_chat_${targetTicket}`, JSON.stringify(merged))
       }
+    } else {
+      merged = dbMessages
     }
 
     setMessages(merged)
@@ -250,15 +315,31 @@ function ChatDeskContent() {
     window.addEventListener('storage', handleStorage)
     window.addEventListener('focus', handleStorage)
 
+    let broadcastChannel: BroadcastChannel | null = null
+    try {
+      broadcastChannel = new BroadcastChannel('jurnalwave_chat')
+      broadcastChannel.onmessage = (event) => {
+        if (event?.data?.type === 'chat_sent') {
+          loadActiveMessages()
+          scanAllTicketChats()
+        }
+      }
+    } catch {}
+
     const pollInterval = setInterval(() => {
       loadActiveMessages()
       scanAllTicketChats()
-    }, 3000)
+    }, 2000)
 
     return () => {
       clearInterval(pollInterval)
       window.removeEventListener('storage', handleStorage)
       window.removeEventListener('focus', handleStorage)
+      if (broadcastChannel) {
+        try {
+          broadcastChannel.close()
+        } catch {}
+      }
     }
   }, [selectedTicketId, reports])
 
@@ -321,6 +402,11 @@ function ChatDeskContent() {
             if (targetTicket) {
               localStorage.setItem(`halo_jurnal_chat_${targetTicket}`, JSON.stringify(next))
             }
+            try {
+              const bc = new BroadcastChannel('jurnalwave_chat')
+              bc.postMessage({ type: 'chat_sent', ticketNumber: targetTicket || targetId })
+              bc.close()
+            } catch {}
             window.dispatchEvent(new Event('storage'))
           }
           setIsSending(false)
@@ -355,6 +441,11 @@ function ChatDeskContent() {
         if (targetTicket) {
           localStorage.setItem(`halo_jurnal_chat_${targetTicket}`, JSON.stringify(next))
         }
+        try {
+          const bc = new BroadcastChannel('jurnalwave_chat')
+          bc.postMessage({ type: 'chat_sent', ticketNumber: targetTicket || targetId })
+          bc.close()
+        } catch {}
         window.dispatchEvent(new Event('storage'))
       } catch (err) {
         console.error('Error saving chat in desk:', err)

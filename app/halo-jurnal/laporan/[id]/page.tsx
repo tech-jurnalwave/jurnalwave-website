@@ -220,44 +220,51 @@ export default function HaloJurnalLaporanDetailPage() {
     }
 
     let finalMessages: any[] = []
-    if (dbMessages.length > 0) {
-      // Pertahankan file lampiran dari local cache jika DB belum memuatnya
-      finalMessages = dbMessages.map((dbM) => {
-        if (!dbM.file_url && local.length > 0) {
-          const matched = local.find(
-            (loc: any) =>
-              loc.id === dbM.id ||
-              (loc.created_at === dbM.created_at && (loc.sender_id === dbM.sender_id || loc.message === dbM.message))
-          )
-          if (matched && matched.file_url) {
-            return {
-              ...dbM,
-              file_url: matched.file_url,
-              file_type: matched.file_type,
-            }
-          }
-        }
-        return dbM
-      })
+    const messageMap = new Map<string, any>()
 
-      // Selalu sertakan pesan sambutan awal dari Redaksi di paling atas jika belum ada
-      const hasWelcome = finalMessages.some((m) => m.isSystem || (m.role === 'admin' && String(m.id || '').startsWith('sys-')))
-      if (!hasWelcome && report) {
-        finalMessages = [initialSystemMessage, ...finalMessages]
-      }
-    } else if (local.length > 0) {
-      finalMessages = local
-      const hasWelcome = finalMessages.some((m) => m.isSystem || (m.role === 'admin' && String(m.id || '').startsWith('sys-')))
-      if (!hasWelcome && report) {
-        finalMessages = [initialSystemMessage, ...finalMessages]
-      }
-    } else if (report) {
-      finalMessages = [initialSystemMessage]
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.setItem(`halo_jurnal_chat_${chatKey}`, JSON.stringify(finalMessages))
-        } catch {}
-      }
+    // Masukkan pesan lokal terlebih dahulu
+    if (Array.isArray(local)) {
+      local.forEach((m: any) => {
+        if (!m) return
+        const key = m.id || `${m.created_at}_${m.message}`
+        messageMap.set(key, m)
+      })
+    }
+
+    // Gabungkan dengan pesan dari database (authoritative)
+    if (Array.isArray(dbMessages)) {
+      dbMessages.forEach((dbM: any) => {
+        if (!dbM) return
+        const key = dbM.id || `${dbM.created_at}_${dbM.message}`
+        const matchedLocal = messageMap.get(key) || Array.from(messageMap.values()).find(
+          (loc: any) => loc.created_at === dbM.created_at && (loc.sender_id === dbM.sender_id || loc.message === dbM.message)
+        )
+        if (matchedLocal && matchedLocal.file_url && !dbM.file_url) {
+          dbM.file_url = matchedLocal.file_url
+          dbM.file_type = matchedLocal.file_type
+        }
+        messageMap.set(key, dbM)
+      })
+    }
+
+    finalMessages = Array.from(messageMap.values())
+
+    // Selalu sertakan pesan sambutan awal dari Redaksi di paling atas jika belum ada
+    const hasWelcome = finalMessages.some((m) => m.isSystem || (m.role === 'admin' && String(m.id || '').startsWith('sys-')))
+    if (!hasWelcome && report) {
+      finalMessages = [initialSystemMessage, ...finalMessages]
+    }
+
+    // Urutkan pesan berdasarkan kronologi waktu
+    finalMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+
+    if (typeof window !== 'undefined' && finalMessages.length > 0) {
+      try {
+        localStorage.setItem(`halo_jurnal_chat_${chatKey}`, JSON.stringify(finalMessages))
+        if (id && chatKey !== id) {
+          localStorage.setItem(`halo_jurnal_chat_${id}`, JSON.stringify(finalMessages))
+        }
+      } catch {}
     }
 
     // Periksa notifikasi suara saat ada pesan baru dari pihak redaksi / admin
@@ -286,12 +293,23 @@ export default function HaloJurnalLaporanDetailPage() {
     setMessages(finalMessages)
   }
 
-  // Polling chat otomatis setiap 5 detik agar percakapan dua arah selalu ter-update
+  // Polling chat otomatis setiap 2 detik dan realtime sinkronisasi BroadcastChannel
   useEffect(() => {
     fetchChatMessages()
+
+    let broadcastChannel: BroadcastChannel | null = null
+    try {
+      broadcastChannel = new BroadcastChannel('jurnalwave_chat')
+      broadcastChannel.onmessage = (event) => {
+        if (event?.data?.type === 'chat_sent') {
+          fetchChatMessages()
+        }
+      }
+    } catch {}
+
     const interval = setInterval(() => {
       fetchChatMessages()
-    }, 5000)
+    }, 2000)
 
     window.addEventListener('storage', fetchChatMessages)
     window.addEventListener('focus', fetchChatMessages)
@@ -299,6 +317,11 @@ export default function HaloJurnalLaporanDetailPage() {
       clearInterval(interval)
       window.removeEventListener('storage', fetchChatMessages)
       window.removeEventListener('focus', fetchChatMessages)
+      if (broadcastChannel) {
+        try {
+          broadcastChannel.close()
+        } catch {}
+      }
     }
   }, [id, report?.nomor_tiket, report?.ticketNumber])
 
@@ -499,6 +522,12 @@ export default function HaloJurnalLaporanDetailPage() {
             if (report?.nomor_tiket) {
               localStorage.setItem(`halo_jurnal_chat_${report.nomor_tiket}`, JSON.stringify(next))
             }
+            try {
+              const bc = new BroadcastChannel('jurnalwave_chat')
+              bc.postMessage({ type: 'chat_sent', ticketNumber: report?.nomor_tiket || id })
+              bc.close()
+            } catch {}
+            window.dispatchEvent(new Event('storage'))
           } catch {}
         }
         return next
