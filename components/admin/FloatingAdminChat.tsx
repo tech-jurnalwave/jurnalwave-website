@@ -101,6 +101,37 @@ export default function FloatingAdminChat() {
     }
   }, [reports, selectedTicketId])
 
+  // Listener event buka floating chat fullscreen dari halaman lain (misal tombol Buka Chat di detail aduan)
+  useEffect(() => {
+    const handleExternalOpen = (e: any) => {
+      const detail = e.detail || {}
+      if (detail.ticketNumber) {
+        setSelectedTicketId(detail.ticketNumber)
+        setMobilePane('chat')
+      }
+      setIsOpen(true)
+      setIsMaximized(detail.isMaximized !== false)
+    }
+
+    window.addEventListener('openFloatingAdminChat', handleExternalOpen as any)
+    return () => {
+      window.removeEventListener('openFloatingAdminChat', handleExternalOpen as any)
+    }
+  }, [])
+
+  // Cek parameter openChat / ticket di URL saat pertama kali halaman dimuat
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const urlParams = new URLSearchParams(window.location.search)
+    const openChatParam = urlParams.get('openChat') || urlParams.get('ticket')
+    if (openChatParam) {
+      setSelectedTicketId(openChatParam)
+      setMobilePane('chat')
+      setIsOpen(true)
+      setIsMaximized(true)
+    }
+  }, [])
+
   // Scan metadata percakapan dari seluruh tiket secara real-time dari database
   const scanAllTicketChats = async () => {
     try {
@@ -165,26 +196,93 @@ export default function FloatingAdminChat() {
           ? JSON.parse(localStorage.getItem('halo_jurnal_read_chats') || '[]')
           : []
       )
+      const readTicketTimes: Record<string, number> =
+        typeof window !== 'undefined'
+          ? JSON.parse(localStorage.getItem('halo_jurnal_read_ticket_times') || '{}')
+          : {}
+
       const newMeta: Record<string, any> = {}
 
       reports.forEach((rep) => {
         const keyId = rep.id
         const keyTicket = rep.nomor_tiket ? String(rep.nomor_tiket).toUpperCase() : null
 
-        // Ambil pesan dari DB
-        const dbList = (keyTicket && messagesByTicket[keyTicket]) || (keyId && messagesByTicket[String(keyId).toUpperCase()]) || []
+        // Ambil pesan dari DB (gabungkan keyTicket dan keyId jika ada)
+        const dbList = [
+          ...((keyTicket && messagesByTicket[keyTicket]) || []),
+          ...((keyId && messagesByTicket[String(keyId).toUpperCase()]) || []),
+        ]
 
         // Ambil pesan lokal jika ada
         let localList: any[] = []
         if (typeof window !== 'undefined') {
           const localId = localStorage.getItem(`halo_jurnal_chat_${keyId}`)
           const localTicket = rep.nomor_tiket ? localStorage.getItem(`halo_jurnal_chat_${rep.nomor_tiket}`) : null
+          const localTicketLower = rep.nomor_tiket ? localStorage.getItem(`halo_jurnal_chat_${rep.nomor_tiket.toLowerCase()}`) : null
           try {
-            localList = JSON.parse(localId || localTicket || '[]')
+            localList = JSON.parse(localId || localTicket || localTicketLower || '[]')
           } catch {}
         }
 
-        const combined = dbList.length > 0 ? dbList : localList
+        // Deduplikasi pesan gabungan DB & lokal
+        const itemMap = new Map<string, any>()
+        if (Array.isArray(localList)) {
+          localList.forEach((m: any) => {
+            if (!m) return
+            const k = m.id || `${m.created_at}_${m.message}`
+            itemMap.set(k, m)
+          })
+        }
+        if (Array.isArray(dbList)) {
+          dbList.forEach((m: any) => {
+            if (!m) return
+            let matchedKey: string | null = null
+            for (const [k, loc] of itemMap.entries()) {
+              if (loc.id === m.id) {
+                matchedKey = k
+                break
+              }
+              const sameText = (loc.message || '').trim() === (m.message || '').trim()
+              const timeDiff = Math.abs(new Date(loc.created_at).getTime() - new Date(m.created_at).getTime())
+              if (sameText && timeDiff < 15000) {
+                matchedKey = k
+                break
+              }
+            }
+            if (matchedKey) itemMap.delete(matchedKey)
+            const authoritativeKey = m.id || `${m.created_at}_${m.message}`
+            itemMap.set(authoritativeKey, m)
+          })
+        }
+        const combined = Array.from(itemMap.values())
+
+        const isCurrentlyActiveTicket =
+          isOpen &&
+          (mobilePane === 'chat' || (typeof window !== 'undefined' && window.innerWidth >= 640)) &&
+          (selectedTicketId === rep.id ||
+            selectedTicketId?.toLowerCase() === rep.nomor_tiket?.toLowerCase())
+
+        const latestMsgTime = combined.reduce((max: number, m: any) => {
+          const t = new Date(m.created_at).getTime()
+          return isNaN(t) ? max : Math.max(max, t)
+        }, 0)
+
+        if (isCurrentlyActiveTicket) {
+          const readBarrier = Math.max(Date.now(), latestMsgTime) + 60000
+          readTicketTimes[rep.id] = readBarrier
+          if (rep.nomor_tiket) {
+            readTicketTimes[rep.nomor_tiket] = readBarrier
+            readTicketTimes[rep.nomor_tiket.toLowerCase()] = readBarrier
+            readTicketTimes[rep.nomor_tiket.toUpperCase()] = readBarrier
+          }
+        }
+
+        const ticketReadTime = Math.max(
+          readTicketTimes[rep.id] || 0,
+          rep.nomor_tiket ? readTicketTimes[rep.nomor_tiket] || 0 : 0,
+          rep.nomor_tiket ? readTicketTimes[rep.nomor_tiket.toLowerCase()] || 0 : 0,
+          rep.nomor_tiket ? readTicketTimes[rep.nomor_tiket.toUpperCase()] || 0 : 0
+        )
 
         if (Array.isArray(combined) && combined.length > 0) {
           const sorted = [...combined].sort(
@@ -201,40 +299,70 @@ export default function FloatingAdminChat() {
             lastMsg.profiles?.role !== 'redaksi' &&
             !(lastMsg.sender_name && lastMsg.sender_name.toLowerCase().includes('redaksi'))
 
-          const unread = sorted.filter(
-            (m) =>
-              m.role !== 'admin' &&
-              m.role !== 'redaksi' &&
-              m.sender_id !== 'admin-redaksi' &&
-              m.sender_id !== 'dev-admin' &&
-              m.sender_id !== 'admin' &&
-              m.profiles?.role !== 'admin' &&
-              m.profiles?.role !== 'redaksi' &&
-              !(m.sender_name && m.sender_name.toLowerCase().includes('redaksi')) &&
-              !readSet.has(m.id)
-          ).length
+          if (isCurrentlyActiveTicket) {
+            sorted.forEach((m) => {
+              if (m.id) readSet.add(String(m.id))
+            })
+          }
 
+          const unread = isCurrentlyActiveTicket
+            ? 0
+            : sorted.filter((m) => {
+                const isCitizen =
+                  m.role !== 'admin' &&
+                  m.role !== 'redaksi' &&
+                  m.sender_id !== 'admin-redaksi' &&
+                  m.sender_id !== 'dev-admin' &&
+                  m.sender_id !== 'admin' &&
+                  m.profiles?.role !== 'admin' &&
+                  m.profiles?.role !== 'redaksi' &&
+                  !(m.sender_name && m.sender_name.toLowerCase().includes('redaksi'))
+                if (!isCitizen) return false
+
+                if (m.id && readSet.has(String(m.id))) return false
+
+                const msgTime = new Date(m.created_at).getTime()
+                if (ticketReadTime && msgTime <= ticketReadTime) return false
+
+                return true
+              }).length
+
+          const pelaporName = (rep as any).pelaporName || (rep as any).nama_pelapor || 'Warga'
           const metaPayload = {
-            lastMessage: lastMsg.message || 'Mengirim berkas lampiran',
+            lastMessage: lastMsg.message || `Halo ${pelaporName}, terima kasih telah berbagi informasi ini.`,
             lastTime: lastMsg.created_at,
             unreadCount: unread,
             isWaitingAdmin: isWargaLast,
             messageCount: sorted.length,
           }
           newMeta[rep.id] = metaPayload
-          if (rep.nomor_tiket) newMeta[rep.nomor_tiket] = metaPayload
+          if (rep.nomor_tiket) {
+            newMeta[rep.nomor_tiket] = metaPayload
+            newMeta[rep.nomor_tiket.toLowerCase()] = metaPayload
+            newMeta[rep.nomor_tiket.toUpperCase()] = metaPayload
+          }
         } else {
+          const pelaporName = (rep as any).pelaporName || (rep as any).nama_pelapor || 'Warga'
           const defaultMeta = {
-            lastMessage: 'Belum ada percakapan langsung',
+            lastMessage: `Halo ${pelaporName}, terima kasih telah berbagi informasi ini.`,
             lastTime: rep.created_at,
             unreadCount: 0,
             isWaitingAdmin: false,
             messageCount: 0,
           }
           newMeta[rep.id] = defaultMeta
-          if (rep.nomor_tiket) newMeta[rep.nomor_tiket] = defaultMeta
+          if (rep.nomor_tiket) {
+            newMeta[rep.nomor_tiket] = defaultMeta
+            newMeta[rep.nomor_tiket.toLowerCase()] = defaultMeta
+            newMeta[rep.nomor_tiket.toUpperCase()] = defaultMeta
+          }
         }
       })
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('halo_jurnal_read_chats', JSON.stringify(Array.from(readSet)))
+        localStorage.setItem('halo_jurnal_read_ticket_times', JSON.stringify(readTicketTimes))
+      }
 
       setTicketMeta(newMeta)
     } catch (err) {
@@ -327,21 +455,129 @@ export default function FloatingAdminChat() {
       merged = dbMessages
     }
 
-    setMessages(merged)
+    // Selalu sertakan pesan pembuka resmi redaksi di paling awal agar tidak hilang
+    const ticketNum = activeReport?.nomor_tiket || activeReport?.id || selectedTicketId
+    const pelapor = (activeReport as any)?.pelaporName || (activeReport as any)?.nama_pelapor || 'Warga'
+    const initialWelcomeMessage = {
+      id: `sys-${ticketNum}`,
+      isSystem: true,
+      role: 'admin',
+      sender_id: 'admin-redaksi',
+      sender_name: '🛡️ Redaksi Hallo Jurnal',
+      message: `Halo ${pelapor}, terima kasih telah berbagi informasi ini. Ruang obrolan ini dapat Anda gunakan untuk koordinasi langsung atau menambahkan keterangan tambahan jika diperlukan.`,
+      created_at: activeReport?.created_at || new Date().toISOString(),
+      profiles: {
+        full_name: '🛡️ Redaksi Hallo Jurnal',
+        role: 'admin',
+      },
+    }
 
-    // Tandai pesan sudah dibaca
-    if (typeof window !== 'undefined' && merged.length > 0) {
+    const hasWelcome = merged.some(
+      (m: any) => m.isSystem || (m.role === 'admin' && String(m.id || '').startsWith('sys-'))
+    )
+    const finalMerged = activeReport && !hasWelcome ? [initialWelcomeMessage, ...merged] : merged
+
+    setMessages(finalMerged)
+
+    // Tandai pesan tiket ini sudah dibaca dan simpan timestamp read
+    if (typeof window !== 'undefined') {
       try {
+        const latestMsgTime = finalMerged.reduce((max: number, m: any) => {
+          const t = new Date(m.created_at).getTime()
+          return isNaN(t) ? max : Math.max(max, t)
+        }, 0)
+        const readBarrier = Math.max(Date.now(), latestMsgTime) + 60000
+
+        const times: Record<string, number> = JSON.parse(
+          localStorage.getItem('halo_jurnal_read_ticket_times') || '{}'
+        )
+        times[targetId] = readBarrier
+        if (targetTicket) {
+          times[targetTicket] = readBarrier
+          times[targetTicket.toLowerCase()] = readBarrier
+          times[targetTicket.toUpperCase()] = readBarrier
+        }
+        localStorage.setItem('halo_jurnal_read_ticket_times', JSON.stringify(times))
+
         const readChats: string[] = JSON.parse(
           localStorage.getItem('halo_jurnal_read_chats') || '[]'
         )
         const readSet = new Set(readChats)
-        merged.forEach((m: any) => readSet.add(m.id))
+        finalMerged.forEach((m: any) => {
+          if (m.id) readSet.add(String(m.id))
+        })
         localStorage.setItem(
           'halo_jurnal_read_chats',
           JSON.stringify(Array.from(readSet))
         )
+
+        // Langsung nolkan unreadCount tiket terpilih
+        setTicketMeta((prev) => {
+          const updated = { ...prev }
+          if (updated[targetId]) updated[targetId] = { ...updated[targetId], unreadCount: 0 }
+          if (targetTicket) {
+            if (updated[targetTicket]) updated[targetTicket] = { ...updated[targetTicket], unreadCount: 0 }
+            if (updated[targetTicket.toLowerCase()]) updated[targetTicket.toLowerCase()] = { ...updated[targetTicket.toLowerCase()], unreadCount: 0 }
+            if (updated[targetTicket.toUpperCase()]) updated[targetTicket.toUpperCase()] = { ...updated[targetTicket.toUpperCase()], unreadCount: 0 }
+          }
+          return updated
+        })
+
+        window.dispatchEvent(new Event('storage'))
       } catch {}
+    }
+  }
+
+  // Fungsi Tandai Semua Sudah Dibaca (Mark All As Read)
+  const handleMarkAllAsRead = () => {
+    try {
+      const now = Date.now() + 86400000 // 24 jam buffer waktu untuk memastikan seluruh pesan terhitung sudah dibaca
+      const times: Record<string, number> = {}
+      reports.forEach((rep) => {
+        times[rep.id] = now
+        if (rep.nomor_tiket) {
+          times[rep.nomor_tiket] = now
+          times[rep.nomor_tiket.toLowerCase()] = now
+          times[rep.nomor_tiket.toUpperCase()] = now
+        }
+      })
+
+      const readChats: string[] = JSON.parse(
+        localStorage.getItem('halo_jurnal_read_chats') || '[]'
+      )
+      const readSet = new Set(readChats)
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i)
+        if (k && k.startsWith('halo_jurnal_chat_')) {
+          const ticketKey = k.replace('halo_jurnal_chat_', '')
+          times[ticketKey] = now
+          times[ticketKey.toLowerCase()] = now
+          times[ticketKey.toUpperCase()] = now
+          try {
+            const list = JSON.parse(localStorage.getItem(k) || '[]')
+            if (Array.isArray(list)) {
+              list.forEach((m: any) => {
+                if (m.id) readSet.add(String(m.id))
+              })
+            }
+          } catch {}
+        }
+      }
+      localStorage.setItem('halo_jurnal_read_ticket_times', JSON.stringify(times))
+      localStorage.setItem('halo_jurnal_read_chats', JSON.stringify(Array.from(readSet)))
+
+      setTicketMeta((prev) => {
+        const updated: Record<string, any> = {}
+        Object.keys(prev).forEach((k) => {
+          updated[k] = { ...prev[k], unreadCount: 0 }
+        })
+        return updated
+      })
+
+      window.dispatchEvent(new Event('storage'))
+      window.dispatchEvent(new CustomEvent('openFloatingAdminChat'))
+    } catch (err) {
+      console.error('Error mark all as read:', err)
     }
   }
 
@@ -528,11 +764,26 @@ export default function FloatingAdminChat() {
     (r) => r.id === selectedTicketId || r.nomor_tiket === selectedTicketId
   )
 
-  const calculatedUnread = useMemo(() => {
-    return Object.values(ticketMeta).reduce((acc: number, cur: any) => acc + (cur.unreadCount || 0), 0)
-  }, [ticketMeta])
+  const unreadTotal = useMemo(() => {
+    const countedTickets = new Set<string>()
+    let sum = 0
+    reports.forEach((rep) => {
+      const ticketKey = (rep.nomor_tiket || rep.id).toLowerCase()
+      if (countedTickets.has(ticketKey)) return
+      countedTickets.add(ticketKey)
 
-  const unreadTotal = counts.unreadChat || calculatedUnread || 0
+      const meta =
+        ticketMeta[rep.id] ||
+        (rep.nomor_tiket ? ticketMeta[rep.nomor_tiket] : null) ||
+        (rep.nomor_tiket ? ticketMeta[rep.nomor_tiket.toUpperCase()] : null) ||
+        (rep.nomor_tiket ? ticketMeta[rep.nomor_tiket.toLowerCase()] : null)
+
+      if (meta?.unreadCount && meta.unreadCount > 0) {
+        sum += meta.unreadCount
+      }
+    })
+    return sum
+  }, [reports, ticketMeta])
 
   return (
     <>
@@ -650,24 +901,37 @@ export default function FloatingAdminChat() {
                   />
                 </div>
 
-                <div className="flex items-center gap-1 text-[11px]">
-                  {[
-                    { key: 'semua', label: 'Semua' },
-                    { key: 'belum_dibalas', label: 'Perlu Balasan' },
-                    { key: 'sudah_respon', label: 'Direspons' },
-                  ].map((tab) => (
+                <div className="flex items-center justify-between gap-1 text-[11px]">
+                  <div className="flex items-center gap-1">
+                    {[
+                      { key: 'semua', label: 'Semua' },
+                      { key: 'belum_dibalas', label: 'Perlu Balasan' },
+                      { key: 'sudah_respon', label: 'Direspons' },
+                    ].map((tab) => (
+                      <button
+                        key={tab.key}
+                        onClick={() => setFilterType(tab.key as any)}
+                        className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition cursor-pointer ${
+                          filterType === tab.key
+                            ? 'bg-[#c00015] text-white shadow-2xs'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {unreadTotal > 0 && (
                     <button
-                      key={tab.key}
-                      onClick={() => setFilterType(tab.key as any)}
-                      className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition cursor-pointer ${
-                        filterType === tab.key
-                          ? 'bg-[#c00015] text-white shadow-2xs'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                      }`}
+                      type="button"
+                      onClick={handleMarkAllAsRead}
+                      className="text-[10px] text-slate-500 hover:text-[#c00015] font-semibold underline underline-offset-2 shrink-0 cursor-pointer"
+                      title="Tandai semua pesan warga sudah dibaca"
                     >
-                      {tab.label}
+                      Baca Semua
                     </button>
-                  ))}
+                  )}
                 </div>
               </div>
 
@@ -700,8 +964,35 @@ export default function FloatingAdminChat() {
                       <div
                         key={rep.id}
                         onClick={() => {
-                          setSelectedTicketId(rep.nomor_tiket || rep.id)
+                          const targetKey = rep.nomor_tiket || rep.id
+                          setSelectedTicketId(targetKey)
                           setMobilePane('chat')
+                          const now = Date.now() + 86400000
+                          try {
+                            const times: Record<string, number> = JSON.parse(
+                              localStorage.getItem('halo_jurnal_read_ticket_times') || '{}'
+                            )
+                            times[rep.id] = now
+                            if (rep.nomor_tiket) {
+                              times[rep.nomor_tiket] = now
+                              times[rep.nomor_tiket.toLowerCase()] = now
+                              times[rep.nomor_tiket.toUpperCase()] = now
+                            }
+                            localStorage.setItem('halo_jurnal_read_ticket_times', JSON.stringify(times))
+                          } catch {}
+
+                          setTicketMeta((prev) => ({
+                            ...prev,
+                            [rep.id]: { ...(prev[rep.id] || {}), unreadCount: 0 },
+                            ...(rep.nomor_tiket
+                              ? {
+                                  [rep.nomor_tiket]: { ...(prev[rep.nomor_tiket] || {}), unreadCount: 0 },
+                                  [rep.nomor_tiket.toLowerCase()]: { ...(prev[rep.nomor_tiket.toLowerCase()] || {}), unreadCount: 0 },
+                                  [rep.nomor_tiket.toUpperCase()]: { ...(prev[rep.nomor_tiket.toUpperCase()] || {}), unreadCount: 0 },
+                                }
+                              : {}),
+                          }))
+                          window.dispatchEvent(new Event('storage'))
                         }}
                         className={`p-2.5 transition cursor-pointer text-left relative ${
                           isSelected
@@ -809,6 +1100,32 @@ export default function FloatingAdminChat() {
                       </div>
                     ) : (
                       messages.map((msg) => {
+                        const isSystemGreeting =
+                          msg.isSystem || String(msg.id || '').startsWith('sys-')
+
+                        const timeStr = new Date(msg.created_at).toLocaleTimeString('id-ID', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+
+                        if (isSystemGreeting) {
+                          return (
+                            <div key={msg.id} className="flex flex-col items-center my-2">
+                              <div className="bg-amber-50/90 border border-amber-200/90 rounded-xl px-4 py-2.5 max-w-[92%] sm:max-w-[85%] shadow-2xs">
+                                <div className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-900 mb-1">
+                                  <span>🛡️ Pesan Pembuka Otomatis Redaksi</span>
+                                </div>
+                                <p className="text-xs text-amber-950/90 whitespace-pre-line leading-relaxed">
+                                  {msg.message}
+                                </p>
+                                <div className="text-[9px] text-amber-800/70 mt-1 select-none text-right">
+                                  {timeStr}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        }
+
                         const isAdmin =
                           msg.role === 'admin' ||
                           msg.role === 'redaksi' ||
@@ -819,11 +1136,6 @@ export default function FloatingAdminChat() {
                           msg.profiles?.role === 'redaksi' ||
                           msg.sender_name === 'Admin Redaksi' ||
                           (msg.sender_name && msg.sender_name.toLowerCase().includes('redaksi'))
-
-                        const timeStr = new Date(msg.created_at).toLocaleTimeString('id-ID', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })
 
                         return (
                           <div

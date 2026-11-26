@@ -63,6 +63,9 @@ export default function HaloJurnalLaporanDetailPage() {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
       if (!AudioCtx) return
       const ctx = new AudioCtx()
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {})
+      }
       const osc = ctx.createOscillator()
       const gain = ctx.createGain()
       osc.connect(gain)

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -214,6 +214,43 @@ export default function AdminDetailLaporanPage() {
       window.removeEventListener('focus', handleStorageChange)
     }
   }, [report?.id, report?.nomor_tiket, id])
+
+  const unreadCount = useMemo(() => {
+    if (typeof window === 'undefined' || !chatMessages.length) return 0
+    try {
+      const readSet = new Set<string>(
+        JSON.parse(localStorage.getItem('halo_jurnal_read_chats') || '[]')
+      )
+      const readTicketTimes: Record<string, number> = JSON.parse(
+        localStorage.getItem('halo_jurnal_read_ticket_times') || '{}'
+      )
+      const ticketKey = report?.nomor_tiket || id
+      const ticketReadTime = Math.max(
+        readTicketTimes[ticketKey] || 0,
+        readTicketTimes[ticketKey.toUpperCase()] || 0,
+        readTicketTimes[ticketKey.toLowerCase()] || 0,
+        readTicketTimes[id] || 0
+      )
+
+      return chatMessages.filter((m: any) => {
+        const isCitizen =
+          m.sender_id !== 'admin-redaksi' &&
+          m.sender_id !== 'admin' &&
+          m.profiles?.role !== 'admin' &&
+          m.profiles?.role !== 'redaksi' &&
+          m.role !== 'admin' &&
+          m.role !== 'redaksi' &&
+          !(m.sender_name && m.sender_name.toLowerCase().includes('redaksi'))
+        if (!isCitizen) return false
+        if (m.id && readSet.has(String(m.id))) return false
+        const msgTime = new Date(m.created_at).getTime()
+        if (ticketReadTime && msgTime <= ticketReadTime) return false
+        return true
+      }).length
+    } catch {
+      return 0
+    }
+  }, [chatMessages, report?.nomor_tiket, id])
 
   if (loading) {
     return (
@@ -722,19 +759,29 @@ export default function AdminDetailLaporanPage() {
                   </div>
 
                   <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
-                    <Link
-                      href={`/jurnal-central/chat?ticket=${report.nomor_tiket || report.id}`}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.dispatchEvent(
+                          new CustomEvent('openFloatingAdminChat', {
+                            detail: {
+                              ticketNumber: report.nomor_tiket || report.id,
+                              isMaximized: true,
+                            },
+                          })
+                        )
+                      }}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#c00015] hover:bg-[#a00012] text-white text-xs font-semibold transition shadow-2xs cursor-pointer shrink-0"
-                      title="Buka Ruang Obrolan Web Resmi Hallo Jurnal"
+                      title="Buka Ruang Obrolan Web Resmi Hallo Jurnal Fullscreen"
                     >
                       <MessageSquare className="w-3.5 h-3.5" />
                       <span>Buka Chat</span>
-                      {chatMessages.length > 0 && (
-                        <span className="ml-0.5 px-1.5 py-0.2 bg-black/20 text-white rounded text-[10px] font-bold">
-                          {chatMessages.length}
+                      {unreadCount > 0 && (
+                        <span className="ml-0.5 px-1.5 py-0.2 bg-white/25 text-white rounded text-[10px] font-bold">
+                          {unreadCount} baru
                         </span>
                       )}
-                    </Link>
+                    </button>
 
                     {/* Tombol Tangguhkan / Aktifkan Akun Pelapor */}
                     {(() => {

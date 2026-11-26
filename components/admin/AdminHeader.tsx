@@ -97,7 +97,7 @@ export default function AdminHeader({ onToggleSidebar }: AdminHeaderProps) {
       return { section: 'Hallo Jurnal', page: 'Buku Induk Pengaduan', sectionHref: '/jurnal-central/laporan' }
     }
     if (pathname === '/jurnal-central/chat') {
-      return { section: 'Hallo Jurnal', page: 'Pusat Chat Warga', sectionHref: '/jurnal-central/chat' }
+      return { section: 'Hallo Jurnal', page: 'Pusat Chat Warga', sectionHref: '/jurnal-central/laporan' }
     }
     if (pathname === '/jurnal-central/berita') {
       return { section: 'JurnalWave', page: 'Manajemen Konten', sectionHref: '/jurnal-central/berita' }

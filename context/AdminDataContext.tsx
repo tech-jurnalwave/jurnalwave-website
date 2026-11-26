@@ -84,35 +84,60 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
     articlesRef.current = articles
   }, [articles])
 
-  // 2. Fungsi Hitung Unread Chat dari localStorage
+  // 2. Fungsi Hitung Unread Chat dari localStorage (Deduplikasi unik per pesan ID & timestamp tiket)
   const calculateUnreadChats = useCallback(() => {
     if (typeof window === 'undefined') return 0
     try {
       const readSet = new Set<string>(
         JSON.parse(localStorage.getItem('halo_jurnal_read_chats') || '[]')
       )
-      let unread = 0
+      const readTicketTimes: Record<string, number> = JSON.parse(
+        localStorage.getItem('halo_jurnal_read_ticket_times') || '{}'
+      )
+
+      const countedUnreadIds = new Set<string>()
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i)
         if (k && k.startsWith('halo_jurnal_chat_')) {
+          const ticketOrIdKey = k.replace('halo_jurnal_chat_', '')
+          const ticketReadTime = Math.max(
+            readTicketTimes[ticketOrIdKey] || 0,
+            readTicketTimes[ticketOrIdKey.toUpperCase()] || 0,
+            readTicketTimes[ticketOrIdKey.toLowerCase()] || 0
+          )
+
           try {
             const list = JSON.parse(localStorage.getItem(k) || '[]')
             if (Array.isArray(list)) {
               list.forEach((m: any) => {
                 if (
+                  m &&
                   m.sender_id !== 'admin-redaksi' &&
+                  m.sender_id !== 'dev-admin' &&
+                  m.sender_id !== 'admin' &&
                   m.profiles?.role !== 'admin' &&
+                  m.profiles?.role !== 'redaksi' &&
                   m.role !== 'admin' &&
-                  !readSet.has(m.id)
+                  m.role !== 'redaksi' &&
+                  !(m.sender_name && m.sender_name.toLowerCase().includes('redaksi'))
                 ) {
-                  unread++
+                  const msgId = String(m.id || '')
+                  const msgTime = new Date(m.created_at).getTime()
+                  const isRead =
+                    (msgId && readSet.has(msgId)) ||
+                    (ticketReadTime && msgTime <= ticketReadTime)
+
+                  if (!isRead) {
+                    const uniqueKey = msgId || `${ticketOrIdKey}-${msgTime}-${m.message?.slice(0, 10)}`
+                    countedUnreadIds.add(uniqueKey)
+                  }
                 }
               })
             }
           } catch {}
         }
       }
-      return unread
+      return countedUnreadIds.size
     } catch {
       return 0
     }

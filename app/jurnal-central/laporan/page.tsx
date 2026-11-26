@@ -162,40 +162,72 @@ export default function AdminLaporanPage() {
     await refreshReports()
   }
 
-  // Scan jumlah pesan chat warga aktif
+  // Scan jumlah pesan chat warga aktif yang belum dibaca (Unread)
   useEffect(() => {
     const scanChats = () => {
       if (typeof window === 'undefined') return
-      const map: Record<string, number> = {}
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i)
-        if (key && key.startsWith('halo_jurnal_chat_')) {
-          try {
-            const list = JSON.parse(localStorage.getItem(key) || '[]')
-            if (Array.isArray(list) && list.length > 0) {
-              const wargaMsgs = list.filter(
-                (m: any) =>
-                  m.sender_id !== 'admin-redaksi' &&
-                  m.profiles?.role !== 'admin' &&
-                  m.role !== 'admin'
-              )
-              const idPart = key.replace('halo_jurnal_chat_', '')
-              if (wargaMsgs.length > 0) {
-                map[idPart] = wargaMsgs.length
+      try {
+        const readSet = new Set<string>(
+          JSON.parse(localStorage.getItem('halo_jurnal_read_chats') || '[]')
+        )
+        const readTicketTimes: Record<string, number> = JSON.parse(
+          localStorage.getItem('halo_jurnal_read_ticket_times') || '{}'
+        )
+
+        const map: Record<string, number> = {}
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key && key.startsWith('halo_jurnal_chat_')) {
+            const ticketKey = key.replace('halo_jurnal_chat_', '')
+            const ticketReadTime = Math.max(
+              readTicketTimes[ticketKey] || 0,
+              readTicketTimes[ticketKey.toUpperCase()] || 0,
+              readTicketTimes[ticketKey.toLowerCase()] || 0
+            )
+
+            try {
+              const list = JSON.parse(localStorage.getItem(key) || '[]')
+              if (Array.isArray(list) && list.length > 0) {
+                const unreadCitizenMsgs = list.filter((m: any) => {
+                  const isCitizen =
+                    m.sender_id !== 'admin-redaksi' &&
+                    m.sender_id !== 'admin' &&
+                    m.profiles?.role !== 'admin' &&
+                    m.profiles?.role !== 'redaksi' &&
+                    m.role !== 'admin' &&
+                    m.role !== 'redaksi' &&
+                    !(m.sender_name && m.sender_name.toLowerCase().includes('redaksi'))
+                  if (!isCitizen) return false
+
+                  if (m.id && readSet.has(String(m.id))) return false
+
+                  const msgTime = new Date(m.created_at).getTime()
+                  if (ticketReadTime && msgTime <= ticketReadTime) return false
+
+                  return true
+                })
+
+                if (unreadCitizenMsgs.length > 0) {
+                  map[ticketKey] = unreadCitizenMsgs.length
+                  map[ticketKey.toUpperCase()] = unreadCitizenMsgs.length
+                  map[ticketKey.toLowerCase()] = unreadCitizenMsgs.length
+                }
               }
-            }
-          } catch {}
+            } catch {}
+          }
         }
-      }
-      setChatCounts(map)
+        setChatCounts(map)
+      } catch {}
     }
 
     scanChats()
     window.addEventListener('storage', scanChats)
     window.addEventListener('focus', scanChats)
+    window.addEventListener('openFloatingAdminChat', scanChats)
     return () => {
       window.removeEventListener('storage', scanChats)
       window.removeEventListener('focus', scanChats)
+      window.removeEventListener('openFloatingAdminChat', scanChats)
     }
   }, [])
 
@@ -522,10 +554,10 @@ export default function AdminLaporanPage() {
                           </span>
                           {reportChatCount > 0 && (
                             <span
-                              className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#c00015]"
-                              title={`${reportChatCount} pesan dari warga di tiket ini`}
+                              className="inline-flex items-center gap-1 text-[10px] font-bold text-white bg-[#c00015] px-1.5 py-0.5 rounded-full shadow-2xs"
+                              title={`${reportChatCount} pesan baru dari warga di tiket ini`}
                             >
-                              <MessageSquare className="w-3 h-3 text-[#c00015]" />
+                              <MessageSquare className="w-2.5 h-2.5 text-white" />
                               <span>{reportChatCount}</span>
                             </span>
                           )}
@@ -584,13 +616,26 @@ export default function AdminLaporanPage() {
                       <td className="py-3 px-4 whitespace-nowrap text-center align-middle">
                         <div className="inline-flex items-center justify-center gap-1.5">
                           {/* Chat Warga */}
-                          <Link
-                            href={`/jurnal-central/chat?ticket=${report.nomor_tiket || report.id}`}
-                            className="p-1.5 rounded-md text-slate-400 hover:text-[#c00015] hover:bg-red-50 transition cursor-pointer"
-                            title="Buka Chat dengan Pelapor"
+                          <button
+                            type="button"
+                            onClick={() => {
+                              window.dispatchEvent(
+                                new CustomEvent('openFloatingAdminChat', {
+                                  detail: {
+                                    ticketNumber: report.nomor_tiket || report.id,
+                                    isMaximized: true,
+                                  },
+                                })
+                              )
+                            }}
+                            className="p-1.5 rounded-md text-slate-400 hover:text-[#c00015] hover:bg-red-50 transition cursor-pointer relative"
+                            title="Buka Chat Warga Fullscreen"
                           >
                             <MessageSquare className="w-3.5 h-3.5" />
-                          </Link>
+                            {reportChatCount > 0 && (
+                              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[#c00015] ring-2 ring-white" />
+                            )}
+                          </button>
 
                           {/* Buka Detail Aduan */}
                           <Link
