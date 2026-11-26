@@ -52,6 +52,7 @@ export default function HaloJurnalLaporanDetailPage() {
 
   const chatEndRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
+  const isNearBottomRef = useRef(true)
   const prevMessageCountRef = useRef(0)
   const hasLoadedReportRef = useRef(false)
   const seenChatIdsRef = useRef<Set<string>>(new Set())
@@ -79,6 +80,13 @@ export default function HaloJurnalLaporanDetailPage() {
       osc.start()
       osc.stop(ctx.currentTime + 0.35)
     } catch {}
+  }
+
+  // Deteksi posisi scroll agar tidak mengganggu warga saat membaca riwayat lama
+  const handleChatScroll = () => {
+    if (!chatContainerRef.current) return
+    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current
+    isNearBottomRef.current = scrollHeight - scrollTop - clientHeight < 100
   }
 
   // Menggulir hanya kontainer pesan di dalam kotak chat, BUKAN seluruh jendela browser
@@ -159,11 +167,13 @@ export default function HaloJurnalLaporanDetailPage() {
   }, [id])
 
   useEffect(() => {
-    // Hanya scroll ke dasar kontainer jika ada pesan baru bertambah (bukan setiap interval polling 5s)
+    // Hanya scroll ke dasar kontainer jika user memang sedang di dasar atau baru pertama kali buka
     if (messages.length > prevMessageCountRef.current) {
       const isInitial = prevMessageCountRef.current === 0
       prevMessageCountRef.current = messages.length
-      scrollToBottom(isInitial ? 'auto' : 'smooth')
+      if (isInitial || isNearBottomRef.current) {
+        scrollToBottom(isInitial ? 'auto' : 'smooth')
+      }
     }
   }, [messages, showChatSimulation])
 
@@ -315,7 +325,20 @@ export default function HaloJurnalLaporanDetailPage() {
       }
     }
 
-    setMessages(finalMessages)
+    setMessages((prev) => {
+      if (
+        prev.length === finalMessages.length &&
+        prev.every(
+          (m, idx) =>
+            m.id === finalMessages[idx]?.id &&
+            m.message === finalMessages[idx]?.message &&
+            m.created_at === finalMessages[idx]?.created_at
+        )
+      ) {
+        return prev
+      }
+      return finalMessages
+    })
   }
 
   // Polling chat otomatis setiap 1.5 detik dan realtime sinkronisasi BroadcastChannel
@@ -546,6 +569,9 @@ export default function HaloJurnalLaporanDetailPage() {
       }
       return next
     })
+
+    isNearBottomRef.current = true
+    setTimeout(() => scrollToBottom('smooth'), 50)
 
     // Kirim pesan ke API database di background
     try {
@@ -1225,7 +1251,7 @@ export default function HaloJurnalLaporanDetailPage() {
                 </p>
               </div>
                 {/* Message Thread (HANYA DITAMPILKAN JIKA PEMILIK LAPORAN ATAU ADMIN) */}
-                <div ref={chatContainerRef} className="space-y-4 max-h-[380px] overflow-y-auto pr-1 mb-4 no-scrollbar">
+                <div ref={chatContainerRef} onScroll={handleChatScroll} className="space-y-4 max-h-[380px] overflow-y-auto pr-1 mb-4 overscroll-contain [scrollbar-width:thin]">
                   {messages.length > 0 ? (
                     messages.map((msg) => {
                       const isRedaksi =

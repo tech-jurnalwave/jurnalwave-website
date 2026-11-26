@@ -30,6 +30,9 @@ export default function FloatingAdminChat() {
   const [mobilePane, setMobilePane] = useState<'inbox' | 'chat'>('inbox')
   const [activePhoto, setActivePhoto] = useState<string | null>(null)
   const chatScrollRef = useRef<HTMLDivElement>(null)
+  const isNearBottomRef = useRef(true)
+  const prevTicketIdRef = useRef<string>('')
+  const prevMessagesLengthRef = useRef(0)
   const seenAdminChatIdsRef = useRef<Set<string>>(new Set())
   const hasInitializedAdminChatRef = useRef(false)
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -477,7 +480,20 @@ export default function FloatingAdminChat() {
     )
     const finalMerged = activeReport && !hasWelcome ? [initialWelcomeMessage, ...merged] : merged
 
-    setMessages(finalMerged)
+    setMessages((prev) => {
+      if (
+        prev.length === finalMerged.length &&
+        prev.every(
+          (m, idx) =>
+            m.id === finalMerged[idx]?.id &&
+            m.message === finalMerged[idx]?.message &&
+            m.created_at === finalMerged[idx]?.created_at
+        )
+      ) {
+        return prev
+      }
+      return finalMerged
+    })
 
     // Tandai pesan tiket ini sudah dibaca dan simpan timestamp read
     if (typeof window !== 'undefined') {
@@ -629,12 +645,39 @@ export default function FloatingAdminChat() {
     }
   }, [isOpen, selectedTicketId, reports])
 
-  // Scroll otomatis ke percakapan terakhir
+  // Deteksi posisi scroll: apakah admin sedang membaca riwayat di atas atau sedang di posisi paling bawah
+  const handleChatScroll = () => {
+    if (!chatScrollRef.current) return
+    const { scrollTop, scrollHeight, clientHeight } = chatScrollRef.current
+    isNearBottomRef.current = scrollHeight - scrollTop - clientHeight < 100
+  }
+
+  // Scroll cerdas: hanya scroll ke dasar saat ganti tiket, kirim pesan, atau ada pesan baru dan admin memang sedang di dasar
   useEffect(() => {
-    if (isOpen && chatScrollRef.current) {
+    if (!isOpen || !chatScrollRef.current) return
+
+    const isTicketChanged = prevTicketIdRef.current !== selectedTicketId
+    const hasNewMessage = messages.length > prevMessagesLengthRef.current
+
+    if (isTicketChanged) {
+      prevTicketIdRef.current = selectedTicketId
+      prevMessagesLengthRef.current = messages.length
+      isNearBottomRef.current = true
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
+      return
     }
-  }, [messages, isOpen])
+
+    if (hasNewMessage) {
+      prevMessagesLengthRef.current = messages.length
+      // Hanya scroll jika admin memang sedang berada di dasar kontainer
+      if (isNearBottomRef.current) {
+        chatScrollRef.current.scrollTo({
+          top: chatScrollRef.current.scrollHeight,
+          behavior: 'smooth',
+        })
+      }
+    }
+  }, [messages, isOpen, selectedTicketId])
 
   // Kirim balasan redaksi
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -696,6 +739,12 @@ export default function FloatingAdminChat() {
             window.dispatchEvent(new Event('storage'))
           }
           setIsSending(false)
+          isNearBottomRef.current = true
+          setTimeout(() => {
+            if (chatScrollRef.current) {
+              chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
+            }
+          }, 30)
           return
         }
       }
@@ -739,6 +788,12 @@ export default function FloatingAdminChat() {
     }
 
     setIsSending(false)
+    isNearBottomRef.current = true
+    setTimeout(() => {
+      if (chatScrollRef.current) {
+        chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
+      }
+    }, 30)
   }
 
   // Filter daftar tiket warga di panel kiri
@@ -1089,7 +1144,8 @@ export default function FloatingAdminChat() {
                   {/* Area Balon Percakapan */}
                   <div
                     ref={chatScrollRef}
-                    className="flex-1 p-3.5 overflow-y-auto space-y-3 bg-[#fbf9f9] [scrollbar-width:thin]"
+                    onScroll={handleChatScroll}
+                    className="flex-1 p-3.5 overflow-y-auto space-y-3 bg-[#fbf9f9] [scrollbar-width:thin] overscroll-contain"
                   >
                     {messages.length === 0 ? (
                       <div className="py-12 text-center text-xs text-slate-400 space-y-1">
