@@ -30,6 +30,55 @@ export default function FloatingAdminChat() {
   const [mobilePane, setMobilePane] = useState<'inbox' | 'chat'>('inbox')
   const [activePhoto, setActivePhoto] = useState<string | null>(null)
   const chatScrollRef = useRef<HTMLDivElement>(null)
+  const seenAdminChatIdsRef = useRef<Set<string>>(new Set())
+  const hasInitializedAdminChatRef = useRef(false)
+  const audioContextRef = useRef<AudioContext | null>(null)
+
+  // Buka izin Web Audio API saat pertama kali user melakukan interaksi di halaman admin
+  useEffect(() => {
+    const unlockAudio = () => {
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
+        if (!AudioCtx) return
+        if (!audioContextRef.current) {
+          audioContextRef.current = new AudioCtx()
+        }
+        if (audioContextRef.current.state === 'suspended') {
+          audioContextRef.current.resume()
+        }
+      } catch {}
+    }
+    window.addEventListener('click', unlockAudio, { once: true })
+    window.addEventListener('keydown', unlockAudio, { once: true })
+    return () => {
+      window.removeEventListener('click', unlockAudio)
+      window.removeEventListener('keydown', unlockAudio)
+    }
+  }, [])
+
+  // Suara lonceng/chime notifikasi saat ada warga mengirim pesan
+  const playNotificationChime = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
+      if (!AudioCtx) return
+      const ctx = audioContextRef.current || new AudioCtx()
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {})
+      }
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.type = 'sine'
+      // Dual-tone ramah & jelas: F5 (698.46Hz) ke C6 (1046.5Hz)
+      osc.frequency.setValueAtTime(698.46, ctx.currentTime)
+      osc.frequency.setValueAtTime(1046.5, ctx.currentTime + 0.1)
+      gain.gain.setValueAtTime(0.2, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4)
+      osc.start()
+      osc.stop(ctx.currentTime + 0.4)
+    } catch {}
+  }
 
   // Map ringkasan metadata per tiket (pesan terakhir, belum dibaca, status menunggu)
   const [ticketMeta, setTicketMeta] = useState<
@@ -52,31 +101,93 @@ export default function FloatingAdminChat() {
     }
   }, [reports, selectedTicketId])
 
-  // Scan metadata percakapan dari seluruh tiket
-  const scanAllTicketChats = () => {
-    if (typeof window === 'undefined') return
+  // Scan metadata percakapan dari seluruh tiket secara real-time dari database
+  const scanAllTicketChats = async () => {
     try {
+      let dbAllMessages: any[] = []
+      try {
+        const res = await fetch('/api/chat?all=true', { cache: 'no-store' })
+        if (res.ok) {
+          const json = await res.json()
+          if (json.success && Array.isArray(json.data)) {
+            dbAllMessages = json.data
+          }
+        }
+      } catch (apiErr) {
+        console.warn('Notice floating chat API scan error:', apiErr)
+      }
+
+      // Kelompokkan chat DB berdasarkan nomor tiket
+      const messagesByTicket: Record<string, any[]> = {}
+      let hasNewCitizenMessage = false
+
+      dbAllMessages.forEach((m) => {
+        const key = String(m.ticketNumber || '').toUpperCase()
+        if (!messagesByTicket[key]) messagesByTicket[key] = []
+        messagesByTicket[key].push(m)
+
+        const isCitizen =
+          m.role !== 'admin' &&
+          m.role !== 'redaksi' &&
+          m.sender_id !== 'admin-redaksi' &&
+          m.sender_id !== 'admin' &&
+          m.senderId !== 'admin-redaksi' &&
+          m.senderId !== 'admin' &&
+          m.profiles?.role !== 'admin' &&
+          m.profiles?.role !== 'redaksi' &&
+          !(m.sender_name && m.sender_name.toLowerCase().includes('redaksi'))
+
+        if (isCitizen && m.id) {
+          if (!seenAdminChatIdsRef.current.has(m.id)) {
+            if (hasInitializedAdminChatRef.current) {
+              hasNewCitizenMessage = true
+            }
+            seenAdminChatIdsRef.current.add(m.id)
+          }
+        }
+      })
+
+      if (!hasInitializedAdminChatRef.current) {
+        hasInitializedAdminChatRef.current = true
+      } else if (hasNewCitizenMessage) {
+        playNotificationChime()
+        if (typeof document !== 'undefined') {
+          const originalTitle = document.title
+          document.title = '🔔 (Pesan Baru Warga!) ' + originalTitle.replace(/^🔔 \(.*?\)\s*/, '')
+          setTimeout(() => {
+            document.title = originalTitle.replace(/^🔔 \(.*?\)\s*/, '')
+          }, 4000)
+        }
+      }
+
       const readSet = new Set<string>(
-        JSON.parse(localStorage.getItem('halo_jurnal_read_chats') || '[]')
+        typeof window !== 'undefined'
+          ? JSON.parse(localStorage.getItem('halo_jurnal_read_chats') || '[]')
+          : []
       )
       const newMeta: Record<string, any> = {}
 
       reports.forEach((rep) => {
         const keyId = rep.id
-        const keyTicket = rep.nomor_tiket
-        const localId = localStorage.getItem(`halo_jurnal_chat_${keyId}`)
-        const localTicket = keyTicket
-          ? localStorage.getItem(`halo_jurnal_chat_${keyTicket}`)
-          : null
-        const raw = localId || localTicket || '[]'
+        const keyTicket = rep.nomor_tiket ? String(rep.nomor_tiket).toUpperCase() : null
 
-        let chatList: any[] = []
-        try {
-          chatList = JSON.parse(raw)
-        } catch {}
+        // Ambil pesan dari DB
+        const dbList = (keyTicket && messagesByTicket[keyTicket]) || (keyId && messagesByTicket[String(keyId).toUpperCase()]) || []
 
-        if (Array.isArray(chatList) && chatList.length > 0) {
-          const sorted = [...chatList].sort(
+        // Ambil pesan lokal jika ada
+        let localList: any[] = []
+        if (typeof window !== 'undefined') {
+          const localId = localStorage.getItem(`halo_jurnal_chat_${keyId}`)
+          const localTicket = rep.nomor_tiket ? localStorage.getItem(`halo_jurnal_chat_${rep.nomor_tiket}`) : null
+          try {
+            localList = JSON.parse(localId || localTicket || '[]')
+          } catch {}
+        }
+
+        const combined = dbList.length > 0 ? dbList : localList
+
+        if (Array.isArray(combined) && combined.length > 0) {
+          const sorted = [...combined].sort(
             (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
           )
           const lastMsg = sorted[sorted.length - 1]
@@ -153,38 +264,67 @@ export default function FloatingAdminChat() {
       }
     } catch {}
 
-    let merged = dbMessages
+    let merged: any[] = []
     if (typeof window !== 'undefined') {
-      const local = JSON.parse(
-        localStorage.getItem(`halo_jurnal_chat_${targetId}`) ||
-        (targetTicket ? localStorage.getItem(`halo_jurnal_chat_${targetTicket}`) : null) ||
-        '[]'
-      )
-      if (dbMessages.length > 0) {
-        merged = dbMessages.map((dbM) => {
-          if (!dbM.file_url && local.length > 0) {
-            const matched = local.find(
-              (loc: any) =>
-                loc.id === dbM.id ||
-                (loc.created_at === dbM.created_at && (loc.sender_id === dbM.sender_id || loc.message === dbM.message))
-            )
-            if (matched && matched.file_url) {
-              return {
-                ...dbM,
-                file_url: matched.file_url,
-                file_type: matched.file_type,
-              }
-            }
+      let local: any[] = []
+      try {
+        local = JSON.parse(
+          localStorage.getItem(`halo_jurnal_chat_${targetId}`) ||
+          (targetTicket ? localStorage.getItem(`halo_jurnal_chat_${targetTicket}`) : null) ||
+          '[]'
+        )
+      } catch {}
+
+      const msgMap = new Map<string, any>()
+      local.forEach((m: any) => {
+        const key = m.id || `${m.created_at}_${m.message}`
+        msgMap.set(key, m)
+      })
+
+      dbMessages.forEach((dbM: any) => {
+        let matchedOldKey: string | null = null
+        for (const [k, loc] of msgMap.entries()) {
+          if (loc.id === dbM.id) {
+            matchedOldKey = k
+            break
           }
-          return dbM
-        })
-        localStorage.setItem(`halo_jurnal_chat_${targetId}`, JSON.stringify(merged))
-        if (targetTicket) {
-          localStorage.setItem(`halo_jurnal_chat_${targetTicket}`, JSON.stringify(merged))
+          const sameText = (loc.message || '').trim() === (dbM.message || '').trim()
+          const sameSender =
+            loc.sender_id === dbM.sender_id ||
+            loc.senderId === dbM.sender_id ||
+            loc.sender_name === dbM.sender_name
+          const timeDiff = Math.abs(
+            new Date(loc.created_at).getTime() - new Date(dbM.created_at).getTime()
+          )
+          if (sameText && sameSender && timeDiff < 15000) {
+            matchedOldKey = k
+            break
+          }
         }
-      } else {
-        merged = local
+
+        if (matchedOldKey) {
+          const matchedLocal = msgMap.get(matchedOldKey)
+          if (matchedLocal?.file_url && !dbM.file_url) {
+            dbM.file_url = matchedLocal.file_url
+            dbM.file_type = matchedLocal.file_type
+          }
+          msgMap.delete(matchedOldKey)
+        }
+
+        const authoritativeKey = dbM.id || `${dbM.created_at}_${dbM.message}`
+        msgMap.set(authoritativeKey, dbM)
+      })
+
+      merged = Array.from(msgMap.values()).sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      )
+
+      localStorage.setItem(`halo_jurnal_chat_${targetId}`, JSON.stringify(merged))
+      if (targetTicket) {
+        localStorage.setItem(`halo_jurnal_chat_${targetTicket}`, JSON.stringify(merged))
       }
+    } else {
+      merged = dbMessages
     }
 
     setMessages(merged)
@@ -205,28 +345,51 @@ export default function FloatingAdminChat() {
     }
   }
 
-  // Sinkronisasi realtime saat popup dibuka atau tiket berganti
+  // Sinkronisasi realtime global (selalu aktif di background agar notifikasi berbunyi meski popup ditutup)
   useEffect(() => {
-    if (!isOpen) return
     scanAllTicketChats()
-    loadActiveMessages()
-
-    const handleStorage = () => {
-      scanAllTicketChats()
+    if (isOpen) {
       loadActiveMessages()
     }
-    window.addEventListener('storage', handleStorage)
-    window.addEventListener('focus', handleStorage)
+
+    const handleSync = () => {
+      scanAllTicketChats()
+      if (isOpen) {
+        loadActiveMessages()
+      }
+    }
+    window.addEventListener('storage', handleSync)
+    window.addEventListener('focus', handleSync)
+
+    let broadcastChannel: BroadcastChannel | null = null
+    try {
+      broadcastChannel = new BroadcastChannel('jurnalwave_chat')
+      broadcastChannel.onmessage = (event) => {
+        if (event?.data?.type === 'chat_sent') {
+          scanAllTicketChats()
+          if (isOpen) {
+            loadActiveMessages()
+          }
+        }
+      }
+    } catch {}
 
     const pollInterval = setInterval(() => {
-      loadActiveMessages()
       scanAllTicketChats()
-    }, 4000)
+      if (isOpen) {
+        loadActiveMessages()
+      }
+    }, 1500)
 
     return () => {
       clearInterval(pollInterval)
-      window.removeEventListener('storage', handleStorage)
-      window.removeEventListener('focus', handleStorage)
+      window.removeEventListener('storage', handleSync)
+      window.removeEventListener('focus', handleSync)
+      if (broadcastChannel) {
+        try {
+          broadcastChannel.close()
+        } catch {}
+      }
     }
   }, [isOpen, selectedTicketId, reports])
 
@@ -289,6 +452,11 @@ export default function FloatingAdminChat() {
             if (targetTicket) {
               localStorage.setItem(`halo_jurnal_chat_${targetTicket}`, JSON.stringify(next))
             }
+            try {
+              const bc = new BroadcastChannel('jurnalwave_chat')
+              bc.postMessage({ type: 'chat_sent', ticketNumber: targetTicket || targetId })
+              bc.close()
+            } catch {}
             window.dispatchEvent(new Event('storage'))
           }
           setIsSending(false)
@@ -323,6 +491,11 @@ export default function FloatingAdminChat() {
         if (targetTicket) {
           localStorage.setItem(`halo_jurnal_chat_${targetTicket}`, JSON.stringify(next))
         }
+        try {
+          const bc = new BroadcastChannel('jurnalwave_chat')
+          bc.postMessage({ type: 'chat_sent', ticketNumber: targetTicket || targetId })
+          bc.close()
+        } catch {}
         window.dispatchEvent(new Event('storage'))
       } catch (err) {
         console.error('Error saving chat locally:', err)

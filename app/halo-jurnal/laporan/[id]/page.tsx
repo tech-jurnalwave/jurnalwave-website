@@ -235,15 +235,37 @@ export default function HaloJurnalLaporanDetailPage() {
     if (Array.isArray(dbMessages)) {
       dbMessages.forEach((dbM: any) => {
         if (!dbM) return
-        const key = dbM.id || `${dbM.created_at}_${dbM.message}`
-        const matchedLocal = messageMap.get(key) || Array.from(messageMap.values()).find(
-          (loc: any) => loc.created_at === dbM.created_at && (loc.sender_id === dbM.sender_id || loc.message === dbM.message)
-        )
-        if (matchedLocal && matchedLocal.file_url && !dbM.file_url) {
-          dbM.file_url = matchedLocal.file_url
-          dbM.file_type = matchedLocal.file_type
+        let matchedOldKey: string | null = null
+        for (const [k, loc] of messageMap.entries()) {
+          if (loc.id === dbM.id) {
+            matchedOldKey = k
+            break
+          }
+          const sameText = (loc.message || '').trim() === (dbM.message || '').trim()
+          const sameSender =
+            loc.sender_id === dbM.sender_id ||
+            loc.senderId === dbM.sender_id ||
+            loc.role === dbM.role
+          const timeDiff = Math.abs(
+            new Date(loc.created_at).getTime() - new Date(dbM.created_at).getTime()
+          )
+          if (sameText && sameSender && timeDiff < 15000) {
+            matchedOldKey = k
+            break
+          }
         }
-        messageMap.set(key, dbM)
+
+        if (matchedOldKey) {
+          const matchedLocal = messageMap.get(matchedOldKey)
+          if (matchedLocal?.file_url && !dbM.file_url) {
+            dbM.file_url = matchedLocal.file_url
+            dbM.file_type = matchedLocal.file_type
+          }
+          messageMap.delete(matchedOldKey)
+        }
+
+        const authoritativeKey = dbM.id || `${dbM.created_at}_${dbM.message}`
+        messageMap.set(authoritativeKey, dbM)
       })
     }
 
@@ -293,7 +315,7 @@ export default function HaloJurnalLaporanDetailPage() {
     setMessages(finalMessages)
   }
 
-  // Polling chat otomatis setiap 2 detik dan realtime sinkronisasi BroadcastChannel
+  // Polling chat otomatis setiap 1.5 detik dan realtime sinkronisasi BroadcastChannel
   useEffect(() => {
     fetchChatMessages()
 
@@ -309,7 +331,7 @@ export default function HaloJurnalLaporanDetailPage() {
 
     const interval = setInterval(() => {
       fetchChatMessages()
-    }, 2000)
+    }, 1500)
 
     window.addEventListener('storage', fetchChatMessages)
     window.addEventListener('focus', fetchChatMessages)
@@ -456,86 +478,121 @@ export default function HaloJurnalLaporanDetailPage() {
     }
 
     const textMsg = (chatMessage || '').trim()
-    if (!textMsg) return
+    if (!textMsg || isSendingChat) return
 
+    // Langsung bersihkan input teks untuk pengalaman mengetik instan (0ms)
+    setChatMessage('')
     setIsSendingChat(true)
-    try {
-      const ticketNum = report?.nomor_tiket || report?.ticket_number || report?.ticketNumber || id
-      const senderDisplayName = activeUser?.user_metadata?.full_name || activeUser?.full_name || 'Warga Pelapor'
 
-      // 1. Kirim pesan ke API database
-      try {
-        await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ticketNumber: ticketNum,
-            message: textMsg,
-            senderName: senderDisplayName,
-            senderId: activeUser?.id || 'warga',
-            role: 'warga',
-            fileUrl: null,
-            fileType: null,
-          }),
-        })
-      } catch (apiErr) {
-        console.warn('Gagal kirim chat ke database via API:', apiErr)
+    const ticketNum = report?.nomor_tiket || report?.ticket_number || report?.ticketNumber || id
+    const senderDisplayName = activeUser?.user_metadata?.full_name || activeUser?.full_name || 'Warga Pelapor'
+
+    const tempId = `temp-warga-${Date.now()}`
+    const sentMsg = {
+      id: tempId,
+      laporan_id: id,
+      sender_id: activeUser?.id || 'warga',
+      sender_name: senderDisplayName,
+      role: 'warga',
+      message: textMsg,
+      file_url: null,
+      file_type: null,
+      created_at: new Date().toISOString(),
+      profiles: {
+        full_name: senderDisplayName,
+        role: 'warga',
+      },
+    }
+
+    seenChatIdsRef.current.add(tempId)
+
+    // Tampilkan pesan secara instan (optimistic UI)
+    setMessages((prev) => {
+      const ticket = report?.nomor_tiket || report?.ticket_number || report?.ticketNumber || id
+      const pelapor = (report as any)?.pelaporName || (report as any)?.nama_pelapor || activeUser?.user_metadata?.full_name || 'Warga'
+      const initialSystemMessage = {
+        id: `sys-${ticket}`,
+        sender: 'Redaksi Hallo Jurnal',
+        sender_name: 'Redaksi Hallo Jurnal',
+        role: 'admin',
+        avatar: '/logo-jurnal-wave.webp',
+        message: `Halo ${pelapor}, terima kasih telah berbagi informasi ini. Ruang obrolan ini dapat Anda gunakan untuk koordinasi langsung atau menambahkan keterangan tambahan jika diperlukan.`,
+        created_at: report?.created_at || new Date().toISOString(),
+        timestamp: 'Baru saja',
+        isSystem: true,
       }
 
-      const sentMsg = {
-        id: `chat-warga-${Date.now()}`,
-        laporan_id: id,
-        sender_id: activeUser?.id || 'warga',
-        message: textMsg,
-        file_url: null,
-        file_type: null,
-        created_at: new Date().toISOString(),
-        profiles: {
-          full_name: senderDisplayName,
-          role: 'warga',
-        },
-      }
+      const hasWelcome = prev.some((m) => m.isSystem || (m.role === 'admin' && String(m.id || '').startsWith('sys-')))
+      const base = !hasWelcome && report ? [initialSystemMessage, ...prev] : prev
+      const next = [...base, sentMsg]
 
-      seenChatIdsRef.current.add(sentMsg.id)
-      setMessages((prev) => {
-        const ticket = report?.nomor_tiket || report?.ticket_number || report?.ticketNumber || id
-        const pelapor = (report as any)?.pelaporName || (report as any)?.nama_pelapor || activeUser?.user_metadata?.full_name || 'Warga'
-        const initialSystemMessage = {
-          id: `sys-${ticket}`,
-          sender: 'Redaksi Hallo Jurnal',
-          sender_name: 'Redaksi Hallo Jurnal',
-          role: 'admin',
-          avatar: '/logo-jurnal-wave.webp',
-          message: `Halo ${pelapor}, terima kasih telah berbagi informasi ini. Ruang obrolan ini dapat Anda gunakan untuk koordinasi langsung atau menambahkan keterangan tambahan jika diperlukan.`,
-          created_at: report?.created_at || new Date().toISOString(),
-          timestamp: 'Baru saja',
-          isSystem: true,
-        }
-
-        const hasWelcome = prev.some((m) => m.isSystem || (m.role === 'admin' && String(m.id || '').startsWith('sys-')))
-        const base = !hasWelcome && report ? [initialSystemMessage, ...prev] : prev
-        const next = [...base, sentMsg]
-
-        if (typeof window !== 'undefined') {
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(`halo_jurnal_chat_${id}`, JSON.stringify(next))
+          if (report?.nomor_tiket) {
+            localStorage.setItem(`halo_jurnal_chat_${report.nomor_tiket}`, JSON.stringify(next))
+          }
           try {
-            localStorage.setItem(`halo_jurnal_chat_${id}`, JSON.stringify(next))
-            if (report?.nomor_tiket) {
-              localStorage.setItem(`halo_jurnal_chat_${report.nomor_tiket}`, JSON.stringify(next))
-            }
-            try {
-              const bc = new BroadcastChannel('jurnalwave_chat')
-              bc.postMessage({ type: 'chat_sent', ticketNumber: report?.nomor_tiket || id })
-              bc.close()
-            } catch {}
-            window.dispatchEvent(new Event('storage'))
+            const bc = new BroadcastChannel('jurnalwave_chat')
+            bc.postMessage({ type: 'chat_sent', ticketNumber: report?.nomor_tiket || id })
+            bc.close()
           } catch {}
-        }
-        return next
+          window.dispatchEvent(new Event('storage'))
+        } catch {}
+      }
+      return next
+    })
+
+    // Kirim pesan ke API database di background
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticketNumber: ticketNum,
+          message: textMsg,
+          senderName: senderDisplayName,
+          senderId: activeUser?.id || 'warga',
+          role: 'warga',
+          fileUrl: null,
+          fileType: null,
+        }),
       })
 
-      setChatMessage('')
-    } catch (err) {
-      console.error('Send message error:', err)
+      if (res.ok) {
+        const json = await res.json()
+        if (json.success && json.data) {
+          const realMsg = {
+            id: json.data.id,
+            ticketNumber: json.data.ticketNumber,
+            sender_id: json.data.sender_id || activeUser?.id || 'warga',
+            sender_name: json.data.sender_name || senderDisplayName,
+            role: 'warga',
+            message: json.data.message || textMsg,
+            created_at: json.data.created_at || sentMsg.created_at,
+            profiles: {
+              full_name: json.data.sender_name || senderDisplayName,
+              role: 'warga',
+            },
+          }
+          seenChatIdsRef.current.add(realMsg.id)
+
+          setMessages((prev) => {
+            const updated = prev.map((m) => (m.id === tempId ? realMsg : m))
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.setItem(`halo_jurnal_chat_${id}`, JSON.stringify(updated))
+                if (report?.nomor_tiket) {
+                  localStorage.setItem(`halo_jurnal_chat_${report.nomor_tiket}`, JSON.stringify(updated))
+                }
+              } catch {}
+            }
+            return updated
+          })
+        }
+      }
+    } catch (apiErr) {
+      console.warn('Gagal kirim chat ke database via API:', apiErr)
     } finally {
       setIsSendingChat(false)
     }

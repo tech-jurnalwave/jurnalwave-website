@@ -263,15 +263,37 @@ function ChatDeskContent() {
 
       // Tambahkan dan sinkronkan dengan database (authoritative)
       dbMessages.forEach((dbM: any) => {
-        const key = dbM.id || `${dbM.created_at}_${dbM.message}`
-        const matched = msgMap.get(key) || Array.from(msgMap.values()).find(
-          (loc: any) => loc.created_at === dbM.created_at && (loc.sender_id === dbM.sender_id || loc.message === dbM.message)
-        )
-        if (matched && matched.file_url && !dbM.file_url) {
-          dbM.file_url = matched.file_url
-          dbM.file_type = matched.file_type
+        let matchedOldKey: string | null = null
+        for (const [k, loc] of msgMap.entries()) {
+          if (loc.id === dbM.id) {
+            matchedOldKey = k
+            break
+          }
+          const sameText = (loc.message || '').trim() === (dbM.message || '').trim()
+          const sameSender =
+            loc.sender_id === dbM.sender_id ||
+            loc.senderId === dbM.sender_id ||
+            loc.sender_name === dbM.sender_name
+          const timeDiff = Math.abs(
+            new Date(loc.created_at).getTime() - new Date(dbM.created_at).getTime()
+          )
+          if (sameText && sameSender && timeDiff < 15000) {
+            matchedOldKey = k
+            break
+          }
         }
-        msgMap.set(key, dbM)
+
+        if (matchedOldKey) {
+          const matchedLocal = msgMap.get(matchedOldKey)
+          if (matchedLocal?.file_url && !dbM.file_url) {
+            dbM.file_url = matchedLocal.file_url
+            dbM.file_type = matchedLocal.file_type
+          }
+          msgMap.delete(matchedOldKey)
+        }
+
+        const authoritativeKey = dbM.id || `${dbM.created_at}_${dbM.message}`
+        msgMap.set(authoritativeKey, dbM)
       })
 
       merged = Array.from(msgMap.values()).sort(
@@ -329,7 +351,7 @@ function ChatDeskContent() {
     const pollInterval = setInterval(() => {
       loadActiveMessages()
       scanAllTicketChats()
-    }, 2000)
+    }, 1500)
 
     return () => {
       clearInterval(pollInterval)
