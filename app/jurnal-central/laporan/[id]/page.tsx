@@ -120,10 +120,14 @@ export default function AdminDetailLaporanPage() {
 
           if (savedOverride?.acc_status) {
             initialAcc = savedOverride.acc_status
-          } else if (found.is_public === true || (found as any).visibilitas === 'publik') {
-            initialAcc = 'publik'
+          } else if (savedOverride?.is_public !== undefined) {
+            initialAcc = savedOverride.is_public ? 'publik' : 'privat'
+          } else if ((found as any).acc_status) {
+            initialAcc = (found as any).acc_status
           } else if (found.status === 'diterima') {
             initialAcc = 'menunggu_acc'
+          } else if (found.is_public === true || (found as any).visibilitas === 'publik') {
+            initialAcc = 'publik'
           } else {
             initialAcc = 'privat'
           }
@@ -1000,6 +1004,18 @@ export default function AdminDetailLaporanPage() {
                   <span className="w-2 h-2 rounded-full bg-slate-800" />
                 )}
               </button>
+
+              {/* Opsi 3: Kembalikan ke Menunggu ACC */}
+              {accStatus !== 'menunggu_acc' && (
+                <button
+                  type="button"
+                  onClick={() => handleUpdateAccStatus('menunggu_acc')}
+                  className="w-full text-left px-3.5 py-2 rounded-lg border border-dashed border-amber-300 bg-amber-50/50 hover:bg-amber-100/60 text-amber-900 transition cursor-pointer flex items-center justify-between text-xs font-semibold"
+                >
+                  <span>Kembalikan ke Menunggu ACC</span>
+                  <span className="text-[10px] text-amber-700 font-normal">Reset</span>
+                </button>
+              )}
             </div>
 
             {/* Ringkasan Metadata Aduan */}

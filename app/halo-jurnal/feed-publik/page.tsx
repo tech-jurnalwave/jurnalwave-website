@@ -159,8 +159,13 @@ function FeedPublikContent() {
         }
       }
 
-      // Hanya tampilkan laporan yang dibuka untuk publik (is_public !== false)
-      let filtered = baseReports.filter((r) => r.is_public !== false)
+      // Hanya tampilkan laporan yang dibuka untuk publik dan sudah di-ACC admin (bukan menunggu_acc)
+      let filtered = baseReports.filter((r) => {
+        if (r.is_public === false || (r as any).isPublic === false) return false
+        if (r.acc_status === 'privat' || r.acc_status === 'menunggu_acc') return false
+        if (r.status === 'diterima' && r.acc_status !== 'publik') return false
+        return true
+      })
 
       // Filter Pencarian kata kunci judul atau deskripsi
       if (searchQuery.trim()) {

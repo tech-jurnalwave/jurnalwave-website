@@ -226,7 +226,9 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
         return {
           ...r,
           status: saved.status || r.status,
+          acc_status: saved.acc_status || (r as any).acc_status,
           is_public: saved.is_public !== undefined ? saved.is_public : r.is_public,
+          isPublic: saved.is_public !== undefined ? saved.is_public : r.isPublic,
         }
       }
       return r

@@ -384,6 +384,7 @@ export default function HaloJurnalLaporanDetailPage() {
           found = {
             ...found,
             status: saved.status || found.status,
+            acc_status: saved.acc_status || found.acc_status,
             is_public: saved.is_public !== undefined ? saved.is_public : found.is_public,
             status_log: saved.status_log || found.status_log,
           }
@@ -897,26 +898,45 @@ export default function HaloJurnalLaporanDetailPage() {
         </div>
       )}
 
-      {/* Banner Peringatan Laporan Privat / Disembunyikan */}
+      {/* Banner Status Peninjauan (Menunggu ACC vs Privat) */}
       {report.is_public === false && (
-        <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-slate-900 text-white border border-slate-800 flex items-start gap-3.5 shadow-md">
-          <Lock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-bold text-xs uppercase tracking-wider text-amber-400">
-                Laporan Bersifat Privat / Rahasia
-              </span>
-              <span className="text-[10px] font-semibold bg-white/10 px-2 py-0.5 rounded text-slate-300">
-                Disembunyikan dari Feed Publik
-              </span>
+        (report.acc_status === 'menunggu_acc' || (!report.acc_status && report.status === 'diterima')) ? (
+          <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-amber-950 text-white border border-amber-800 flex items-start gap-3.5 shadow-md">
+            <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-bold text-xs uppercase tracking-wider text-amber-400">
+                  Menunggu ACC Redaksi
+                </span>
+                <span className="text-[10px] font-semibold bg-white/10 px-2 py-0.5 rounded text-amber-200">
+                  Dalam Antrean Verifikasi
+                </span>
+              </div>
+              <p className="text-xs text-amber-100/90 leading-relaxed">
+                Laporan Anda dengan tiket <code className="text-amber-300 font-mono font-bold">#{ticketDisplayId}</code> telah berhasil diterima sistem dan sedang dalam antrean verifikasi oleh Tim Redaksi Hallo Jurnal sebelum diputuskan status hak tayangnya (Publik / Privat).
+              </p>
             </div>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Laporan ini disembunyikan dari Feed Publik warga oleh Redaksi Hallo Jurnal. Hanya pemilik nomor tiket{' '}
-              <code className="text-amber-300 font-mono font-bold">{ticketDisplayId}</code> dan admin redaksi yang
-              dapat memantau penanganan ini. Dukungan publik dinonaktifkan.
-            </p>
           </div>
-        </div>
+        ) : (
+          <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-slate-900 text-white border border-slate-800 flex items-start gap-3.5 shadow-md">
+            <Lock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-bold text-xs uppercase tracking-wider text-amber-400">
+                  Laporan Bersifat Privat / Rahasia
+                </span>
+                <span className="text-[10px] font-semibold bg-white/10 px-2 py-0.5 rounded text-slate-300">
+                  Disembunyikan dari Feed Publik
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Laporan ini disimpan sebagai aduan privat internal oleh Redaksi Hallo Jurnal. Hanya pemilik nomor tiket{' '}
+                <code className="text-amber-300 font-mono font-bold">#{ticketDisplayId}</code> dan admin redaksi yang
+                dapat memantau penanganan ini. Dukungan publik dinonaktifkan.
+              </p>
+            </div>
+          </div>
+        )
       )}
 
       {/* Mobile View Switcher (Detail vs Chat) - Hanya tampil jika Pemilik Laporan / Admin */}
@@ -1073,9 +1093,24 @@ export default function HaloJurnalLaporanDetailPage() {
 
               {report.is_public === false && (
                 <div>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-medium border border-slate-200/80 dark:border-slate-700">
-                    <Lock className="w-3.5 h-3.5" />
-                    <span>Privat</span>
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${
+                      report.acc_status === 'menunggu_acc' || (!report.acc_status && report.status === 'diterima')
+                        ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200/80 dark:border-slate-700'
+                    }`}
+                  >
+                    {report.acc_status === 'menunggu_acc' || (!report.acc_status && report.status === 'diterima') ? (
+                      <>
+                        <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                        <span>Menunggu ACC</span>
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>Privat</span>
+                      </>
+                    )}
                   </span>
                 </div>
               )}

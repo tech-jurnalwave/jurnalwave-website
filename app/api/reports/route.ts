@@ -311,7 +311,7 @@ export async function POST(request: NextRequest) {
         pelaporPhone: data.pelaporPhone || null,
         pelaporEmail: data.pelaporEmail || null,
         status: 'diterima',
-        isPublic: data.isPublic !== undefined ? Boolean(data.isPublic) : true,
+        isPublic: data.isPublic !== undefined ? Boolean(data.isPublic) : false,
         attachments: {
           create: attachmentItems.map((att) => ({
             fileUrl: att.fileUrl,
@@ -322,7 +322,7 @@ export async function POST(request: NextRequest) {
           create: [
             {
               status: 'diterima',
-              note: 'Laporan baru diterima oleh sistem Hallo Jurnal (Menunggu Review Redaksi)',
+              note: 'Laporan baru diterima oleh sistem Hallo Jurnal (Menunggu ACC Redaksi)',
             },
           ],
         },

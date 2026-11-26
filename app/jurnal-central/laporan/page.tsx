@@ -61,6 +61,7 @@ export default function AdminLaporanPage() {
       const targetKey = r.id || r.nomor_tiket
       const override = localOverrides[r.id] || (r.nomor_tiket ? localOverrides[r.nomor_tiket] : null)
 
+      // 1. Keputusan ACC eksplisit dari admin selalu jadi prioritas tertinggi
       if (override?.acc_status) {
         return override.acc_status
       }
@@ -73,13 +74,12 @@ export default function AdminLaporanPage() {
         return (r as any).acc_status
       }
 
-      // Default data bawaan:
-      // Jika statusnya 'diterima' dan belum ada keputusan ACC eksplisit -> 'menunggu_acc'
-      if (r.status === 'diterima' && r.is_public !== true) {
+      // 2. Setiap laporan yang baru masuk dari warga (status masih 'diterima') WAJIB masuk antrean 'menunggu_acc'
+      if (r.status === 'diterima') {
         return 'menunggu_acc'
       }
 
-      // Jika laporan berstatus publik -> 'publik'
+      // 3. Jika status laporan sudah diproses/selesai dan diatur publik -> 'publik'
       if (r.is_public === true || (r as any).visibilitas === 'publik') {
         return 'publik'
       }
@@ -594,11 +594,7 @@ export default function AdminLaporanPage() {
                               : 'bg-slate-100 text-slate-700 border-slate-200'
                           }`}
                         >
-                          {status === 'menunggu_acc' && (
-                            <option value="menunggu_acc" disabled>
-                              Menunggu ACC
-                            </option>
-                          )}
+                          <option value="menunggu_acc">Menunggu ACC</option>
                           <option value="publik">Tayang Publik</option>
                           <option value="privat">Privat</option>
                         </select>
