@@ -932,69 +932,73 @@ export default function HaloJurnalLaporanDetailPage() {
         </button>
       </div>
 
-      {/* Banner Sukses Kirim Laporan */}
-      {showSuccessBanner && (
+      {/* Banner Notifikasi & Status Peninjauan (Cukup SATU Banner Terpadu) */}
+      {showSuccessBanner ? (
         <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-950 dark:text-emerald-100 flex items-start justify-between gap-3 shadow-xs">
           <div className="flex items-start gap-3">
             <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-bold text-sm text-emerald-900 dark:text-emerald-200">
-                Laporan Berhasil Diterima oleh Redaksi!
-              </p>
-              <p className="text-xs text-emerald-800 dark:text-emerald-300 mt-1 leading-relaxed">
-                Nomor Tiket Anda: <span className="font-mono font-bold text-emerald-900 dark:text-emerald-200">#{ticketDisplayId}</span>. Tim redaksi telah menerima laporan Anda dan membuka ruang obrolan langsung di samping untuk koordinasi verifikasi fakta.
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-bold text-sm text-emerald-900 dark:text-emerald-200">
+                  Laporan Berhasil Diterima oleh Redaksi!
+                </p>
+                <span className="text-[10px] font-semibold bg-emerald-600/15 dark:bg-emerald-400/20 text-emerald-800 dark:text-emerald-200 px-2 py-0.5 rounded">
+                  Menunggu ACC Redaksi
+                </span>
+              </div>
+              <p className="text-xs text-emerald-800 dark:text-emerald-300 leading-relaxed">
+                Nomor Tiket: <span className="font-mono font-bold text-emerald-900 dark:text-emerald-200">#{ticketDisplayId}</span>. Laporan Anda sedang dalam antrean verifikasi oleh Tim Redaksi Hallo Jurnal sebelum diputuskan status hak tayangnya (Publik / Privat). Ruang obrolan langsung di samping telah dibuka untuk koordinasi verifikasi.
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={() => setShowSuccessBanner(false)}
-            className="text-emerald-700 hover:text-emerald-900 dark:text-emerald-400 p-1 cursor-pointer font-bold"
+            className="text-emerald-700 hover:text-emerald-900 dark:text-emerald-400 p-1 cursor-pointer font-bold shrink-0"
             title="Tutup banner"
           >
             ✕
           </button>
         </div>
-      )}
-
-      {/* Banner Status Peninjauan (Menunggu ACC vs Privat) */}
-      {report.is_public === false && (
-        (report.acc_status === 'menunggu_acc' || (!report.acc_status && report.status === 'diterima')) ? (
-          <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-amber-950 text-white border border-amber-800 flex items-start gap-3.5 shadow-md">
-            <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-bold text-xs uppercase tracking-wider text-amber-400">
-                  Menunggu ACC Redaksi
-                </span>
-                <span className="text-[10px] font-semibold bg-white/10 px-2 py-0.5 rounded text-amber-200">
-                  Dalam Antrean Verifikasi
-                </span>
+      ) : (
+        report.is_public === false && (
+          (report.acc_status === 'menunggu_acc' || (!report.acc_status && report.status === 'diterima')) ? (
+            <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-amber-950 text-white border border-amber-800 flex items-start gap-3.5 shadow-md">
+              <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-bold text-xs uppercase tracking-wider text-amber-400">
+                    Menunggu ACC Redaksi
+                  </span>
+                  <span className="text-[10px] font-semibold bg-white/10 px-2 py-0.5 rounded text-amber-200">
+                    Dalam Antrean Verifikasi
+                  </span>
+                </div>
+                <p className="text-xs text-amber-100/90 leading-relaxed">
+                  Laporan Anda dengan tiket <code className="text-amber-300 font-mono font-bold">#{ticketDisplayId}</code> telah berhasil diterima sistem dan sedang dalam antrean verifikasi oleh Tim Redaksi Hallo Jurnal sebelum diputuskan status hak tayangnya (Publik / Privat).
+                </p>
               </div>
-              <p className="text-xs text-amber-100/90 leading-relaxed">
-                Laporan Anda dengan tiket <code className="text-amber-300 font-mono font-bold">#{ticketDisplayId}</code> telah berhasil diterima sistem dan sedang dalam antrean verifikasi oleh Tim Redaksi Hallo Jurnal sebelum diputuskan status hak tayangnya (Publik / Privat).
-              </p>
             </div>
-          </div>
-        ) : (
-          <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-slate-900 text-white border border-slate-800 flex items-start gap-3.5 shadow-md">
-            <Lock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-bold text-xs uppercase tracking-wider text-amber-400">
-                  Laporan Bersifat Privat / Rahasia
-                </span>
-                <span className="text-[10px] font-semibold bg-white/10 px-2 py-0.5 rounded text-slate-300">
-                  Disembunyikan dari Feed Publik
-                </span>
+          ) : (
+            <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-slate-900 text-white border border-slate-800 flex items-start gap-3.5 shadow-md">
+              <Lock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-bold text-xs uppercase tracking-wider text-amber-400">
+                    Laporan Bersifat Privat / Rahasia
+                  </span>
+                  <span className="text-[10px] font-semibold bg-white/10 px-2 py-0.5 rounded text-slate-300">
+                    Disembunyikan dari Feed Publik
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Laporan ini disimpan sebagai aduan privat internal oleh Redaksi Hallo Jurnal. Hanya pemilik nomor tiket{' '}
+                  <code className="text-amber-300 font-mono font-bold">#{ticketDisplayId}</code> dan admin redaksi yang
+                  dapat memantau penanganan ini. Dukungan publik dinonaktifkan.
+                </p>
               </div>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Laporan ini disimpan sebagai aduan privat internal oleh Redaksi Hallo Jurnal. Hanya pemilik nomor tiket{' '}
-                <code className="text-amber-300 font-mono font-bold">#{ticketDisplayId}</code> dan admin redaksi yang
-                dapat memantau penanganan ini. Dukungan publik dinonaktifkan.
-              </p>
             </div>
-          </div>
+          )
         )
       )}
 
@@ -1192,17 +1196,9 @@ export default function HaloJurnalLaporanDetailPage() {
               </div>
             </div>
 
-            {/* 5. Bar Aksi Bawah: Dukung Laporan & Tombol Bagikan Minimalis */}
-            <div className="pt-4 border-t border-outline-variant/60 flex items-center justify-between gap-3">
-              {report.is_public === false ? (
-                <span
-                  title="Dukungan publik dinonaktifkan karena laporan ini berstatus privat"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-100 text-slate-400 text-xs font-medium cursor-not-allowed select-none"
-                >
-                  <Lock className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Dukungan Dinonaktifkan</span>
-                </span>
-              ) : (
+            {/* 5. Bar Aksi Bawah: Dukung Laporan (Hanya untuk Laporan Publik) & Tombol Bagikan Minimalis */}
+            <div className={`pt-4 border-t border-outline-variant/60 flex items-center gap-3 ${report.is_public === false ? 'justify-end' : 'justify-between'}`}>
+              {report.is_public !== false && (
                 <button
                   type="button"
                   onClick={handleLike}
