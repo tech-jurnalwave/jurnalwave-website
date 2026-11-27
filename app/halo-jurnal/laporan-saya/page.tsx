@@ -483,10 +483,10 @@ export default function HaloJurnalLaporanSayaPage() {
 
                     {/* Footer: Chat Info & Akses Detail */}
                     <div className="pt-3 mt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-3 text-xs">
-                      {report.chat_messages && report.chat_messages[0]?.count > 0 ? (
+                      {((report.chat_count && report.chat_count > 0) || (report.chat_messages && report.chat_messages[0]?.count > 0)) ? (
                         <div className="inline-flex items-center gap-1.5 text-slate-600 dark:text-slate-300 font-medium">
                           <MessageSquare className="w-3.5 h-3.5 text-[#c00015]" />
-                          <span>{report.chat_messages[0].count} pesan koordinasi</span>
+                          <span>{report.chat_count || report.chat_messages[0].count} pesan koordinasi</span>
                         </div>
                       ) : (
                         <span className="text-slate-400 dark:text-slate-500 text-[11px]">

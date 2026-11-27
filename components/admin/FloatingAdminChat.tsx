@@ -216,15 +216,24 @@ export default function FloatingAdminChat() {
           ...((keyId && messagesByTicket[String(keyId).toUpperCase()]) || []),
         ]
 
-        // Ambil pesan lokal jika ada
+        // Ambil pesan lokal jika ada dari semua varian key (ID cuid dan nomor tiket)
         let localList: any[] = []
         if (typeof window !== 'undefined') {
-          const localId = localStorage.getItem(`halo_jurnal_chat_${keyId}`)
-          const localTicket = rep.nomor_tiket ? localStorage.getItem(`halo_jurnal_chat_${rep.nomor_tiket}`) : null
-          const localTicketLower = rep.nomor_tiket ? localStorage.getItem(`halo_jurnal_chat_${rep.nomor_tiket.toLowerCase()}`) : null
-          try {
-            localList = JSON.parse(localId || localTicket || localTicketLower || '[]')
-          } catch {}
+          const sources = [
+            localStorage.getItem(`halo_jurnal_chat_${keyId}`),
+            rep.nomor_tiket ? localStorage.getItem(`halo_jurnal_chat_${rep.nomor_tiket}`) : null,
+            rep.nomor_tiket ? localStorage.getItem(`halo_jurnal_chat_${rep.nomor_tiket.toLowerCase()}`) : null,
+            rep.nomor_tiket ? localStorage.getItem(`halo_jurnal_chat_${rep.nomor_tiket.toUpperCase()}`) : null,
+          ].filter(Boolean)
+
+          sources.forEach((src) => {
+            try {
+              const parsed = JSON.parse(src!)
+              if (Array.isArray(parsed)) {
+                localList.push(...parsed)
+              }
+            } catch {}
+          })
         }
 
         // Deduplikasi pesan gabungan DB & lokal
@@ -271,7 +280,7 @@ export default function FloatingAdminChat() {
         }, 0)
 
         if (isCurrentlyActiveTicket) {
-          const readBarrier = Math.max(Date.now(), latestMsgTime) + 60000
+          const readBarrier = latestMsgTime ? Math.max(Date.now(), latestMsgTime) : Date.now()
           readTicketTimes[rep.id] = readBarrier
           if (rep.nomor_tiket) {
             readTicketTimes[rep.nomor_tiket] = readBarrier
@@ -293,6 +302,8 @@ export default function FloatingAdminChat() {
           )
           const lastMsg = sorted[sorted.length - 1]
           const isWargaLast =
+            !lastMsg.isSystem &&
+            !String(lastMsg.id || '').startsWith('sys-') &&
             lastMsg.role !== 'admin' &&
             lastMsg.role !== 'redaksi' &&
             lastMsg.sender_id !== 'admin-redaksi' &&
@@ -311,6 +322,9 @@ export default function FloatingAdminChat() {
           const unread = isCurrentlyActiveTicket
             ? 0
             : sorted.filter((m) => {
+                const isSystem = m.isSystem || String(m.id || '').startsWith('sys-')
+                if (isSystem) return false
+
                 const isCitizen =
                   m.role !== 'admin' &&
                   m.role !== 'redaksi' &&
@@ -363,11 +377,39 @@ export default function FloatingAdminChat() {
       })
 
       if (typeof window !== 'undefined') {
-        localStorage.setItem('halo_jurnal_read_chats', JSON.stringify(Array.from(readSet)))
-        localStorage.setItem('halo_jurnal_read_ticket_times', JSON.stringify(readTicketTimes))
+        const chatsStr = JSON.stringify(Array.from(readSet))
+        if (localStorage.getItem('halo_jurnal_read_chats') !== chatsStr) {
+          localStorage.setItem('halo_jurnal_read_chats', chatsStr)
+        }
+        const timesStr = JSON.stringify(readTicketTimes)
+        if (localStorage.getItem('halo_jurnal_read_ticket_times') !== timesStr) {
+          localStorage.setItem('halo_jurnal_read_ticket_times', timesStr)
+        }
       }
 
-      setTicketMeta(newMeta)
+      setTicketMeta((prev) => {
+        const prevKeys = Object.keys(prev)
+        const newKeys = Object.keys(newMeta)
+        if (
+          prevKeys.length === newKeys.length &&
+          newKeys.every((k) => {
+            const p = prev[k]
+            const n = newMeta[k]
+            return (
+              p &&
+              n &&
+              p.unreadCount === n.unreadCount &&
+              p.lastMessage === n.lastMessage &&
+              p.lastTime === n.lastTime &&
+              p.messageCount === n.messageCount &&
+              p.isWaitingAdmin === n.isWaitingAdmin
+            )
+          })
+        ) {
+          return prev
+        }
+        return newMeta
+      })
     } catch (err) {
       console.error('Error scanning floating ticket chats:', err)
     }
@@ -399,11 +441,19 @@ export default function FloatingAdminChat() {
     if (typeof window !== 'undefined') {
       let local: any[] = []
       try {
-        local = JSON.parse(
-          localStorage.getItem(`halo_jurnal_chat_${targetId}`) ||
-          (targetTicket ? localStorage.getItem(`halo_jurnal_chat_${targetTicket}`) : null) ||
-          '[]'
-        )
+        const sources = [
+          localStorage.getItem(`halo_jurnal_chat_${targetId}`),
+          targetTicket ? localStorage.getItem(`halo_jurnal_chat_${targetTicket}`) : null,
+          targetTicket ? localStorage.getItem(`halo_jurnal_chat_${targetTicket.toLowerCase()}`) : null,
+          targetTicket ? localStorage.getItem(`halo_jurnal_chat_${targetTicket.toUpperCase()}`) : null,
+        ].filter(Boolean)
+
+        sources.forEach((src) => {
+          try {
+            const parsed = JSON.parse(src!)
+            if (Array.isArray(parsed)) local.push(...parsed)
+          } catch {}
+        })
       } catch {}
 
       const msgMap = new Map<string, any>()
@@ -450,9 +500,12 @@ export default function FloatingAdminChat() {
         (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       )
 
-      localStorage.setItem(`halo_jurnal_chat_${targetId}`, JSON.stringify(merged))
-      if (targetTicket) {
-        localStorage.setItem(`halo_jurnal_chat_${targetTicket}`, JSON.stringify(merged))
+      const serialized = JSON.stringify(merged)
+      if (localStorage.getItem(`halo_jurnal_chat_${targetId}`) !== serialized) {
+        localStorage.setItem(`halo_jurnal_chat_${targetId}`, serialized)
+        if (targetTicket) {
+          localStorage.setItem(`halo_jurnal_chat_${targetTicket}`, serialized)
+        }
       }
     } else {
       merged = dbMessages
@@ -461,6 +514,7 @@ export default function FloatingAdminChat() {
     // Selalu sertakan pesan pembuka resmi redaksi di paling awal agar tidak hilang
     const ticketNum = activeReport?.nomor_tiket || activeReport?.id || selectedTicketId
     const pelapor = (activeReport as any)?.pelaporName || (activeReport as any)?.nama_pelapor || 'Warga'
+    const fallbackCreatedAt = activeReport?.created_at || '2026-01-01T00:00:00.000Z'
     const initialWelcomeMessage = {
       id: `sys-${ticketNum}`,
       isSystem: true,
@@ -468,7 +522,7 @@ export default function FloatingAdminChat() {
       sender_id: 'admin-redaksi',
       sender_name: '🛡️ Redaksi Hallo Jurnal',
       message: `Halo ${pelapor}, terima kasih telah berbagi informasi ini. Ruang obrolan ini dapat Anda gunakan untuk koordinasi langsung atau menambahkan keterangan tambahan jika diperlukan.`,
-      created_at: activeReport?.created_at || new Date().toISOString(),
+      created_at: fallbackCreatedAt,
       profiles: {
         full_name: '🛡️ Redaksi Hallo Jurnal',
         role: 'admin',
@@ -502,7 +556,7 @@ export default function FloatingAdminChat() {
           const t = new Date(m.created_at).getTime()
           return isNaN(t) ? max : Math.max(max, t)
         }, 0)
-        const readBarrier = Math.max(Date.now(), latestMsgTime) + 60000
+        const readBarrier = latestMsgTime ? Math.max(Date.now(), latestMsgTime) : Date.now()
 
         const times: Record<string, number> = JSON.parse(
           localStorage.getItem('halo_jurnal_read_ticket_times') || '{}'
@@ -527,8 +581,14 @@ export default function FloatingAdminChat() {
           JSON.stringify(Array.from(readSet))
         )
 
-        // Langsung nolkan unreadCount tiket terpilih
+        // Langsung nolkan unreadCount tiket terpilih jika belum 0
         setTicketMeta((prev) => {
+          if (
+            (prev[targetId]?.unreadCount === 0 || !prev[targetId]) &&
+            (!targetTicket || prev[targetTicket]?.unreadCount === 0)
+          ) {
+            return prev
+          }
           const updated = { ...prev }
           if (updated[targetId]) updated[targetId] = { ...updated[targetId], unreadCount: 0 }
           if (targetTicket) {
@@ -538,8 +598,6 @@ export default function FloatingAdminChat() {
           }
           return updated
         })
-
-        window.dispatchEvent(new Event('storage'))
       } catch {}
     }
   }
@@ -547,7 +605,7 @@ export default function FloatingAdminChat() {
   // Fungsi Tandai Semua Sudah Dibaca (Mark All As Read)
   const handleMarkAllAsRead = () => {
     try {
-      const now = Date.now() + 86400000 // 24 jam buffer waktu untuk memastikan seluruh pesan terhitung sudah dibaca
+      const now = Date.now()
       const times: Record<string, number> = {}
       reports.forEach((rep) => {
         times[rep.id] = now
@@ -597,6 +655,11 @@ export default function FloatingAdminChat() {
     }
   }
 
+  // Sinkronisasi realtime saat data reports berubah
+  useEffect(() => {
+    scanAllTicketChats()
+  }, [reports])
+
   // Sinkronisasi realtime global (selalu aktif di background agar notifikasi berbunyi meski popup ditutup)
   useEffect(() => {
     scanAllTicketChats()
@@ -643,7 +706,7 @@ export default function FloatingAdminChat() {
         } catch {}
       }
     }
-  }, [isOpen, selectedTicketId, reports])
+  }, [isOpen, selectedTicketId])
 
   // Deteksi posisi scroll: apakah admin sedang membaca riwayat di atas atau sedang di posisi paling bawah
   const handleChatScroll = () => {
@@ -1047,7 +1110,6 @@ export default function FloatingAdminChat() {
                                 }
                               : {}),
                           }))
-                          window.dispatchEvent(new Event('storage'))
                         }}
                         className={`p-2.5 transition cursor-pointer text-left relative ${
                           isSelected

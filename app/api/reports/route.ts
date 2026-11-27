@@ -27,7 +27,7 @@ const ReportInputSchema = z.object({
 
 // Helper format laporan dari database ke format kompatibel frontend
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapReportFromDb(item: any, supportCount = 0) {
+function mapReportFromDb(item: any, supportCount = 0, chatCount = 0) {
   const category = normalizeCategoryName(item.reportType || item.kategori || 'Infrastruktur')
   const rawJenis = (item as any).jenis || ''
   const jenis =
@@ -61,6 +61,8 @@ function mapReportFromDb(item: any, supportCount = 0) {
     isPublic: Boolean(item.isPublic !== false),
     dukungan_count: supportCount,
     komentar_count: 0,
+    chat_messages: [{ count: chatCount }],
+    chat_count: chatCount,
     created_at: item.createdAt ? new Date(item.createdAt).toISOString() : new Date().toISOString(),
     createdAt: item.createdAt,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -143,7 +145,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Eksekusi query database secara paralel (Promise.all) agar hemat roundtrip latency ke Neon PostgreSQL
-    const [dbReports, countRows] = await Promise.all([
+    const [dbReports, countRows, chatCountRows] = await Promise.all([
       prisma.report.findMany({
         where,
         include: {
@@ -157,6 +159,9 @@ export async function GET(request: NextRequest) {
       prisma.$queryRawUnsafe<any[]>(
         `SELECT "ticketNumber", COUNT(*)::int as count FROM "report_supports" GROUP BY "ticketNumber"`
       ).catch(() => []),
+      prisma.$queryRawUnsafe<any[]>(
+        `SELECT "ticketNumber", COUNT(*)::int as count FROM "chat_messages" GROUP BY "ticketNumber"`
+      ).catch(() => []),
     ])
 
     // Hitung dukungan nyata dari tabel report_supports
@@ -169,7 +174,24 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    let mappedData = dbReports.map((r) => mapReportFromDb(r, supportCountsMap[r.ticketNumber] || 0))
+    // Hitung pesan chat koordinasi nyata dari tabel chat_messages
+    const chatCountsMap: Record<string, number> = {}
+    if (Array.isArray(chatCountRows)) {
+      chatCountRows.forEach((r) => {
+        if (r && r.ticketNumber) {
+          chatCountsMap[r.ticketNumber] = Number(r.count) || 0
+          chatCountsMap[String(r.ticketNumber).toUpperCase()] = Number(r.count) || 0
+        }
+      })
+    }
+
+    let mappedData = dbReports.map((r) =>
+      mapReportFromDb(
+        r,
+        supportCountsMap[r.ticketNumber] || 0,
+        chatCountsMap[r.ticketNumber] || chatCountsMap[r.id] || 0
+      )
+    )
 
     // Simpan ke server memory cache jika request umum (semua aduan)
     if (!status && !ticket) {

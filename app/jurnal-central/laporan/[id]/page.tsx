@@ -182,19 +182,60 @@ export default function AdminDetailLaporanPage() {
 
     let merged = dbMessages
     if (typeof window !== 'undefined') {
-      if (dbMessages.length > 0) {
-        merged = dbMessages
-        localStorage.setItem(`halo_jurnal_chat_${targetId}`, JSON.stringify(dbMessages))
-        if (targetTicket) {
-          localStorage.setItem(`halo_jurnal_chat_${targetTicket}`, JSON.stringify(dbMessages))
+      let local: any[] = []
+      try {
+        const sources = [
+          localStorage.getItem(`halo_jurnal_chat_${targetId}`),
+          targetTicket ? localStorage.getItem(`halo_jurnal_chat_${targetTicket}`) : null,
+          targetTicket ? localStorage.getItem(`halo_jurnal_chat_${targetTicket.toLowerCase()}`) : null,
+          targetTicket ? localStorage.getItem(`halo_jurnal_chat_${targetTicket.toUpperCase()}`) : null,
+        ].filter(Boolean)
+
+        sources.forEach((src) => {
+          try {
+            const parsed = JSON.parse(src!)
+            if (Array.isArray(parsed)) local.push(...parsed)
+          } catch {}
+        })
+      } catch {}
+
+      const msgMap = new Map<string, any>()
+      local.forEach((m: any) => {
+        if (!m) return
+        const key = m.id || `${m.created_at}_${m.message}`
+        msgMap.set(key, m)
+      })
+
+      dbMessages.forEach((dbM: any) => {
+        if (!dbM) return
+        let matchedOldKey: string | null = null
+        for (const [k, loc] of msgMap.entries()) {
+          if (loc.id === dbM.id) {
+            matchedOldKey = k
+            break
+          }
+          const sameText = (loc.message || '').trim() === (dbM.message || '').trim()
+          const timeDiff = Math.abs(new Date(loc.created_at).getTime() - new Date(dbM.created_at).getTime())
+          if (sameText && timeDiff < 15000) {
+            matchedOldKey = k
+            break
+          }
         }
-      } else {
-        const local = JSON.parse(
-          localStorage.getItem(`halo_jurnal_chat_${targetId}`) ||
-          (targetTicket ? localStorage.getItem(`halo_jurnal_chat_${targetTicket}`) : null) ||
-          '[]'
-        )
-        merged = local
+        if (matchedOldKey) msgMap.delete(matchedOldKey)
+        const authoritativeKey = dbM.id || `${dbM.created_at}_${dbM.message}`
+        msgMap.set(authoritativeKey, dbM)
+      })
+
+      merged = Array.from(msgMap.values()).sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      )
+
+      const serialized = JSON.stringify(merged)
+      if (localStorage.getItem(`halo_jurnal_chat_${targetId}`) !== serialized) {
+        localStorage.setItem(`halo_jurnal_chat_${targetId}`, serialized)
+        if (targetTicket) {
+          localStorage.setItem(`halo_jurnal_chat_${targetTicket}`, serialized)
+        }
       }
     }
     setChatMessages(merged)
@@ -229,14 +270,18 @@ export default function AdminDetailLaporanPage() {
         localStorage.getItem('halo_jurnal_read_ticket_times') || '{}'
       )
       const ticketKey = report?.nomor_tiket || id
+      const targetId = report?.id || id
       const ticketReadTime = Math.max(
         readTicketTimes[ticketKey] || 0,
         readTicketTimes[ticketKey.toUpperCase()] || 0,
         readTicketTimes[ticketKey.toLowerCase()] || 0,
-        readTicketTimes[id] || 0
+        readTicketTimes[targetId] || 0,
+        readTicketTimes[targetId.toUpperCase()] || 0,
+        readTicketTimes[targetId.toLowerCase()] || 0
       )
 
       return chatMessages.filter((m: any) => {
+        if (m.isSystem || String(m.id || '').startsWith('sys-')) return false
         const isCitizen =
           m.sender_id !== 'admin-redaksi' &&
           m.sender_id !== 'admin' &&

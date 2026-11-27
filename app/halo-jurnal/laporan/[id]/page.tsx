@@ -57,13 +57,43 @@ export default function HaloJurnalLaporanDetailPage() {
   const hasLoadedReportRef = useRef(false)
   const seenChatIdsRef = useRef<Set<string>>(new Set())
   const hasInitializedChatRef = useRef(false)
+  const audioContextRef = useRef<AudioContext | null>(null)
+
+  // Buka suspensi Web Audio API saat ada interaksi pertama dari warga
+  useEffect(() => {
+    const unlockAudio = () => {
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
+        if (!AudioCtx) return
+        if (!audioContextRef.current) {
+          audioContextRef.current = new AudioCtx()
+        }
+        if (audioContextRef.current.state === 'suspended') {
+          audioContextRef.current.resume().catch(() => {})
+        }
+      } catch {}
+      window.removeEventListener('click', unlockAudio)
+      window.removeEventListener('touchstart', unlockAudio)
+      window.removeEventListener('keydown', unlockAudio)
+    }
+
+    window.addEventListener('click', unlockAudio)
+    window.addEventListener('touchstart', unlockAudio)
+    window.addEventListener('keydown', unlockAudio)
+
+    return () => {
+      window.removeEventListener('click', unlockAudio)
+      window.removeEventListener('touchstart', unlockAudio)
+      window.removeEventListener('keydown', unlockAudio)
+    }
+  }, [])
 
   // Suara notifikasi Web Audio API yang merdu dan ramah untuk warga saat pesan redaksi masuk
   const playNotificationChime = () => {
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
       if (!AudioCtx) return
-      const ctx = new AudioCtx()
+      const ctx = audioContextRef.current || new AudioCtx()
       if (ctx.state === 'suspended') {
         ctx.resume().catch(() => {})
       }
@@ -220,6 +250,7 @@ export default function HaloJurnalLaporanDetailPage() {
 
     const ticket = report?.nomor_tiket || report?.ticket_number || report?.ticketNumber || id
     const pelapor = (report as any)?.pelaporName || (report as any)?.nama_pelapor || user?.user_metadata?.full_name || 'Warga'
+    const fallbackCreatedAt = report?.created_at || '2026-01-01T00:00:00.000Z'
     const initialSystemMessage = {
       id: `sys-${ticket}`,
       sender: 'Redaksi Hallo Jurnal',
@@ -227,7 +258,7 @@ export default function HaloJurnalLaporanDetailPage() {
       role: 'admin',
       avatar: '/logo-jurnal-wave.webp',
       message: `Halo ${pelapor}, terima kasih telah berbagi informasi ini. Ruang obrolan ini dapat Anda gunakan untuk koordinasi langsung atau menambahkan keterangan tambahan jika diperlukan.`,
-      created_at: report?.created_at || new Date().toISOString(),
+      created_at: fallbackCreatedAt,
       timestamp: 'Baru saja',
       isSystem: true,
     }
@@ -295,33 +326,34 @@ export default function HaloJurnalLaporanDetailPage() {
 
     if (typeof window !== 'undefined' && finalMessages.length > 0) {
       try {
-        localStorage.setItem(`halo_jurnal_chat_${chatKey}`, JSON.stringify(finalMessages))
-        if (id && chatKey !== id) {
-          localStorage.setItem(`halo_jurnal_chat_${id}`, JSON.stringify(finalMessages))
+        const serialized = JSON.stringify(finalMessages)
+        if (localStorage.getItem(`halo_jurnal_chat_${chatKey}`) !== serialized) {
+          localStorage.setItem(`halo_jurnal_chat_${chatKey}`, serialized)
+          if (id && chatKey !== id) {
+            localStorage.setItem(`halo_jurnal_chat_${id}`, serialized)
+          }
         }
       } catch {}
     }
 
     // Periksa notifikasi suara saat ada pesan baru dari pihak redaksi / admin
-    if (finalMessages.length > 0) {
-      if (!hasInitializedChatRef.current) {
-        // Catat pesan yang sudah ada saat halaman pertama kali dibuka
-        finalMessages.forEach((m: any) => seenChatIdsRef.current.add(m.id))
-        hasInitializedChatRef.current = true
-      } else {
-        let hasNewRedaksiMessage = false
-        finalMessages.forEach((m: any) => {
-          if (!seenChatIdsRef.current.has(m.id)) {
-            seenChatIdsRef.current.add(m.id)
-            const isRedaksi = m.role === 'redaksi' || m.role === 'admin' || m.sender_id === 'admin-redaksi'
-            if (isRedaksi) {
-              hasNewRedaksiMessage = true
-            }
+    if (!hasInitializedChatRef.current) {
+      // Catat pesan yang sudah ada saat halaman pertama kali dibuka
+      finalMessages.forEach((m: any) => seenChatIdsRef.current.add(m.id))
+      hasInitializedChatRef.current = true
+    } else if (finalMessages.length > 0) {
+      let hasNewRedaksiMessage = false
+      finalMessages.forEach((m: any) => {
+        if (!seenChatIdsRef.current.has(m.id)) {
+          seenChatIdsRef.current.add(m.id)
+          const isRedaksi = m.role === 'redaksi' || m.role === 'admin' || m.sender_id === 'admin-redaksi'
+          if (isRedaksi) {
+            hasNewRedaksiMessage = true
           }
-        })
-        if (hasNewRedaksiMessage) {
-          playNotificationChime()
         }
+      })
+      if (hasNewRedaksiMessage) {
+        playNotificationChime()
       }
     }
 
@@ -534,41 +566,42 @@ export default function HaloJurnalLaporanDetailPage() {
     seenChatIdsRef.current.add(tempId)
 
     // Tampilkan pesan secara instan (optimistic UI)
-    setMessages((prev) => {
-      const ticket = report?.nomor_tiket || report?.ticket_number || report?.ticketNumber || id
-      const pelapor = (report as any)?.pelaporName || (report as any)?.nama_pelapor || activeUser?.user_metadata?.full_name || 'Warga'
-      const initialSystemMessage = {
-        id: `sys-${ticket}`,
-        sender: 'Redaksi Hallo Jurnal',
-        sender_name: 'Redaksi Hallo Jurnal',
-        role: 'admin',
-        avatar: '/logo-jurnal-wave.webp',
-        message: `Halo ${pelapor}, terima kasih telah berbagi informasi ini. Ruang obrolan ini dapat Anda gunakan untuk koordinasi langsung atau menambahkan keterangan tambahan jika diperlukan.`,
-        created_at: report?.created_at || new Date().toISOString(),
-        timestamp: 'Baru saja',
-        isSystem: true,
-      }
+    const ticket = report?.nomor_tiket || report?.ticket_number || report?.ticketNumber || id
+    const pelapor = (report as any)?.pelaporName || (report as any)?.nama_pelapor || activeUser?.user_metadata?.full_name || 'Warga'
+    const fallbackCreatedAt = report?.created_at || '2026-01-01T00:00:00.000Z'
+    const initialSystemMessage = {
+      id: `sys-${ticket}`,
+      sender: 'Redaksi Hallo Jurnal',
+      sender_name: 'Redaksi Hallo Jurnal',
+      role: 'admin',
+      avatar: '/logo-jurnal-wave.webp',
+      message: `Halo ${pelapor}, terima kasih telah berbagi informasi ini. Ruang obrolan ini dapat Anda gunakan untuk koordinasi langsung atau menambahkan keterangan tambahan jika diperlukan.`,
+      created_at: fallbackCreatedAt,
+      timestamp: 'Baru saja',
+      isSystem: true,
+    }
 
+    setMessages((prev) => {
       const hasWelcome = prev.some((m) => m.isSystem || (m.role === 'admin' && String(m.id || '').startsWith('sys-')))
       const base = !hasWelcome && report ? [initialSystemMessage, ...prev] : prev
-      const next = [...base, sentMsg]
-
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.setItem(`halo_jurnal_chat_${id}`, JSON.stringify(next))
-          if (report?.nomor_tiket) {
-            localStorage.setItem(`halo_jurnal_chat_${report.nomor_tiket}`, JSON.stringify(next))
-          }
-          try {
-            const bc = new BroadcastChannel('jurnalwave_chat')
-            bc.postMessage({ type: 'chat_sent', ticketNumber: report?.nomor_tiket || id })
-            bc.close()
-          } catch {}
-          window.dispatchEvent(new Event('storage'))
-        } catch {}
-      }
-      return next
+      return [...base, sentMsg]
     })
+
+    if (typeof window !== 'undefined') {
+      try {
+        const curList = JSON.parse(localStorage.getItem(`halo_jurnal_chat_${id}`) || '[]')
+        const nextLocal = [...curList, sentMsg]
+        localStorage.setItem(`halo_jurnal_chat_${id}`, JSON.stringify(nextLocal))
+        if (report?.nomor_tiket) {
+          localStorage.setItem(`halo_jurnal_chat_${report.nomor_tiket}`, JSON.stringify(nextLocal))
+        }
+        try {
+          const bc = new BroadcastChannel('jurnalwave_chat')
+          bc.postMessage({ type: 'chat_sent', ticketNumber: report?.nomor_tiket || id })
+          bc.close()
+        } catch {}
+      } catch {}
+    }
 
     isNearBottomRef.current = true
     setTimeout(() => scrollToBottom('smooth'), 50)
@@ -607,18 +640,18 @@ export default function HaloJurnalLaporanDetailPage() {
           }
           seenChatIdsRef.current.add(realMsg.id)
 
-          setMessages((prev) => {
-            const updated = prev.map((m) => (m.id === tempId ? realMsg : m))
-            if (typeof window !== 'undefined') {
-              try {
-                localStorage.setItem(`halo_jurnal_chat_${id}`, JSON.stringify(updated))
-                if (report?.nomor_tiket) {
-                  localStorage.setItem(`halo_jurnal_chat_${report.nomor_tiket}`, JSON.stringify(updated))
-                }
-              } catch {}
-            }
-            return updated
-          })
+          setMessages((prev) => prev.map((m) => (m.id === tempId ? realMsg : m)))
+
+          if (typeof window !== 'undefined') {
+            try {
+              const curList = JSON.parse(localStorage.getItem(`halo_jurnal_chat_${id}`) || '[]')
+              const updatedLocal = curList.map((m: any) => (m.id === tempId ? realMsg : m))
+              localStorage.setItem(`halo_jurnal_chat_${id}`, JSON.stringify(updatedLocal))
+              if (report?.nomor_tiket) {
+                localStorage.setItem(`halo_jurnal_chat_${report.nomor_tiket}`, JSON.stringify(updatedLocal))
+              }
+            } catch {}
+          }
         }
       }
     } catch (apiErr) {

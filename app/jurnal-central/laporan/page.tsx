@@ -174,21 +174,40 @@ export default function AdminLaporanPage() {
           localStorage.getItem('halo_jurnal_read_ticket_times') || '{}'
         )
 
+        const ticketToId: Record<string, string> = {}
+        const idToTicket: Record<string, string> = {}
+        reportsList.forEach((r) => {
+          if (r.id && r.nomor_tiket) {
+            ticketToId[r.nomor_tiket] = r.id
+            ticketToId[r.nomor_tiket.toLowerCase()] = r.id
+            ticketToId[r.nomor_tiket.toUpperCase()] = r.id
+
+            idToTicket[r.id] = r.nomor_tiket
+            idToTicket[r.id.toLowerCase()] = r.nomor_tiket
+            idToTicket[r.id.toUpperCase()] = r.nomor_tiket
+          }
+        })
+
         const map: Record<string, number> = {}
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i)
           if (key && key.startsWith('halo_jurnal_chat_')) {
             const ticketKey = key.replace('halo_jurnal_chat_', '')
+            const pairedKey = ticketToId[ticketKey] || idToTicket[ticketKey] || ''
             const ticketReadTime = Math.max(
               readTicketTimes[ticketKey] || 0,
               readTicketTimes[ticketKey.toUpperCase()] || 0,
-              readTicketTimes[ticketKey.toLowerCase()] || 0
+              readTicketTimes[ticketKey.toLowerCase()] || 0,
+              pairedKey ? (readTicketTimes[pairedKey] || 0) : 0,
+              pairedKey ? (readTicketTimes[pairedKey.toUpperCase()] || 0) : 0,
+              pairedKey ? (readTicketTimes[pairedKey.toLowerCase()] || 0) : 0
             )
 
             try {
               const list = JSON.parse(localStorage.getItem(key) || '[]')
               if (Array.isArray(list) && list.length > 0) {
                 const unreadCitizenMsgs = list.filter((m: any) => {
+                  if (m.isSystem || String(m.id || '').startsWith('sys-')) return false
                   const isCitizen =
                     m.sender_id !== 'admin-redaksi' &&
                     m.sender_id !== 'admin' &&
@@ -211,6 +230,11 @@ export default function AdminLaporanPage() {
                   map[ticketKey] = unreadCitizenMsgs.length
                   map[ticketKey.toUpperCase()] = unreadCitizenMsgs.length
                   map[ticketKey.toLowerCase()] = unreadCitizenMsgs.length
+                  if (pairedKey) {
+                    map[pairedKey] = unreadCitizenMsgs.length
+                    map[pairedKey.toUpperCase()] = unreadCitizenMsgs.length
+                    map[pairedKey.toLowerCase()] = unreadCitizenMsgs.length
+                  }
                 }
               }
             } catch {}
@@ -224,12 +248,31 @@ export default function AdminLaporanPage() {
     window.addEventListener('storage', scanChats)
     window.addEventListener('focus', scanChats)
     window.addEventListener('openFloatingAdminChat', scanChats)
+
+    let broadcastChannel: BroadcastChannel | null = null
+    try {
+      broadcastChannel = new BroadcastChannel('jurnalwave_chat')
+      broadcastChannel.onmessage = (event) => {
+        if (event?.data?.type === 'chat_sent') {
+          scanChats()
+        }
+      }
+    } catch {}
+
+    const interval = setInterval(scanChats, 4000)
+
     return () => {
+      clearInterval(interval)
       window.removeEventListener('storage', scanChats)
       window.removeEventListener('focus', scanChats)
       window.removeEventListener('openFloatingAdminChat', scanChats)
+      if (broadcastChannel) {
+        try {
+          broadcastChannel.close()
+        } catch {}
+      }
     }
-  }, [])
+  }, [reportsList])
 
   // Baca query pencarian dari parameter URL jika ada
   useEffect(() => {
