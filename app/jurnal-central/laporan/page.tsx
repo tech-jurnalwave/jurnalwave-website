@@ -243,12 +243,28 @@ export default function AdminLaporanPage() {
             } catch {}
           }
         }
-        setChatCounts(map)
+        setChatCounts((prev) => {
+          const prevKeys = Object.keys(prev)
+          const mapKeys = Object.keys(map)
+          if (
+            prevKeys.length === mapKeys.length &&
+            mapKeys.every((k) => prev[k] === map[k])
+          ) {
+            return prev
+          }
+          return map
+        })
       } catch {}
     }
 
     scanChats()
-    window.addEventListener('storage', scanChats)
+    const handleStorageScan = (e: StorageEvent) => {
+      if (!e.key || e.key.startsWith('halo_jurnal_chat_') || e.key === 'halo_jurnal_read_chats') {
+        scanChats()
+      }
+    }
+
+    window.addEventListener('storage', handleStorageScan)
     window.addEventListener('focus', scanChats)
     window.addEventListener('openFloatingAdminChat', scanChats)
 
@@ -266,7 +282,7 @@ export default function AdminLaporanPage() {
 
     return () => {
       clearInterval(interval)
-      window.removeEventListener('storage', scanChats)
+      window.removeEventListener('storage', handleStorageScan)
       window.removeEventListener('focus', scanChats)
       window.removeEventListener('openFloatingAdminChat', scanChats)
       if (broadcastChannel) {

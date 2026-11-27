@@ -23,7 +23,7 @@ export default function FloatingAdminChat() {
   const [isMaximized, setIsMaximized] = useState(false)
   const [selectedTicketId, setSelectedTicketId] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
-  const [filterType, setFilterType] = useState<'semua' | 'belum_dibalas' | 'sudah_respon'>('semua')
+  const [filterType, setFilterType] = useState<'semua' | 'belum_dibaca'>('semua')
   const [messages, setMessages] = useState<any[]>([])
   const [inputText, setInputText] = useState('')
   const [isSending, setIsSending] = useState(false)
@@ -35,6 +35,7 @@ export default function FloatingAdminChat() {
   const prevMessagesLengthRef = useRef(0)
   const seenAdminChatIdsRef = useRef<Set<string>>(new Set())
   const hasInitializedAdminChatRef = useRef(false)
+  const hasCheckedUrlParamRef = useRef(false)
   const audioContextRef = useRef<AudioContext | null>(null)
 
   // Buka izin Web Audio API saat pertama kali user melakukan interaksi di halaman admin
@@ -97,19 +98,15 @@ export default function FloatingAdminChat() {
     >
   >({})
 
-  // Auto-select tiket pertama saat reports tersedia
-  useEffect(() => {
-    if (!selectedTicketId && reports.length > 0) {
-      setSelectedTicketId(reports[0].nomor_tiket || reports[0].id)
-    }
-  }, [reports, selectedTicketId])
-
   // Listener event buka floating chat fullscreen dari halaman lain (misal tombol Buka Chat di detail aduan)
   useEffect(() => {
     const handleExternalOpen = (e: any) => {
       const detail = e.detail || {}
-      if (detail.ticketNumber) {
+      if (detail.ticketNumber && detail.ticketNumber !== 'true') {
         setSelectedTicketId(detail.ticketNumber)
+        setMobilePane('chat')
+      } else if (reports.length > 0) {
+        setSelectedTicketId(reports[0].nomor_tiket || reports[0].id)
         setMobilePane('chat')
       }
       setIsOpen(true)
@@ -120,20 +117,25 @@ export default function FloatingAdminChat() {
     return () => {
       window.removeEventListener('openFloatingAdminChat', handleExternalOpen as any)
     }
-  }, [])
+  }, [reports])
 
   // Cek parameter openChat / ticket di URL saat pertama kali halaman dimuat
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined' || hasCheckedUrlParamRef.current) return
     const urlParams = new URLSearchParams(window.location.search)
     const openChatParam = urlParams.get('openChat') || urlParams.get('ticket')
     if (openChatParam) {
-      setSelectedTicketId(openChatParam)
+      hasCheckedUrlParamRef.current = true
+      if (openChatParam !== 'true' && openChatParam !== '1') {
+        setSelectedTicketId(openChatParam)
+      } else if (reports.length > 0) {
+        setSelectedTicketId(reports[0].nomor_tiket || reports[0].id)
+      }
       setMobilePane('chat')
       setIsOpen(true)
       setIsMaximized(true)
     }
-  }, [])
+  }, [reports])
 
   // Scan metadata percakapan dari seluruh tiket secara real-time dari database
   const scanAllTicketChats = async () => {
@@ -279,13 +281,15 @@ export default function FloatingAdminChat() {
           return isNaN(t) ? max : Math.max(max, t)
         }, 0)
 
-        if (isCurrentlyActiveTicket) {
-          const readBarrier = latestMsgTime ? Math.max(Date.now(), latestMsgTime) : Date.now()
-          readTicketTimes[rep.id] = readBarrier
-          if (rep.nomor_tiket) {
-            readTicketTimes[rep.nomor_tiket] = readBarrier
-            readTicketTimes[rep.nomor_tiket.toLowerCase()] = readBarrier
-            readTicketTimes[rep.nomor_tiket.toUpperCase()] = readBarrier
+        if (isCurrentlyActiveTicket && latestMsgTime > 0) {
+          const prevRead = readTicketTimes[rep.id] || 0
+          if (latestMsgTime > prevRead) {
+            readTicketTimes[rep.id] = latestMsgTime
+            if (rep.nomor_tiket) {
+              readTicketTimes[rep.nomor_tiket] = latestMsgTime
+              readTicketTimes[rep.nomor_tiket.toLowerCase()] = latestMsgTime
+              readTicketTimes[rep.nomor_tiket.toUpperCase()] = latestMsgTime
+            }
           }
         }
 
@@ -297,9 +301,12 @@ export default function FloatingAdminChat() {
         )
 
         if (Array.isArray(combined) && combined.length > 0) {
-          const sorted = [...combined].sort(
-            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-          )
+          const sorted = [...combined].sort((a, b) => {
+            const tA = new Date(a.created_at).getTime()
+            const tB = new Date(b.created_at).getTime()
+            if (tA !== tB) return tA - tB
+            return String(a.id || '').localeCompare(String(b.id || ''))
+          })
           const lastMsg = sorted[sorted.length - 1]
           const isWargaLast =
             !lastMsg.isSystem &&
@@ -496,9 +503,12 @@ export default function FloatingAdminChat() {
         msgMap.set(authoritativeKey, dbM)
       })
 
-      merged = Array.from(msgMap.values()).sort(
-        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      )
+      merged = Array.from(msgMap.values()).sort((a, b) => {
+        const tA = new Date(a.created_at).getTime()
+        const tB = new Date(b.created_at).getTime()
+        if (tA !== tB) return tA - tB
+        return String(a.id || '').localeCompare(String(b.id || ''))
+      })
 
       const serialized = JSON.stringify(merged)
       if (localStorage.getItem(`halo_jurnal_chat_${targetId}`) !== serialized) {
@@ -541,7 +551,7 @@ export default function FloatingAdminChat() {
           (m, idx) =>
             m.id === finalMerged[idx]?.id &&
             m.message === finalMerged[idx]?.message &&
-            m.created_at === finalMerged[idx]?.created_at
+            m.file_url === finalMerged[idx]?.file_url
         )
       ) {
         return prev
@@ -549,37 +559,45 @@ export default function FloatingAdminChat() {
       return finalMerged
     })
 
-    // Tandai pesan tiket ini sudah dibaca dan simpan timestamp read
+    // Tandai pesan tiket ini sudah dibaca dan simpan timestamp read secara efisien
     if (typeof window !== 'undefined') {
       try {
         const latestMsgTime = finalMerged.reduce((max: number, m: any) => {
           const t = new Date(m.created_at).getTime()
           return isNaN(t) ? max : Math.max(max, t)
         }, 0)
-        const readBarrier = latestMsgTime ? Math.max(Date.now(), latestMsgTime) : Date.now()
+        const readBarrier = latestMsgTime > 0 ? latestMsgTime : Date.now()
 
         const times: Record<string, number> = JSON.parse(
           localStorage.getItem('halo_jurnal_read_ticket_times') || '{}'
         )
-        times[targetId] = readBarrier
-        if (targetTicket) {
-          times[targetTicket] = readBarrier
-          times[targetTicket.toLowerCase()] = readBarrier
-          times[targetTicket.toUpperCase()] = readBarrier
+        const currentRead = times[targetId] || 0
+        if (readBarrier > currentRead) {
+          times[targetId] = readBarrier
+          if (targetTicket) {
+            times[targetTicket] = readBarrier
+            times[targetTicket.toLowerCase()] = readBarrier
+            times[targetTicket.toUpperCase()] = readBarrier
+          }
+          localStorage.setItem('halo_jurnal_read_ticket_times', JSON.stringify(times))
         }
-        localStorage.setItem('halo_jurnal_read_ticket_times', JSON.stringify(times))
 
-        const readChats: string[] = JSON.parse(
-          localStorage.getItem('halo_jurnal_read_chats') || '[]'
-        )
+        const currentChatsStr = localStorage.getItem('halo_jurnal_read_chats') || '[]'
+        const readChats: string[] = JSON.parse(currentChatsStr)
         const readSet = new Set(readChats)
+        let hasNewRead = false
         finalMerged.forEach((m: any) => {
-          if (m.id) readSet.add(String(m.id))
+          if (m.id && !readSet.has(String(m.id))) {
+            readSet.add(String(m.id))
+            hasNewRead = true
+          }
         })
-        localStorage.setItem(
-          'halo_jurnal_read_chats',
-          JSON.stringify(Array.from(readSet))
-        )
+        if (hasNewRead) {
+          localStorage.setItem(
+            'halo_jurnal_read_chats',
+            JSON.stringify(Array.from(readSet))
+          )
+        }
 
         // Langsung nolkan unreadCount tiket terpilih jika belum 0
         setTicketMeta((prev) => {
@@ -667,14 +685,22 @@ export default function FloatingAdminChat() {
       loadActiveMessages()
     }
 
-    const handleSync = () => {
-      scanAllTicketChats()
-      if (isOpen) {
-        loadActiveMessages()
+    const handleSync = (e?: StorageEvent) => {
+      if (
+        !e ||
+        !e.key ||
+        e.key.startsWith('halo_jurnal_chat_') ||
+        e.key === 'halo_jurnal_read_chats' ||
+        e.key === 'halo_jurnal_user_reports'
+      ) {
+        scanAllTicketChats()
+        if (isOpen) {
+          loadActiveMessages()
+        }
       }
     }
-    window.addEventListener('storage', handleSync)
-    window.addEventListener('focus', handleSync)
+    window.addEventListener('storage', handleSync as any)
+    window.addEventListener('focus', () => handleSync())
 
     let broadcastChannel: BroadcastChannel | null = null
     try {
@@ -694,12 +720,12 @@ export default function FloatingAdminChat() {
       if (isOpen) {
         loadActiveMessages()
       }
-    }, 1500)
+    }, 3000)
 
     return () => {
       clearInterval(pollInterval)
-      window.removeEventListener('storage', handleSync)
-      window.removeEventListener('focus', handleSync)
+      window.removeEventListener('storage', handleSync as any)
+      window.removeEventListener('focus', () => handleSync())
       if (broadcastChannel) {
         try {
           broadcastChannel.close()
@@ -859,23 +885,57 @@ export default function FloatingAdminChat() {
     }, 30)
   }
 
-  // Filter daftar tiket warga di panel kiri
-  const filteredReports = reports.filter((rep) => {
-    const meta = ticketMeta[rep.nomor_tiket] || ticketMeta[rep.id]
-    const matchesSearch =
-      rep.judul.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      rep.nomor_tiket.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (rep.lokasi && rep.lokasi.toLowerCase().includes(searchQuery.toLowerCase()))
+  // Filter & Urutkan daftar tiket warga ala WhatsApp (pesan paling baru di posisi paling atas)
+  const filteredReports = useMemo(() => {
+    const list = reports.filter((rep) => {
+      const meta =
+        ticketMeta[rep.nomor_tiket] ||
+        ticketMeta[rep.id] ||
+        (rep.nomor_tiket ? ticketMeta[rep.nomor_tiket.toUpperCase()] : null) ||
+        (rep.nomor_tiket ? ticketMeta[rep.nomor_tiket.toLowerCase()] : null)
 
-    if (!matchesSearch) return false
-    if (filterType === 'belum_dibalas') {
-      return meta?.isWaitingAdmin || (meta?.unreadCount || 0) > 0
+      const matchesSearch =
+        rep.judul.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        rep.nomor_tiket.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (rep.lokasi && rep.lokasi.toLowerCase().includes(searchQuery.toLowerCase()))
+
+      if (!matchesSearch) return false
+      if (filterType === 'belum_dibaca') {
+        return (meta?.unreadCount || 0) > 0
+      }
+      return true
+    })
+
+    return list.sort((a, b) => {
+      const metaA =
+        ticketMeta[a.nomor_tiket] ||
+        ticketMeta[a.id] ||
+        (a.nomor_tiket ? ticketMeta[a.nomor_tiket.toUpperCase()] : null) ||
+        (a.nomor_tiket ? ticketMeta[a.nomor_tiket.toLowerCase()] : null)
+      const metaB =
+        ticketMeta[b.nomor_tiket] ||
+        ticketMeta[b.id] ||
+        (b.nomor_tiket ? ticketMeta[b.nomor_tiket.toUpperCase()] : null) ||
+        (b.nomor_tiket ? ticketMeta[b.nomor_tiket.toLowerCase()] : null)
+
+      const timeA = metaA?.lastTime
+        ? new Date(metaA.lastTime).getTime()
+        : new Date(a.created_at).getTime()
+      const timeB = metaB?.lastTime
+        ? new Date(metaB.lastTime).getTime()
+        : new Date(b.created_at).getTime()
+
+      if (timeA !== timeB) return timeB - timeA // Menurun: aktivitas chat terbaru selalu melompat ke paling atas!
+      return String(b.id || '').localeCompare(String(a.id || ''))
+    })
+  }, [reports, ticketMeta, searchQuery, filterType])
+
+  // Auto-select tiket pertama (paling atas / terbaru) saat daftar tersedia jika belum ada tiket aktif atau parameter 'true'
+  useEffect(() => {
+    if ((!selectedTicketId || selectedTicketId === 'true') && filteredReports.length > 0) {
+      setSelectedTicketId(filteredReports[0].nomor_tiket || filteredReports[0].id)
     }
-    if (filterType === 'sudah_respon') {
-      return !meta?.isWaitingAdmin && (meta?.messageCount || 0) > 0
-    }
-    return true
-  })
+  }, [filteredReports, selectedTicketId])
 
   // Tiket yang sedang dibuka
   const currentReport = reports.find(
@@ -1020,22 +1080,33 @@ export default function FloatingAdminChat() {
                 </div>
 
                 <div className="flex items-center justify-between gap-1 text-[11px]">
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
                     {[
                       { key: 'semua', label: 'Semua' },
-                      { key: 'belum_dibalas', label: 'Perlu Balasan' },
-                      { key: 'sudah_respon', label: 'Direspons' },
+                      { key: 'belum_dibaca', label: 'Belum Dibaca' },
                     ].map((tab) => (
                       <button
                         key={tab.key}
+                        type="button"
                         onClick={() => setFilterType(tab.key as any)}
-                        className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition cursor-pointer ${
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition cursor-pointer flex items-center gap-1.5 ${
                           filterType === tab.key
                             ? 'bg-[#c00015] text-white shadow-2xs'
                             : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
                         }`}
                       >
-                        {tab.label}
+                        <span>{tab.label}</span>
+                        {tab.key === 'belum_dibaca' && unreadTotal > 0 && (
+                          <span
+                            className={`px-1.5 py-0.2 rounded-full text-[9px] font-extrabold ${
+                              filterType === 'belum_dibaca'
+                                ? 'bg-white text-[#c00015]'
+                                : 'bg-[#c00015] text-white'
+                            }`}
+                          >
+                            {unreadTotal}
+                          </span>
+                        )}
                       </button>
                     ))}
                   </div>
@@ -1085,7 +1156,7 @@ export default function FloatingAdminChat() {
                           const targetKey = rep.nomor_tiket || rep.id
                           setSelectedTicketId(targetKey)
                           setMobilePane('chat')
-                          const now = Date.now() + 86400000
+                          const now = Date.now()
                           try {
                             const times: Record<string, number> = JSON.parse(
                               localStorage.getItem('halo_jurnal_read_ticket_times') || '{}'
@@ -1217,7 +1288,7 @@ export default function FloatingAdminChat() {
                         </p>
                       </div>
                     ) : (
-                      messages.map((msg) => {
+                      messages.map((msg, msgIdx) => {
                         const isSystemGreeting =
                           msg.isSystem || String(msg.id || '').startsWith('sys-')
 
@@ -1228,7 +1299,7 @@ export default function FloatingAdminChat() {
 
                         if (isSystemGreeting) {
                           return (
-                            <div key={msg.id} className="flex flex-col items-center my-2">
+                            <div key={msg.id || `sys-admin-${msg.created_at || 'time'}-${msgIdx}`} className="flex flex-col items-center my-2">
                               <div className="bg-amber-50/90 border border-amber-200/90 rounded-xl px-4 py-2.5 max-w-[92%] sm:max-w-[85%] shadow-2xs">
                                 <div className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-900 mb-1">
                                   <span>🛡️ Pesan Pembuka Otomatis Redaksi</span>
@@ -1257,7 +1328,7 @@ export default function FloatingAdminChat() {
 
                         return (
                           <div
-                            key={msg.id}
+                            key={msg.id || `admin-chat-${msg.created_at || 'time'}-${msgIdx}`}
                             className={`flex flex-col ${isAdmin ? 'items-end' : 'items-start'}`}
                           >
                             {!isAdmin && (

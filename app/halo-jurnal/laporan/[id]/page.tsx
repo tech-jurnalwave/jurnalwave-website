@@ -321,8 +321,13 @@ export default function HaloJurnalLaporanDetailPage() {
       finalMessages = [initialSystemMessage, ...finalMessages]
     }
 
-    // Urutkan pesan berdasarkan kronologi waktu
-    finalMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    // Urutkan pesan berdasarkan kronologi waktu dengan tie-breaker deterministik
+    finalMessages.sort((a, b) => {
+      const tA = new Date(a.created_at).getTime()
+      const tB = new Date(b.created_at).getTime()
+      if (tA !== tB) return tA - tB
+      return String(a.id || '').localeCompare(String(b.id || ''))
+    })
 
     if (typeof window !== 'undefined' && finalMessages.length > 0) {
       try {
@@ -364,7 +369,7 @@ export default function HaloJurnalLaporanDetailPage() {
           (m, idx) =>
             m.id === finalMessages[idx]?.id &&
             m.message === finalMessages[idx]?.message &&
-            m.created_at === finalMessages[idx]?.created_at
+            m.file_url === finalMessages[idx]?.file_url
         )
       ) {
         return prev
@@ -373,7 +378,7 @@ export default function HaloJurnalLaporanDetailPage() {
     })
   }
 
-  // Polling chat otomatis setiap 1.5 detik dan realtime sinkronisasi BroadcastChannel
+  // Polling chat otomatis dan sinkronisasi real-time BroadcastChannel
   useEffect(() => {
     fetchChatMessages()
 
@@ -389,13 +394,24 @@ export default function HaloJurnalLaporanDetailPage() {
 
     const interval = setInterval(() => {
       fetchChatMessages()
-    }, 1500)
+    }, 2500)
 
-    window.addEventListener('storage', fetchChatMessages)
+    const handleStorageChange = (e: StorageEvent) => {
+      const ticketNum = report?.nomor_tiket || report?.ticket_number || report?.ticketNumber || id
+      if (
+        !e.key ||
+        e.key === `halo_jurnal_chat_${ticketNum}` ||
+        e.key === `halo_jurnal_chat_${id}`
+      ) {
+        fetchChatMessages()
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
     window.addEventListener('focus', fetchChatMessages)
     return () => {
       clearInterval(interval)
-      window.removeEventListener('storage', fetchChatMessages)
+      window.removeEventListener('storage', handleStorageChange)
       window.removeEventListener('focus', fetchChatMessages)
       if (broadcastChannel) {
         try {
@@ -1283,7 +1299,7 @@ export default function HaloJurnalLaporanDetailPage() {
                 {/* Message Thread (HANYA DITAMPILKAN JIKA PEMILIK LAPORAN ATAU ADMIN) */}
                 <div ref={chatContainerRef} onScroll={handleChatScroll} className="space-y-4 max-h-[380px] overflow-y-auto pr-1 mb-4 overscroll-contain [scrollbar-width:thin]">
                   {messages.length > 0 ? (
-                    messages.map((msg) => {
+                    messages.map((msg, msgIndex) => {
                       const isRedaksi =
                         msg.role === 'admin' ||
                         msg.role === 'redaksi' ||
@@ -1316,7 +1332,7 @@ export default function HaloJurnalLaporanDetailPage() {
 
                       return (
                         <div
-                          key={msg.id}
+                          key={msg.id || `chat-warga-${msg.created_at || 'time'}-${msgIndex}`}
                           className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
                         >
                           {/* Message Header Sender (Hanya tampil untuk pesan dari Redaksi / Pelapor lain, teks 'Anda' dihilangkan) */}

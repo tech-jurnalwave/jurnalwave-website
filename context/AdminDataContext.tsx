@@ -241,30 +241,26 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       }
     })
 
-    // Sinkronisasi percakapan chat dari DB untuk menghitung unread badge
-    try {
-      const chatRes = await fetch('/api/chat?all=true', { cache: 'no-store' })
-      if (chatRes.ok) {
-        const chatJson = await chatRes.json()
-        if (chatJson.success && Array.isArray(chatJson.data) && typeof window !== 'undefined') {
-          const chatsByTicket: Record<string, any[]> = {}
-          chatJson.data.forEach((m: any) => {
-            const key = m.ticketNumber
-            if (key) {
-              if (!chatsByTicket[key]) chatsByTicket[key] = []
-              chatsByTicket[key].push(m)
-            }
-          })
-          Object.entries(chatsByTicket).forEach(([ticket, list]) => {
-            try {
-              localStorage.setItem(`halo_jurnal_chat_${ticket}`, JSON.stringify(list))
-            } catch {}
-          })
-        }
+    setReports((prev) => {
+      if (
+        prev.length === finalReports.length &&
+        prev.every((r, idx) => {
+          const n = finalReports[idx]
+          return (
+            r &&
+            n &&
+            r.id === n.id &&
+            r.status === n.status &&
+            (r as any).acc_status === (n as any).acc_status &&
+            r.is_public === n.is_public &&
+            r.dukungan_count === n.dukungan_count
+          )
+        })
+      ) {
+        return prev
       }
-    } catch {}
-
-    setReports(finalReports)
+      return finalReports
+    })
     setCachedAdminReports(finalReports)
     syncCounts(finalReports, articlesRef.current)
     setIsLoadingReports(false)
@@ -277,7 +273,15 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       if (res.ok) {
         const json = await res.json()
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          setArticles(json.data)
+          setArticles((prev) => {
+            if (
+              prev.length === json.data.length &&
+              prev.every((a, idx) => a.id === json.data[idx]?.id && a.title === json.data[idx]?.title)
+            ) {
+              return prev
+            }
+            return json.data
+          })
           setCachedAdminArticles(json.data)
           setIsLoadingArticles(false)
           syncCounts(reportsRef.current, json.data)
@@ -313,14 +317,16 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
   // 7. Initial Fetch & Auto-Sync dengan Portal Warga
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const handleSync = () => {
-        refreshReports()
+      const handleSync = (e: StorageEvent) => {
+        if (!e.key || e.key === 'halo_jurnal_user_reports' || e.key === 'halo_jurnal_status_overrides') {
+          refreshReports()
+        }
       }
       window.addEventListener('storage', handleSync)
-      window.addEventListener('reports-updated', handleSync)
+      window.addEventListener('reports-updated', () => refreshReports())
       return () => {
         window.removeEventListener('storage', handleSync)
-        window.removeEventListener('reports-updated', handleSync)
+        window.removeEventListener('reports-updated', () => refreshReports())
       }
     }
   }, [refreshReports])
@@ -328,12 +334,17 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     refreshAll()
 
-    const handleStorage = () => {
+    const handleStorage = (e: any) => {
+      if (!e?.key || e.key.startsWith('halo_jurnal_') || e.key.startsWith('jurnal_wave_')) {
+        syncCounts(reportsRef.current, articlesRef.current)
+      }
+    }
+    const handleFocus = () => {
       syncCounts(reportsRef.current, articlesRef.current)
     }
 
     window.addEventListener('storage', handleStorage)
-    window.addEventListener('focus', handleStorage)
+    window.addEventListener('focus', handleFocus)
 
     // Polling latar belakang berkala tiap 15 detik hanya saat tab aktif
     const interval = setInterval(() => {
@@ -345,7 +356,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
     return () => {
       clearInterval(interval)
       window.removeEventListener('storage', handleStorage)
-      window.removeEventListener('focus', handleStorage)
+      window.removeEventListener('focus', handleFocus)
     }
   }, [refreshAll, refreshReports, syncCounts])
 
