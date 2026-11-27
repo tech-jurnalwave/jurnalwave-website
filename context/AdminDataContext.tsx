@@ -222,16 +222,23 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
         (r.nomor_tiket ? overrides[r.nomor_tiket] : null) ||
         (r.ticket_number ? overrides[r.ticket_number] : null) ||
         (r.ticketNumber ? overrides[r.ticketNumber] : null)
+      const isPub = saved?.is_public !== undefined ? Boolean(saved.is_public) : Boolean(r.is_public ?? r.isPublic)
+      const acc = saved?.acc_status || (r as any).acc_status || (isPub ? 'publik' : r.status === 'diterima' ? 'menunggu_acc' : 'privat')
       if (saved) {
         return {
           ...r,
           status: saved.status || r.status,
-          acc_status: saved.acc_status || (r as any).acc_status,
-          is_public: saved.is_public !== undefined ? saved.is_public : r.is_public,
-          isPublic: saved.is_public !== undefined ? saved.is_public : r.isPublic,
+          acc_status: acc,
+          is_public: isPub,
+          isPublic: isPub,
         }
       }
-      return r
+      return {
+        ...r,
+        acc_status: acc,
+        is_public: isPub,
+        isPublic: isPub,
+      }
     })
 
     // Sinkronisasi percakapan chat dari DB untuk menghitung unread badge

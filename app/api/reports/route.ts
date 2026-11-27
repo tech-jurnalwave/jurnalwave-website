@@ -57,8 +57,37 @@ function mapReportFromDb(item: any, supportCount = 0, chatCount = 0) {
     pelaporPhone: (item as any).pelaporPhone || '',
     email: (item as any).pelaporEmail || (item as any).citizenEmail || '',
     status: item.status || 'diterima',
-    is_public: Boolean(item.isPublic !== false),
-    isPublic: Boolean(item.isPublic !== false),
+    is_public: Boolean(item.isPublic),
+    isPublic: Boolean(item.isPublic),
+    acc_status: (() => {
+      if (item.isPublic === true) return 'publik'
+      const logs = item.statusLogs || []
+      let lastAccNote = ''
+      for (let i = logs.length - 1; i >= 0; i--) {
+        const n = (logs[i].note || '').toLowerCase()
+        if (
+          n.includes('privat') ||
+          n.includes('feed publik') ||
+          n.includes('ditayangkan') ||
+          n.includes('dikembalikan') ||
+          n.includes('antrean peninjauan') ||
+          n.includes('menunggu acc')
+        ) {
+          lastAccNote = n
+          break
+        }
+      }
+      if (lastAccNote.includes('dikembalikan') || lastAccNote.includes('antrean peninjauan')) {
+        return 'menunggu_acc'
+      }
+      if (lastAccNote.includes('privat')) {
+        return 'privat'
+      }
+      if (item.status === 'diproses' || item.status === 'selesai' || item.status === 'ditolak') {
+        return 'privat'
+      }
+      return 'menunggu_acc'
+    })(),
     dukungan_count: supportCount,
     komentar_count: 0,
     chat_messages: [{ count: chatCount }],
@@ -409,14 +438,38 @@ export async function PUT(request: NextRequest) {
     }
 
     const newStatus = body.status || existing.status
-    const note = body.catatan || body.note || `Status laporan diubah menjadi ${newStatus}`
+
+    const nextAccStatus = body.acc_status || body.accStatus
+    let isPublicVal = existing.isPublic
+    if (nextAccStatus === 'publik') {
+      isPublicVal = true
+    } else if (nextAccStatus === 'privat' || nextAccStatus === 'menunggu_acc') {
+      isPublicVal = false
+    } else if (body.is_public !== undefined) {
+      isPublicVal = Boolean(body.is_public)
+    } else if (body.isPublic !== undefined) {
+      isPublicVal = Boolean(body.isPublic)
+    }
+
+    let note = body.catatan || body.note
+    if (!note) {
+      if (nextAccStatus === 'publik' || isPublicVal === true) {
+        note = 'Laporan di-ACC dan ditayangkan ke Feed Publik oleh admin.'
+      } else if (nextAccStatus === 'privat') {
+        note = 'Laporan di-ACC sebagai aduan privat internal oleh admin.'
+      } else if (nextAccStatus === 'menunggu_acc') {
+        note = 'Laporan dikembalikan ke antrean peninjauan redaksi.'
+      } else {
+        note = `Status laporan diubah menjadi ${newStatus}`
+      }
+    }
 
     // Update status report dan tambahkan log riwayat
     const updated = await prisma.report.update({
       where: { id: existing.id },
       data: {
         status: newStatus,
-        isPublic: body.is_public !== undefined ? Boolean(body.is_public) : existing.isPublic,
+        isPublic: isPublicVal,
         statusLogs: {
           create: {
             status: newStatus,

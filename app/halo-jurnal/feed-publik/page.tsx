@@ -144,26 +144,35 @@ function FeedPublikContent() {
               (r.nomor_tiket ? overrides[r.nomor_tiket] : null) ||
               (r.ticket_number ? overrides[r.ticket_number] : null) ||
               (r.ticketNumber ? overrides[r.ticketNumber] : null)
+            const isPub = saved?.is_public !== undefined ? Boolean(saved.is_public) : Boolean(r.is_public ?? r.isPublic)
+            const acc = saved?.acc_status || (r as any).acc_status || (isPub ? 'publik' : r.status === 'diterima' ? 'menunggu_acc' : 'privat')
             if (saved) {
               return {
                 ...r,
                 status: saved.status || r.status,
-                is_public:
-                  saved.is_public !== undefined ? saved.is_public : r.is_public,
+                acc_status: acc,
+                is_public: isPub,
+                isPublic: isPub,
               }
             }
-            return r
+            return {
+              ...r,
+              acc_status: acc,
+              is_public: isPub,
+              isPublic: isPub,
+            }
           })
         } catch (e) {
           console.error('Error combining user reports in feed publik:', e)
         }
       }
 
-      // Hanya tampilkan laporan yang dibuka untuk publik dan sudah di-ACC admin (bukan menunggu_acc)
+      // Hanya tampilkan laporan yang dibuka untuk publik dan sudah di-ACC admin (bukan menunggu_acc atau privat)
       let filtered = baseReports.filter((r) => {
-        if (r.is_public === false || (r as any).isPublic === false) return false
-        if (r.acc_status === 'privat' || r.acc_status === 'menunggu_acc') return false
-        if (r.status === 'diterima' && r.acc_status !== 'publik') return false
+        const isPub = r.is_public === true || (r as any).isPublic === true
+        const acc = (r as any).acc_status
+        if (acc === 'privat' || acc === 'menunggu_acc') return false
+        if (!isPub) return false
         return true
       })
 
