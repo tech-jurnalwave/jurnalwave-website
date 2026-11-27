@@ -70,21 +70,22 @@ export default function AdminLaporanPage() {
         return override.is_public ? 'publik' : 'privat'
       }
 
+      // 2. Data resmi dari backend/API
       if ((r as any).acc_status) {
         return (r as any).acc_status
       }
 
-      // 2. Setiap laporan yang baru masuk dari warga (status masih 'diterima') WAJIB masuk antrean 'menunggu_acc'
+      // 3. Jika laporan diset publik -> 'publik'
+      if (r.is_public === true || (r as any).isPublic === true || (r as any).visibilitas === 'publik') {
+        return 'publik'
+      }
+
+      // 4. Setiap laporan yang baru masuk dari warga (status masih 'diterima' dan belum publik) -> 'menunggu_acc'
       if (r.status === 'diterima') {
         return 'menunggu_acc'
       }
 
-      // 3. Jika status laporan sudah diproses/selesai dan diatur publik -> 'publik'
-      if (r.is_public === true || (r as any).visibilitas === 'publik') {
-        return 'publik'
-      }
-
-      // Sisanya -> 'privat'
+      // 5. Sisanya (diproses / selesai tapi privat) -> 'privat'
       return 'privat'
     },
     [localOverrides]
@@ -145,6 +146,8 @@ export default function AdminLaporanPage() {
         body: JSON.stringify({
           id: report.id,
           ticketNumber: report.nomor_tiket,
+          acc_status: nextStatus,
+          accStatus: nextStatus,
           is_public: isPublic,
           isPublic: isPublic,
           catatan:

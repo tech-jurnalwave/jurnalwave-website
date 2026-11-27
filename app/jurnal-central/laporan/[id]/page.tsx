@@ -124,10 +124,10 @@ export default function AdminDetailLaporanPage() {
             initialAcc = savedOverride.is_public ? 'publik' : 'privat'
           } else if ((found as any).acc_status) {
             initialAcc = (found as any).acc_status
+          } else if (found.is_public === true || (found as any).isPublic === true || (found as any).visibilitas === 'publik') {
+            initialAcc = 'publik'
           } else if (found.status === 'diterima') {
             initialAcc = 'menunggu_acc'
-          } else if (found.is_public === true || (found as any).visibilitas === 'publik') {
-            initialAcc = 'publik'
           } else {
             initialAcc = 'privat'
           }
@@ -551,6 +551,8 @@ export default function AdminDetailLaporanPage() {
         body: JSON.stringify({
           id: report?.id,
           ticketNumber: report?.nomor_tiket,
+          acc_status: nextStatus,
+          accStatus: nextStatus,
           is_public: isPub,
           isPublic: isPub,
           catatan:

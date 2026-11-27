@@ -435,14 +435,15 @@ export default function HaloJurnalLaporanDetailPage() {
       try {
         const overrides = JSON.parse(localStorage.getItem('halo_jurnal_status_overrides') || '{}')
         const saved = overrides[found.id] || (found.nomor_tiket ? overrides[found.nomor_tiket] : null)
-        if (saved) {
-          found = {
-            ...found,
-            status: saved.status || found.status,
-            acc_status: saved.acc_status || found.acc_status,
-            is_public: saved.is_public !== undefined ? saved.is_public : found.is_public,
-            status_log: saved.status_log || found.status_log,
-          }
+        const isPub = saved?.is_public !== undefined ? Boolean(saved.is_public) : Boolean(found.is_public ?? found.isPublic)
+        const acc = saved?.acc_status || found.acc_status || (isPub ? 'publik' : found.status === 'diterima' ? 'menunggu_acc' : 'privat')
+        found = {
+          ...found,
+          status: saved?.status || found.status,
+          acc_status: acc,
+          is_public: isPub,
+          isPublic: isPub,
+          status_log: saved?.status_log || found.status_log,
         }
       } catch {}
     }
